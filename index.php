@@ -1,3 +1,58 @@
+<?php
+// Start session at the very beginning
+session_start();
+
+// Check if user is already logged in, redirect to appropriate dashboard
+if (isset($_SESSION['user_id']) && isset($_SESSION['role'])) {
+    $role = $_SESSION['role'];
+    if ($role == 'student') {
+        header("Location: student_dashboard.php");
+        exit();
+    } elseif ($role == 'teacher') {
+        header("Location: teacher_dashboard.php");
+        exit();
+    } elseif ($role == 'admin') {
+        header("Location: admin_dashboard.php");
+        exit();
+    }
+}
+
+// Check for remember-me cookie
+if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_COOKIE['remember_role'])) {
+    // Connect to database
+    $conn = new mysqli('localhost', 'root', '', 'result_management');
+    if (!$conn->connect_error) {
+        $username = $conn->real_escape_string($_COOKIE['remember_user']);
+        $role = $conn->real_escape_string($_COOKIE['remember_role']);
+        
+        $stmt = $conn->prepare("SELECT * FROM Users WHERE username=? AND role=?");
+        $stmt->bind_param("ss", $username, $role);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows > 0) {
+            $row = $result->fetch_assoc();
+            $_SESSION['user_id'] = $row['user_id'];
+            $_SESSION['username'] = $row['username'];
+            $_SESSION['role'] = $row['role'];
+            
+            // Redirect based on role
+            if ($role == 'student') {
+                header("Location: student_dashboard.php");
+                exit();
+            } elseif ($role == 'teacher') {
+                header("Location: teacher_dashboard.php");
+                exit();
+            } elseif ($role == 'admin') {
+                header("Location: admin_dashboard.php");
+                exit();
+            }
+        }
+        $stmt->close();
+        $conn->close();
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,7 +86,35 @@
             <p class="text-slate-500 font-light">Sign in to your account</p>
         </div>
 
-        <!-- Alert for demonstration purposes -->
+        <!-- Error Message Display -->
+        <?php if(isset($_SESSION['error'])): ?>
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
+            <div class="flex">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                <div class="ml-3">
+                    <p class="text-sm text-red-700">
+                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <?php elseif(isset($_SESSION['success'])): ?>
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
+            <div class="flex">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <div class="ml-3">
+                    <p class="text-sm text-green-700">
+                        <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <?php else: ?>
+        <!-- Welcome Message -->
         <div class="bg-blue-50 border-l-4 border-blue-900 p-4 mb-6 rounded">
             <div class="flex">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-900" viewBox="0 0 20 20" fill="currentColor">
@@ -44,6 +127,7 @@
                 </div>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Login Form -->
         <form action="php/login_process.php" method="POST" class="space-y-5">
@@ -113,8 +197,9 @@
 
         <!-- Footer -->
         <div class="mt-6 text-center text-sm text-slate-500">
-            <p>Need an account? <a href="#" class="font-medium text-blue-900 hover:text-blue-800 transition">Register here</a></p>
+            <p>Need an account? <a href="register.php" class="font-medium text-blue-900 hover:text-blue-800 transition">Register here</a></p>
         </div>
     </div>
 </body>
 </html>
+

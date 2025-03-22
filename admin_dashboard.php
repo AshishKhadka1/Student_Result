@@ -1,3 +1,40 @@
+<?php
+session_start();
+// Check if user is logged in and is an admin
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
+    header("Location: index.php");
+    exit();
+}
+
+// Database connection
+$conn = new mysqli('localhost', 'root', '', 'result_management');
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Get dashboard statistics
+$studentsQuery = "SELECT COUNT(*) as total FROM Users WHERE role = 'student'";
+$resultsQuery = "SELECT COUNT(*) as total FROM Results";
+
+$studentsResult = $conn->query($studentsQuery);
+$resultsResult = $conn->query($resultsQuery);
+
+$totalStudents = 0;
+$totalResults = 0;
+
+if ($studentsResult && $studentsResult->num_rows > 0) {
+    $totalStudents = $studentsResult->fetch_assoc()['total'];
+}
+
+if ($resultsResult && $resultsResult->num_rows > 0) {
+    $totalResults = $resultsResult->fetch_assoc()['total'];
+}
+
+// Get recent results
+$recentResultsQuery = "SELECT * FROM ResultUploads ORDER BY upload_date DESC LIMIT 3";
+$recentResults = $conn->query($recentResultsQuery);
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,22 +42,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
     <!-- Tailwind CSS CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 font-light">
-    <?php
-    session_start();
-    if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-        header("Location: login.html");
-        exit();
-    }
-    // Database connection
-    $conn = new mysqli('localhost', 'root', '', 'result_management');
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
-    ?>
-
     <div class="min-h-screen flex">
         <div class="w-64 bg-blue-900 text-white">
             <div class="p-6">
@@ -37,7 +61,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                         </svg>
-                        <a href="#" class="block">Dashboard</a>
+                        <a href="admin_dashboard.php" class="block">Dashboard</a>
                     </div>
                 </div>
                 <div class="px-6 py-3 hover:bg-blue-800 transition duration-200">
@@ -45,7 +69,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
-                        <a href="#" class="block">Results</a>
+                        <a href="results.php" class="block">Results</a>
                     </div>
                 </div>
                 <div class="px-6 py-3 hover:bg-blue-800 transition duration-200">
@@ -53,7 +77,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
-                        <a href="#" class="block">Students</a>
+                        <a href="students.php" class="block">Students</a>
                     </div>
                 </div>
                 <div class="px-6 py-3 hover:bg-blue-800 transition duration-200">
@@ -62,7 +86,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <a href="#" class="block">Settings</a>
+                        <a href="settings.php" class="block">Settings</a>
                     </div>
                 </div>
                 <div class="px-6 py-3 hover:bg-blue-800 transition duration-200">
@@ -70,7 +94,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                         </svg>
-                        <a href="logout.php" class="block">Logout</a>
+                        <a href="php/logout.php" class="block">Logout</a>
                     </div>
                 </div>
             </nav>
@@ -89,9 +113,9 @@
                         </button>
                         <div class="flex items-center space-x-2">
                             <div class="h-8 w-8 rounded-full bg-blue-700 flex items-center justify-center text-white">
-                                A
+                                <?php echo substr($_SESSION['username'] ?? 'A', 0, 1); ?>
                             </div>
-                            <span class="text-gray-700">Admin</span>
+                            <span class="text-gray-700"><?php echo $_SESSION['username'] ?? 'Admin'; ?></span>
                         </div>
                     </div>
                 </div>
@@ -101,11 +125,29 @@
             <main class="p-6">
                 <!-- Welcome Message -->
                 <div class="mb-8">
-                    <h1 class="text-2xl font-semibold text-gray-800 mb-2">Welcome, Admin</h1>
+                    <h1 class="text-2xl font-semibold text-gray-800 mb-2">Welcome, <?php echo $_SESSION['username'] ?? 'Admin'; ?></h1>
                     <p class="text-gray-600">Manage and upload student results from your dashboard</p>
                 </div>
 
                 <!-- Alert Component -->
+                <?php if (isset($_SESSION['message'])): ?>
+                <div class="bg-<?php echo $_SESSION['message_type'] ?? 'blue'; ?>-100 border-l-4 border-<?php echo $_SESSION['message_type'] ?? 'blue'; ?>-800 text-<?php echo $_SESSION['message_type'] ?? 'blue'; ?>-800 p-4 mb-6 rounded">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm"><?php echo $_SESSION['message']; ?></p>
+                        </div>
+                    </div>
+                </div>
+                <?php 
+                    unset($_SESSION['message']);
+                    unset($_SESSION['message_type']);
+                else: 
+                ?>
                 <div class="bg-blue-100 border-l-4 border-blue-800 text-blue-800 p-4 mb-6 rounded">
                     <div class="flex items-start">
                         <div class="flex-shrink-0">
@@ -118,6 +160,7 @@
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -130,7 +173,7 @@
                             </div>
                             <div>
                                 <p class="text-gray-500 text-sm">Total Students</p>
-                                <p class="text-2xl font-semibold text-gray-800">2,543</p>
+                                <p class="text-2xl font-semibold text-gray-800"><?php echo number_format($totalStudents); ?></p>
                             </div>
                         </div>
                     </div>
@@ -143,7 +186,7 @@
                             </div>
                             <div>
                                 <p class="text-gray-500 text-sm">Results Published</p>
-                                <p class="text-2xl font-semibold text-gray-800">157</p>
+                                <p class="text-2xl font-semibold text-gray-800"><?php echo number_format($totalResults); ?></p>
                             </div>
                         </div>
                     </div>
@@ -156,7 +199,7 @@
                             </div>
                             <div>
                                 <p class="text-gray-500 text-sm">Last Update</p>
-                                <p class="text-2xl font-semibold text-gray-800">Today</p>
+                                <p class="text-2xl font-semibold text-gray-800"><?php echo date('M d, Y'); ?></p>
                             </div>
                         </div>
                     </div>
@@ -220,81 +263,41 @@
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                </svg>
-                                                <span class="text-sm text-gray-900">Spring2023_Results.csv</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            March 20, 2023
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            234
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                Published
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <button class="text-blue-600 hover:text-blue-900 mr-3">View</button>
-                                            <button class="text-red-600 hover:text-red-900">Delete</button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                </svg>
-                                                <span class="text-sm text-gray-900">Winter2023_Finals.csv</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            February 15, 2023
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            189
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                Published
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <button class="text-blue-600 hover:text-blue-900 mr-3">View</button>
-                                            <button class="text-red-600 hover:text-red-900">Delete</button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                </svg>
-                                                <span class="text-sm text-gray-900">Fall2022_Midterms.csv</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            November 10, 2022
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            204
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                                Processing
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <button class="text-blue-600 hover:text-blue-900 mr-3">View</button>
-                                            <button class="text-red-600 hover:text-red-900">Delete</button>
-                                        </td>
-                                    </tr>
+                                    <?php if ($recentResults && $recentResults->num_rows > 0): ?>
+                                        <?php while ($row = $recentResults->fetch_assoc()): ?>
+                                            <tr>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
+                                                        <span class="text-sm text-gray-900"><?php echo htmlspecialchars($row['file_name']); ?></span>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <?php echo date('F d, Y', strtotime($row['upload_date'])); ?>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <?php echo number_format($row['student_count']); ?>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
+                                                        <?php echo htmlspecialchars($row['status']); ?>
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <a href="view_result.php?id=<?php echo $row['id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+                                                    <a href="php/delete_result.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900" onclick="return confirm('Are you sure you want to delete this result?')">Delete</a>
+                                                </td>
+                                            </tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" colspan="5">
+                                                No results found. Upload your first result file.
+                                            </td>
+                                        </tr>
+                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -305,3 +308,4 @@
     </div>
 </body>
 </html>
+
