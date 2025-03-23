@@ -184,7 +184,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['success'] = "Registration successful! You can now log in with your credentials.";
         }
         
-        header("Location: ../index.php");
+        header("Location: ../login.php");
         exit();
     } catch (Exception $e) {
         // Rollback transaction on error

@@ -2,20 +2,6 @@
 // Start session at the very beginning
 session_start();
 
-// Check if user is already logged in, redirect to appropriate dashboard
-if (isset($_SESSION['user_id']) && isset($_SESSION['role'])) {
-    $role = $_SESSION['role'];
-    if ($role == 'student') {
-        header("Location: student_dashboard.php");
-        exit();
-    } elseif ($role == 'teacher') {
-        header("Location: teacher_dashboard.php");
-        exit();
-    } elseif ($role == 'admin') {
-        header("Location: admin_dashboard.php");
-        exit();
-    }
-}
 
 // Get available classes for student registration
 $classes = [];
@@ -230,7 +216,7 @@ try {
 
         <!-- Footer -->
         <div class="mt-6 text-center text-sm text-slate-500">
-            <p>Already have an account? <a href="index.php" class="font-medium text-blue-900 hover:text-blue-800 transition">Sign in</a></p>
+            <p>Already have an account? <a href="login.php" class="font-medium text-blue-900 hover:text-blue-800 transition">Sign in</a></p>
         </div>
     </div>
 

@@ -10,7 +10,7 @@ session_start();
 $conn = new mysqli('localhost', 'root', '', 'result_management');
 if ($conn->connect_error) {
     $_SESSION['error'] = "Connection failed: " . $conn->connect_error;
-    header("Location: ../index.php");
+    header("Location: ../login.php");
     exit();
 }
 

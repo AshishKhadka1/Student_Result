@@ -2,20 +2,7 @@
 // Start session at the very beginning
 session_start();
 
-// Check if user is already logged in, redirect to appropriate dashboard
-if (isset($_SESSION['user_id']) && isset($_SESSION['role'])) {
-    $role = $_SESSION['role'];
-    if ($role == 'student') {
-        header("Location: student_dashboard.php");
-        exit();
-    } elseif ($role == 'teacher') {
-        header("Location: teacher_dashboard.php");
-        exit();
-    } elseif ($role == 'admin') {
-        header("Location: admin_dashboard.php");
-        exit();
-    }
-}
+
 
 // Check for remember-me cookie
 if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_COOKIE['remember_role'])) {

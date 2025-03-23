@@ -1,7 +1,7 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student') {
-    header("Location: index.php");
+    header("Location: login.php");
     exit();
 }
 $conn = new mysqli('localhost', 'root', '', 'result_management');
@@ -90,7 +90,7 @@ $average_gpa = $total_subjects > 0 ? round($average_gpa / $total_subjects, 2) : 
                         <span class="text-slate-300">Student ID: </span>
                         <span class="font-medium"><?php echo $student['student_id']; ?></span>
                     </div>
-                    <a href="/logout.php"
+                    <a href="logout.php"
                         class="flex items-center px-3 py-2 rounded-md text-sm font-medium bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
