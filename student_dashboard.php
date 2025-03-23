@@ -1,14 +1,13 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student') {
-    header("Location: login.html");
+    header("Location: index.php");
     exit();
 }
-// Database connection
 $conn = new mysqli('localhost', 'root', '', 'result_management');
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
-}
+} 
 // Fetch student details
 $user_id = $_SESSION['user_id'];
 $sql = "SELECT * FROM Students WHERE user_id='$user_id'";
@@ -37,6 +36,7 @@ $average_gpa = $total_subjects > 0 ? round($average_gpa / $total_subjects, 2) : 
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -48,37 +48,40 @@ $average_gpa = $total_subjects > 0 ? round($average_gpa / $total_subjects, 2) : 
             font-family: 'Inter', 'Segoe UI', sans-serif;
             font-weight: 300;
         }
-        
+
         .dashboard-card {
             box-shadow: 0 10px 25px rgba(0, 0, 40, 0.1);
         }
-        
+
         .result-table {
             border-collapse: separate;
             border-spacing: 0;
         }
-        
+
         .result-table th,
         .result-table td {
             border: 1px solid #e2e8f0;
         }
-        
+
         .result-table th {
             border-bottom: 2px solid #2d3748;
         }
-        
+
         .result-table tr:hover {
             background-color: #f8fafc;
         }
     </style>
 </head>
+
 <body class="bg-slate-100 min-h-screen">
     <nav class="bg-blue-900 text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                     <span class="font-semibold text-xl">Result Management System</span>
                 </div>
@@ -87,9 +90,12 @@ $average_gpa = $total_subjects > 0 ? round($average_gpa / $total_subjects, 2) : 
                         <span class="text-slate-300">Student ID: </span>
                         <span class="font-medium"><?php echo $student['student_id']; ?></span>
                     </div>
-                    <a href="logout.php" class="flex items-center px-3 py-2 rounded-md text-sm font-medium bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    <a href="/logout.php"
+                        class="flex items-center px-3 py-2 rounded-md text-sm font-medium bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                         </svg>
                         Logout
                     </a>
@@ -97,7 +103,7 @@ $average_gpa = $total_subjects > 0 ? round($average_gpa / $total_subjects, 2) : 
             </div>
         </div>
     </nav>
-    
+
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Student Header -->
         <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -119,35 +125,50 @@ $average_gpa = $total_subjects > 0 ? round($average_gpa / $total_subjects, 2) : 
                 </div>
             </div>
         </div>
-        
+
         <!-- Results Section -->
         <div class="bg-white rounded-lg shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
                 <h2 class="text-lg font-semibold text-blue-900">Your Results</h2>
-                <button onclick="window.print()" class="flex items-center text-sm text-blue-900 hover:text-blue-700 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                <button onclick="window.print()"
+                    class="flex items-center text-sm text-blue-900 hover:text-blue-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                     </svg>
                     Print Results
                 </button>
             </div>
-            
+
             <div class="p-6">
                 <div class="overflow-x-auto">
                     <table class="result-table w-full rounded-lg overflow-hidden">
                         <thead class="bg-slate-50">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">Subject</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">Theory Marks</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">Practical Marks</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">Grade</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">GPA</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
+                                    Subject</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
+                                    Theory Marks</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
+                                    Practical Marks</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
+                                    Grade</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
+                                    GPA</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-slate-200">
                             <?php while ($row = $results->fetch_assoc()) { ?>
                                 <tr>
-                                    <td class="px-4 py-3 whitespace-nowrap font-medium text-blue-900"><?php echo $row['subject_id']; ?></td>
+                                    <td class="px-4 py-3 whitespace-nowrap font-medium text-blue-900">
+                                        <?php echo $row['subject_id']; ?>
+                                    </td>
                                     <td class="px-4 py-3 whitespace-nowrap"><?php echo $row['theory_marks']; ?></td>
                                     <td class="px-4 py-3 whitespace-nowrap"><?php echo $row['practical_marks']; ?></td>
                                     <td class="px-4 py-3 whitespace-nowrap">
@@ -174,13 +195,14 @@ $average_gpa = $total_subjects > 0 ? round($average_gpa / $total_subjects, 2) : 
                                             <?php echo $row['grade']; ?>
                                         </span>
                                     </td>
-                                    <td class="px-4 py-3 whitespace-nowrap font-medium
+                                    <td
+                                        class="px-4 py-3 whitespace-nowrap font-medium
                                         <?php echo $row['gpa'] >= 3.5 ? 'text-green-600' : ($row['gpa'] >= 2.5 ? 'text-blue-600' : 'text-red-600'); ?>">
                                         <?php echo $row['gpa']; ?>
                                     </td>
                                 </tr>
                             <?php } ?>
-                            
+
                             <!-- Summary Row -->
                             <tr class="bg-slate-50 font-medium">
                                 <td class="px-4 py-3 whitespace-nowrap">Overall Summary</td>
@@ -192,7 +214,7 @@ $average_gpa = $total_subjects > 0 ? round($average_gpa / $total_subjects, 2) : 
                         </tbody>
                     </table>
                 </div>
-                
+
                 <!-- GPA Scale Reference -->
                 <div class="mt-6 bg-slate-50 rounded-lg p-4 text-xs text-slate-600">
                     <p class="font-medium mb-1">GPA Scale Reference:</p>
@@ -210,11 +232,12 @@ $average_gpa = $total_subjects > 0 ? round($average_gpa / $total_subjects, 2) : 
             </div>
         </div>
     </main>
-    
+
     <footer class="bg-white mt-12 border-t border-slate-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <p class="text-center text-sm text-slate-500">© 2025 Result Management System. All rights reserved.</p>
         </div>
     </footer>
 </body>
+
 </html>
