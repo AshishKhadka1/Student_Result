@@ -125,7 +125,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 // error_log("Password verification failed");
                 
                 $_SESSION['error'] = "Invalid password!";
-                header("Location: ../index.php");
+                header("Location: ../login.php");
                 exit();
             }
         } else {
@@ -133,20 +133,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // error_log("No user found with username: $username and role: $role");
             
             $_SESSION['error'] = "User not found!";
-            header("Location: ../index.php");
+            header("Location: ../login.php");
             exit();
         }
         
         $stmt->close();
     } else {
         $_SESSION['error'] = "Please fill all required fields";
-        header("Location: ../index.php");
+        header("Location: ../login.php");
         exit();
     }
 } else {
     // If direct access or not POST
     $_SESSION['error'] = "Invalid request method";
-    header("Location: ../index.php");
+    header("Location: ../login.php");
     exit();
 }
 
