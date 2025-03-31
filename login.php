@@ -2,8 +2,6 @@
 // Start session at the very beginning
 session_start();
 
-
-
 // Check for remember-me cookie
 if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_COOKIE['remember_role'])) {
     // Connect to database
@@ -25,13 +23,13 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_
             
             // Redirect based on role
             if ($role == 'student') {
-                header("Location: student_dashboard.php");
+                header("Location: Student\student_dashboard.php");
                 exit();
             } elseif ($role == 'teacher') {
-                header("Location: teacher_dashboard.php");
+                header("Location: Teacher\teacher_dashboard.php");
                 exit();
             } elseif ($role == 'admin') {
-                header("Location: admin_dashboard.php");
+                header("Location: Admin\admin_dashboard.php");
                 exit();
             }
         }
@@ -48,8 +46,8 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_
     <title>Login - Result Management System</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Heroicons CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.0.18/heroicons.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             background-color: #f0f4f8;
@@ -122,9 +120,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_
                 <label for="username" class="block text-sm font-medium text-slate-700 mb-1">Username</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+                        <i class="fas fa-user text-slate-400"></i>
                     </div>
                     <input type="text" id="username" name="username" required class="pl-10 w-full py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition">
                 </div>
@@ -134,9 +130,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_
                 <label for="password" class="block text-sm font-medium text-slate-700 mb-1">Password</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
+                        <i class="fas fa-lock text-slate-400"></i>
                     </div>
                     <input type="password" id="password" name="password" required class="pl-10 w-full py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition">
                 </div>
@@ -146,9 +140,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_
                 <label for="role" class="block text-sm font-medium text-slate-700 mb-1">Role</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
+                        <i class="fas fa-user-tag text-slate-400"></i>
                     </div>
                     <select id="role" name="role" required class="pl-10 w-full py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition appearance-none bg-none">
                         <option value="student">Student</option>
@@ -171,7 +163,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_
                     </label>
                 </div>
                 <div class="text-sm">
-                    <a href="#" class="font-medium text-blue-900 hover:text-blue-800 transition">
+                    <a href="forgot_password.php" class="font-medium text-blue-900 hover:text-blue-800 transition">
                         Forgot password?
                     </a>
                 </div>
@@ -189,4 +181,3 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_
     </div>
 </body>
 </html>
-

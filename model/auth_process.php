@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['username'] = $user['username'];
 
             // Redirect to admin dashboard
-            header("Location: admin_dashboard.php");
+            header("Location: Admin\admin_dashboard.php");
             exit();
         } else {
             $_SESSION['error'] = "Invalid credentials or you are not an admin.";
