@@ -163,6 +163,8 @@ $conn->close();
     <title>Class Toppers | Result Management System</title>
     <link href="https://cdn.tailwindcss.com" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
 </head>
 <body class="bg-gray-100">
     <div class="flex h-screen overflow-hidden">

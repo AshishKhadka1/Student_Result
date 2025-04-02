@@ -44,6 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = "Invalid email format";
     }
+    if (empty($role) || !in_array($role, ['student', 'teacher'])) {
+        $errors[] = "Please select a valid role";
+    }
     
     // Check if username already exists
     $stmt = $conn->prepare("SELECT user_id FROM users WHERE username = ?");

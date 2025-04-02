@@ -45,8 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             // Set remember-me cookie if checked
             if ($remember) {
-                setcookie('remember_user', $username, time() + (86400 * 30), "/"); // 30 days
-                setcookie('remember_role', $role, time() + (86400 * 30), "/"); // 30 days
+                setcookie('remember_user', $username, time() + (86400 * 30), "/");
+                setcookie('remember_role', $role, time() + (86400 * 30), "/");
             }
             
             // Update last login time
@@ -55,8 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $update_stmt->execute();
             $update_stmt->close();
             
-            // Redirect to dashboard
-            header("Location: ../{$role}_dashboard.php");
+            // Redirect to admin dashboard
+            header("Location: ../Admin/admin_dashboard.php");
             exit();
         }
         // Normal password verification
@@ -76,8 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             // Set remember-me cookie if checked
             if ($remember) {
-                setcookie('remember_user', $username, time() + (86400 * 30), "/"); // 30 days
-                setcookie('remember_role', $role, time() + (86400 * 30), "/"); // 30 days
+                setcookie('remember_user', $username, time() + (86400 * 30), "/");
+                setcookie('remember_role', $role, time() + (86400 * 30), "/");
             }
             
             // Update last login time
@@ -86,8 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $update_stmt->execute();
             $update_stmt->close();
             
-            // Redirect to dashboard
-            header("Location: ../{$role}_dashboard.php");
+            // Redirect based on role
+            $redirectPath = ($role === 'admin') ? "Admin/admin_dashboard.php" : "{$role}_dashboard.php";
+            header("Location: ../$redirectPath");
             exit();
         } else {
             $_SESSION['error'] = "Invalid username or password";

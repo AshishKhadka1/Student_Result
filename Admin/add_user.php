@@ -10,168 +10,97 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Get classes for dropdown
+// Get all classes for student assignment
 $classes = [];
-$result = $conn->query("SELECT class_id, class_name, section FROM classes ORDER BY class_name, section");
+$result = $conn->query("SELECT class_id, class_name, section, academic_year FROM classes ORDER BY academic_year DESC, class_name, section");
 while ($row = $result->fetch_assoc()) {
     $classes[] = $row;
 }
 
-// Process form submission
-$success_message = '';
-$error_message = '';
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_user'])) {
-    // Get form data
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
-    $confirm_password = $_POST['confirm_password'] ?? '';
-    $full_name = $_POST['full_name'] ?? '';
-    $email = $_POST['email'] ?? '';
-    $role = $_POST['role'] ?? '';
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+    $full_name = $_POST['full_name'];
+    $email = $_POST['email'];
+    $role = $_POST['role'];
     $status = $_POST['status'] ?? 'active';
     
-    // Additional fields based on role
-    $class_id = $_POST['class_id'] ?? null;
-    $roll_number = $_POST['roll_number'] ?? '';
-    $registration_number = $_POST['registration_number'] ?? '';
-    $teacher_id = $_POST['teacher_id'] ?? '';
-    $department = $_POST['department'] ?? '';
+    // Check if username or email already exists
+    $stmt = $conn->prepare("SELECT user_id FROM users WHERE username = ? OR email = ?");
+    $stmt->bind_param("ss", $username, $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
     
-    // Validate required fields
-    $errors = [];
-    
-    if (empty($username)) {
-        $errors[] = "Username is required.";
+    if ($result->num_rows > 0) {
+        $_SESSION['error'] = "Username or email already exists!";
     } else {
-        // Check if username already exists
-        $stmt = $conn->prepare("SELECT user_id FROM users WHERE username = ?");
-        $stmt->bind_param("s", $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result->num_rows > 0) {
-            $errors[] = "Username already exists.";
-        }
-        $stmt->close();
-    }
-    
-    if (empty($password)) {
-        $errors[] = "Password is required.";
-    } elseif (strlen($password) < 6) {
-        $errors[] = "Password must be at least 6 characters.";
-    } elseif ($password !== $confirm_password) {
-        $errors[] = "Passwords do not match.";
-    }
-    
-    if (empty($full_name)) {
-        $errors[] = "Full name is required.";
-    }
-    
-    if (empty($email)) {
-        $errors[] = "Email is required.";
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = "Invalid email format.";
-    } else {
-        // Check if email already exists
-        $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result->num_rows > 0) {
-            $errors[] = "Email already exists.";
-        }
-        $stmt->close();
-    }
-    
-    if (empty($role)) {
-        $errors[] = "Role is required.";
-    }
-    
-    // Role-specific validations
-    if ($role == 'student') {
-        if (empty($class_id)) {
-            $errors[] = "Class is required for students.";
-        }
+        // Hash password
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         
-        if (empty($roll_number)) {
-            $errors[] = "Roll number is required for students.";
-        } else {
-            // Check if roll number already exists in the same class
-            $stmt = $conn->prepare("SELECT s.student_id FROM students s WHERE s.roll_number = ? AND s.class_id = ?");
-            $stmt->bind_param("si", $roll_number, $class_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            if ($result->num_rows > 0) {
-                $errors[] = "Roll number already exists in this class.";
-            }
-            $stmt->close();
-        }
-    } elseif ($role == 'teacher') {
-        if (empty($teacher_id)) {
-            $errors[] = "Teacher ID is required for teachers.";
-        } else {
-            // Check if teacher ID already exists
-            $stmt = $conn->prepare("SELECT t.teacher_id FROM teachers t WHERE t.teacher_id = ?");
-            $stmt->bind_param("s", $teacher_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            if ($result->num_rows > 0) {
-                $errors[] = "Teacher ID already exists.";
-            }
-            $stmt->close();
-        }
-    }
-    
-    if (empty($errors)) {
-        // Start transaction
+        // Begin transaction
         $conn->begin_transaction();
         
         try {
-            // Hash password
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            
             // Insert user
-            $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, email, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())");
+            $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, email, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
             $stmt->bind_param("ssssss", $username, $hashed_password, $full_name, $email, $role, $status);
             $stmt->execute();
             $user_id = $conn->insert_id;
-            $stmt->close();
             
-            // Insert role-specific data
+            // If role is student, add to students table
             if ($role == 'student') {
-                // Generate student ID if not provided
-                $student_id = 'S' . str_pad($user_id, 3, '0', STR_PAD_LEFT);
+                $roll_number = $_POST['roll_number'];
+                $registration_number = $_POST['registration_number'];
+                $class_id = $_POST['class_id'] ?? null;
+                $batch_year = $_POST['batch_year'];
                 
-                $stmt = $conn->prepare("INSERT INTO students (student_id, user_id, class_id, roll_number, registration_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
-                $stmt->bind_param("siiss", $student_id, $user_id, $class_id, $roll_number, $registration_number);
+                // Generate student ID (e.g., S001, S002, etc.)
+                $result = $conn->query("SELECT MAX(CAST(SUBSTRING(student_id, 2) AS UNSIGNED)) as max_id FROM students");
+                $max_id = $result->fetch_assoc()['max_id'] ?? 0;
+                $student_id = 'S' . str_pad($max_id + 1, 3, '0', STR_PAD_LEFT);
+                
+                $stmt = $conn->prepare("INSERT INTO students (student_id, user_id, roll_number, registration_number, class_id, batch_year) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("sisssi", $student_id, $user_id, $roll_number, $registration_number, $class_id, $batch_year);
                 $stmt->execute();
-                $stmt->close();
-            } elseif ($role == 'teacher') {
-                $stmt = $conn->prepare("INSERT INTO teachers (teacher_id, user_id, department, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())");
-                $stmt->bind_param("sis", $teacher_id, $user_id, $department);
+            }
+            
+            // If role is teacher, add to teachers table
+            elseif ($role == 'teacher') {
+                $employee_id = $_POST['employee_id'];
+                $qualification = $_POST['qualification'] ?? null;
+                $department = $_POST['department'] ?? null;
+                
+                $stmt = $conn->prepare("INSERT INTO teachers (user_id, employee_id, qualification, department) VALUES (?, ?, ?, ?)");
+                $stmt->bind_param("isss", $user_id, $employee_id, $qualification, $department);
                 $stmt->execute();
-                $stmt->close();
             }
             
             // Commit transaction
             $conn->commit();
             
-            $success_message = "User added successfully!";
+            // Add welcome notification
+            $title = "Welcome to Result Management System";
+            $message = "Thank you for registering. Your account has been created successfully.";
+            $notification_type = "system";
             
-            // Clear form data
-            $username = $full_name = $email = $roll_number = $registration_number = $teacher_id = $department = '';
-            $role = $status = 'active';
-            $class_id = null;
+            $stmt = $conn->prepare("INSERT INTO notifications (user_id, title, message, notification_type, created_at) VALUES (?, ?, ?, ?, NOW())");
+            $stmt->bind_param("isss", $user_id, $title, $message, $notification_type);
+            $stmt->execute();
             
+            $_SESSION['success'] = "User added successfully!";
+            header("Location: users.php");
+            exit();
         } catch (Exception $e) {
-            // Rollback on error
+            // Rollback transaction on error
             $conn->rollback();
-            $error_message = "Error adding user: " . $e->getMessage();
+            $_SESSION['error'] = "Error adding user: " . $e->getMessage();
         }
-    } else {
-        $error_message = implode("<br>", $errors);
     }
 }
+
+// Get current year for batch year dropdown
+$current_year = date('Y');
 
 $conn->close();
 ?>
@@ -184,62 +113,119 @@ $conn->close();
     <title>Add User | Result Management System</title>
     <link href="https://cdn.tailwindcss.com" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
 </head>
 <body class="bg-gray-100">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
-                <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
-                <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
-                    <div class="absolute top-0 right-0 -mr-12 pt-2">
-                        <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
-                            <span class="sr-only">Close sidebar</span>
-                            <i class="fas fa-times text-white"></i>
-                        </button>
-                    </div>
-                    <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                        <div class="flex-shrink-0 flex items-center px-4">
-                            <span class="text-white text-lg font-semibold">Result Management</span>
-                        </div>
-                        <nav class="mt-5 px-2 space-y-1">
-                            <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-white bg-gray-700 rounded-md">
-                                <i class="fas fa-tachometer-alt mr-3"></i>
-                                Dashboard
-                            </a>
-                            <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-clipboard-list mr-3"></i>
-                                Results
-                            </a>
-                            <a href="bulk_upload.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-upload mr-3"></i>
-                                Bulk Upload
-                            </a>
-                            <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-users mr-3"></i>
-                                Users
-                            </a>
-                            <a href="students.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-user-graduate mr-3"></i>
-                                Students
-                            </a>
-                            <a href="teachers.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-chalkboard-teacher mr-3"></i>
-                                Teachers
-                            </a>
-                            <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-cog mr-3"></i>
-                                Settings
-                            </a>
-                            <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-sign-out-alt mr-3"></i>
-                                Logout
-                            </a>
-                        </nav>
+        <div class="hidden md:flex md:flex-shrink-0">
+            <div class="flex flex-col w-64 bg-gray-800">
+                <div class="flex items-center justify-center h-16 bg-gray-900">
+                    <span class="text-white text-lg font-semibold">Result Management</span>
+                </div>
+                <div class="flex flex-col flex-grow px-4 mt-5">
+                    <nav class="flex-1 space-y-1">
+                        <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-tachometer-alt mr-3"></i>
+                            Dashboard
+                        </a>
+                        <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-clipboard-list mr-3"></i>
+                            Results
+                        </a>
+                        <a href="bulk_upload.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-upload mr-3"></i>
+                            Bulk Upload
+                        </a>
+                        <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-white bg-gray-700 rounded-md">
+                            <i class="fas fa-users mr-3"></i>
+                            Users
+                        </a>
+                        <a href="classes.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-chalkboard mr-3"></i>
+                            Classes
+                        </a>
+                        <a href="subject.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-book mr-3"></i>
+                            Subjects
+                        </a>
+                        <a href="teachers.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-chalkboard-teacher mr-3"></i>
+                            Teachers
+                        </a>
+                        <a href="exams.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-calendar-alt mr-3"></i>
+                            Exams
+                        </a>
+                        <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-cog mr-3"></i>
+                            Settings
+                        </a>
+                    </nav>
+                    <div class="flex-shrink-0 block w-full">
+                        <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-sign-out-alt mr-3"></i>
+                            Logout
+                        </a>
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Mobile sidebar -->
+        <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
+            <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
+            <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
+                <div class="absolute top-0 right-0 -mr-12 pt-2">
+                    <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
+                        <span class="sr-only">Close sidebar</span>
+                        <i class="fas fa-times text-white"></i>
+                    </button>
+                </div>
+                <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
+                    <div class="flex-shrink-0 flex items-center px-4">
+                        <span class="text-white text-lg font-semibold">Result Management</span>
+                    </div>
+                    <nav class="mt-5 px-2 space-y-1">
+                        <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-tachometer-alt mr-3"></i>
+                            Dashboard
+                        </a>
+                        <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-clipboard-list mr-3"></i>
+                            Results
+                        </a>
+                        <a href="bulk_upload.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-upload mr-3"></i>
+                            Bulk Upload
+                        </a>
+                        <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-white bg-gray-700 rounded-md">
+                            <i class="fas fa-users mr-3"></i>
+                            Users
+                        </a>
+                        <a href="classes.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-chalkboard mr-3"></i>
+                            Classes
+                        </a>
+                        <a href="subject.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-book mr-3"></i>
+                            Subjects
+                        </a>
+                        <a href="teachers.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-chalkboard-teacher mr-3"></i>
+                            Teachers
+                        </a>
+                        <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-cog mr-3"></i>
+                            Settings
+                        </a>
+                        <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-sign-out-alt mr-3"></i>
+                            Logout
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </div>
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
@@ -255,6 +241,11 @@ $conn->close();
                         </div>
                     </div>
                     <div class="ml-4 flex items-center md:ml-6">
+                        <button class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <span class="sr-only">View notifications</span>
+                            <i class="fas fa-bell"></i>
+                        </button>
+
                         <!-- Profile dropdown -->
                         <div class="ml-3 relative">
                             <div>
@@ -265,6 +256,13 @@ $conn->close();
                                     </span>
                                 </button>
                             </div>
+
+                            <!-- Profile dropdown menu -->
+                            <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none" id="user-menu" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" tabindex="-1">
+                                <a href="profile.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Your Profile</a>
+                                <a href="settings.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Settings</a>
+                                <a href="logout.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Sign out</a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -274,168 +272,139 @@ $conn->close();
             <main class="flex-1 relative overflow-y-auto focus:outline-none">
                 <div class="py-6">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-                        <!-- Success/Error Messages -->
-                        <?php if (!empty($success_message)): ?>
-                            <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
-                                <div class="flex">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-check-circle text-green-400"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <p class="text-sm text-green-700"><?php echo $success_message; ?></p>
-                                    </div>
+                        <!-- Notification Messages -->
+                        <?php if(isset($_SESSION['error'])): ?>
+                        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-exclamation-circle text-red-500"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-red-700">
+                                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
+                                    </p>
                                 </div>
                             </div>
+                        </div>
                         <?php endif; ?>
 
-                        <?php if (!empty($error_message)): ?>
-                            <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
-                                <div class="flex">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-exclamation-circle text-red-400"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <p class="text-sm text-red-700"><?php echo $error_message; ?></p>
+                        <!-- Add User Form -->
+                        <div class="bg-white shadow rounded-lg p-6">
+                            <form action="add_user.php" method="POST" class="space-y-6">
+                                <!-- Basic Information -->
+                                <div>
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="full_name" class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                            <input type="text" id="full_name" name="full_name" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                            <input type="email" id="email" name="email" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                                            <input type="text" id="username" name="username" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                            <input type="password" id="password" name="password" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                                            <select id="role" name="role" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" onchange="toggleRoleFields()">
+                                                <option value="">Select Role</option>
+                                                <option value="admin">Admin</option>
+                                                <option value="teacher">Teacher</option>
+                                                <option value="student">Student</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                            <select id="status" name="status" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                                <option value="active">Active</option>
+                                                <option value="inactive">Inactive</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        <?php endif; ?>
-
-                        <!-- User Form -->
-                        <div class="bg-white shadow rounded-lg overflow-hidden">
-                            <div class="px-4 py-5 sm:px-6 bg-gray-50 border-b border-gray-200">
-                                <h3 class="text-lg font-medium text-gray-900">Add New User</h3>
-                                <p class="mt-1 text-sm text-gray-500">Fill in the details to create a new user account.</p>
-                            </div>
-                            <div class="px-4 py-5 sm:p-6">
-                                <form action="add_user.php" method="POST">
-                                    <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                                        <!-- Basic Information -->
-                                        <div class="sm:col-span-3">
-                                            <label for="username" class="block text-sm font-medium text-gray-700">Username *</label>
-                                            <div class="mt-1">
-                                                <input type="text" name="username" id="username" value="<?php echo isset($username) ? htmlspecialchars($username) : ''; ?>" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                            </div>
+                                
+                                <!-- Teacher Specific Fields -->
+                                <div id="teacher_fields" class="hidden">
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Teacher Information</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="employee_id" class="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                                            <input type="text" id="employee_id" name="employee_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                                         </div>
-
-                                        <div class="sm:col-span-3">
-                                            <label for="full_name" class="block text-sm font-medium text-gray-700">Full Name *</label>
-                                            <div class="mt-1">
-                                                <input type="text" name="full_name" id="full_name" value="<?php echo isset($full_name) ? htmlspecialchars($full_name) : ''; ?>" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                            </div>
+                                        
+                                        <div>
+                                            <label for="department" class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                                            <input type="text" id="department" name="department" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                                         </div>
-
-                                        <div class="sm:col-span-3">
-                                            <label for="email" class="block text-sm font-medium text-gray-700">Email *</label>
-                                            <div class="mt-1">
-                                                <input type="email" name="email" id="email" value="<?php echo isset($email) ? htmlspecialchars($email) : ''; ?>" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                            </div>
-                                        </div>
-
-                                        <div class="sm:col-span-3">
-                                            <label for="role" class="block text-sm font-medium text-gray-700">Role *</label>
-                                            <div class="mt-1">
-                                                <select id="role" name="role" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                                    <option value="">-- Select Role --</option>
-                                                    <option value="admin" <?php echo isset($role) && $role == 'admin' ? 'selected' : ''; ?>>Admin</option>
-                                                    <option value="teacher" <?php echo isset($role) && $role == 'teacher' ? 'selected' : ''; ?>>Teacher</option>
-                                                    <option value="student" <?php echo isset($role) && $role == 'student' ? 'selected' : ''; ?>>Student</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div class="sm:col-span-3">
-                                            <label for="password" class="block text-sm font-medium text-gray-700">Password *</label>
-                                            <div class="mt-1">
-                                                <input type="password" name="password" id="password" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                            </div>
-                                            <p class="mt-1 text-xs text-gray-500">Minimum 6 characters</p>
-                                        </div>
-
-                                        <div class="sm:col-span-3">
-                                            <label for="confirm_password" class="block text-sm font-medium text-gray-700">Confirm Password *</label>
-                                            <div class="mt-1">
-                                                <input type="password" name="confirm_password" id="confirm_password" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                            </div>
-                                        </div>
-
-                                        <div class="sm:col-span-3">
-                                            <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                                            <div class="mt-1">
-                                                <select id="status" name="status" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                                    <option value="active" <?php echo isset($status) && $status == 'active' ? 'selected' : ''; ?>>Active</option>
-                                                    <option value="inactive" <?php echo isset($status) && $status == 'inactive' ? 'selected' : ''; ?>>Inactive</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <!-- Student-specific fields -->
-                                        <div id="student-fields" class="sm:col-span-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6 hidden">
-                                            <div class="sm:col-span-6">
-                                                <h3 class="text-lg font-medium text-gray-900 mb-3">Student Information</h3>
-                                            </div>
-                                            
-                                            <div class="sm:col-span-3">
-                                                <label for="class_id" class="block text-sm font-medium text-gray-700">Class *</label>
-                                                <div class="mt-1">
-                                                    <select id="class_id" name="class_id" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                                        <option value="">-- Select Class --</option>
-                                                        <?php foreach ($classes as $class): ?>
-                                                            <option value="<?php echo $class['class_id']; ?>" <?php echo isset($class_id) && $class_id == $class['class_id'] ? 'selected' : ''; ?>>
-                                                                <?php echo $class['class_name'] . ' ' . $class['section']; ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="sm:col-span-3">
-                                                <label for="roll_number" class="block text-sm font-medium text-gray-700">Roll Number *</label>
-                                                <div class="mt-1">
-                                                    <input type="text" name="roll_number" id="roll_number" value="<?php echo isset($roll_number) ? htmlspecialchars($roll_number) : ''; ?>" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="sm:col-span-3">
-                                                <label for="registration_number" class="block text-sm font-medium text-gray-700">Registration Number</label>
-                                                <div class="mt-1">
-                                                    <input type="text" name="registration_number" id="registration_number" value="<?php echo isset($registration_number) ? htmlspecialchars($registration_number) : ''; ?>" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Teacher-specific fields -->
-                                        <div id="teacher-fields" class="sm:col-span-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6 hidden">
-                                            <div class="sm:col-span-6">
-                                                <h3 class="text-lg font-medium text-gray-900 mb-3">Teacher Information</h3>
-                                            </div>
-                                            
-                                            <div class="sm:col-span-3">
-                                                <label for="teacher_id" class="block text-sm font-medium text-gray-700">Teacher ID *</label>
-                                                <div class="mt-1">
-                                                    <input type="text" name="teacher_id" id="teacher_id" value="<?php echo isset($teacher_id) ? htmlspecialchars($teacher_id) : ''; ?>" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="sm:col-span-3">
-                                                <label for="department" class="block text-sm font-medium text-gray-700">Department</label>
-                                                <div class="mt-1">
-                                                    <input type="text" name="department" id="department" value="<?php echo isset($department) ? htmlspecialchars($department) : ''; ?>" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                                                </div>
-                                            </div>
+                                        
+                                        <div class="md:col-span-2">
+                                            <label for="qualification" class="block text-sm font-medium text-gray-700 mb-1">Qualification</label>
+                                            <input type="text" id="qualification" name="qualification" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                                         </div>
                                     </div>
-
-                                    <div class="mt-6 flex justify-end space-x-3">
-                                        <a href="users.php" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                            Cancel
-                                        </a>
-                                        <button type="submit" name="add_user" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                            Add User
-                                        </button>
+                                </div>
+                                
+                                <!-- Student Specific Fields -->
+                                <div id="student_fields" class="hidden">
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Student Information</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="roll_number" class="block text-sm font-medium text-gray-700 mb-1">Roll Number</label>
+                                            <input type="text" id="roll_number" name="roll_number" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="registration_number" class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label>
+                                            <input type="text" id="registration_number" name="registration_number" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="class_id" class="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                                            <select id="class_id" name="class_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                                <option value="">Select Class</option>
+                                                <?php foreach ($classes as $class): ?>
+                                                <option value="<?php echo $class['class_id']; ?>">
+                                                    <?php echo $class['class_name'] . ' ' . $class['section'] . ' (' . $class['academic_year'] . ')'; ?>
+                                                </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="batch_year" class="block text-sm font-medium text-gray-700 mb-1">Batch Year</label>
+                                            <select id="batch_year" name="batch_year" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                                <?php 
+                                                for ($i = 0; $i < 5; $i++) {
+                                                    $year = $current_year - $i;
+                                                    echo "<option value=\"$year\">$year</option>";
+                                                }
+                                                ?>
+                                            </select>
+                                        </div>
                                     </div>
-                                </form>
-                            </div>
+                                </div>
+                                
+                                <div class="flex justify-end space-x-3 pt-4">
+                                    <a href="users.php" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        Cancel
+                                    </a>
+                                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        Add User
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -444,51 +413,66 @@ $conn->close();
     </div>
 
     <script>
-        // Show/hide role-specific fields
-        document.getElementById('role').addEventListener('change', function() {
-            const role = this.value;
-            const studentFields = document.getElementById('student-fields');
-            const teacherFields = document.getElementById('teacher-fields');
+        // Toggle role-specific fields
+        function toggleRoleFields() {
+            const role = document.getElementById('role').value;
+            const teacherFields = document.getElementById('teacher_fields');
+            const studentFields = document.getElementById('student_fields');
             
-            // Hide all role-specific fields
-            studentFields.classList.add('hidden');
             teacherFields.classList.add('hidden');
+            studentFields.classList.add('hidden');
             
-            // Show fields based on selected role
-            if (role === 'student') {
-                studentFields.classList.remove('hidden');
-                
-                // Make student-specific fields required
-                document.getElementById('class_id').required = true;
-                document.getElementById('roll_number').required = true;
-                
-                // Make teacher-specific fields not required
-                document.getElementById('teacher_id').required = false;
-            } else if (role === 'teacher') {
+            if (role === 'teacher') {
                 teacherFields.classList.remove('hidden');
                 
-                // Make teacher-specific fields required
-                document.getElementById('teacher_id').required = true;
+                // Make teacher fields required
+                document.getElementById('employee_id').required = true;
                 
-                // Make student-specific fields not required
-                document.getElementById('class_id').required = false;
+                // Make student fields not required
                 document.getElementById('roll_number').required = false;
-            } else {
-                // Make all role-specific fields not required
-                document.getElementById('class_id').required = false;
-                document.getElementById('roll_number').required = false;
-                document.getElementById('teacher_id').required = false;
+                document.getElementById('registration_number').required = false;
+            } else if (role === 'student') {
+                studentFields.classList.remove('hidden');
+                
+                // Make student fields required
+                document.getElementById('roll_number').required = true;
+                document.getElementById('registration_number').required = true;
+                
+                // Make teacher fields not required
+                document.getElementById('employee_id').required = false;
             }
-        });
-        
-        // Trigger change event to initialize form based on selected role
-        document.getElementById('role').dispatchEvent(new Event('change'));
+        }
         
         // Mobile sidebar toggle
         document.getElementById('sidebar-toggle').addEventListener('click', function() {
-            const sidebar = document.querySelector('.md\\:flex-shrink-0');
-            sidebar.classList.toggle('hidden');
+            document.getElementById('mobile-sidebar').classList.remove('-translate-x-full');
+        });
+        
+        document.getElementById('close-sidebar').addEventListener('click', function() {
+            document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
+        });
+        
+        document.getElementById('sidebar-backdrop').addEventListener('click', function() {
+            document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
+        });
+        
+        // User menu toggle
+        document.getElementById('user-menu-button').addEventListener('click', function() {
+            document.getElementById('user-menu').classList.toggle('hidden');
+        });
+        
+        // Close user menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const userMenu = document.getElementById('user-menu');
+            const userMenuButton = document.getElementById('user-menu-button');
+            
+            if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
+                userMenu.classList.add('hidden');
+            }
         });
     </script>
+
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
 </body>
 </html>
