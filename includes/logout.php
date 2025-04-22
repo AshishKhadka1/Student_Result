@@ -23,6 +23,6 @@ if (isset($_COOKIE['remember_role'])) {
 session_destroy();
 
 // Redirect to login page
-header("Location: login.php");
+header("Location: ../login.php");
 exit();
 ?>

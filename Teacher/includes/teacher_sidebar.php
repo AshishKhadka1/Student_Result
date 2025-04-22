@@ -63,7 +63,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link text-white" href="logout.php">
+                <a class="nav-link text-white" href="../includes/logout.php">
                     <i class="bi bi-box-arrow-right me-2"></i>
                     Logout
                 </a>
@@ -71,4 +71,3 @@
         </ul>
     </div>
 </nav>
-

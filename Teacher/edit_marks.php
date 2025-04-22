@@ -1,79 +1,125 @@
 <?php
-session_start();
-require_once 'includes/config.php';
-require_once 'includes/functions.php';
-require_once 'includes/grade_calculator.php';
+// Start session if not already started
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Check if teacher is logged in
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
+
+// Include database connection and helper functions
+require_once 'includes/config.php';
+require_once 'includes/functions.php';
+require_once 'includes/db_functions.php';
 
 // Get teacher information
 $teacher_id = $_SESSION['user_id'];
-$teacher = getTeacherDetails($conn, $teacher_id);
+$error_message = null;
+$success_message = null;
+$teacher = null;
+$assigned_classes = [];
+$assigned_subjects = [];
+$selected_class_id = null;
+$selected_subject_id = null;
+$selected_exam_id = null;
+$exams = [];
+$students = [];
+$student_marks = [];
+$subject_details = null;
 
-// Get subject and class IDs from URL
-$subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
-$class_id = isset($_GET['class_id']) ? intval($_GET['class_id']) : 0;
-$exam_id = isset($_GET['exam_id']) ? intval($_GET['exam_id']) : 0;
-
-// Validate that teacher is assigned to this subject and class
-if (!isTeacherAssignedToSubject($conn, $teacher_id, $subject_id, $class_id)) {
-    $_SESSION['error'] = "You are not authorized to edit marks for this subject and class.";
-    header("Location: teacher_dashboard.php");
-    exit();
-}
-
-// Get subject details
-$subject = getSubjectDetails($conn, $subject_id);
-
-// Get class details
-$class = getClassDetails($conn, $class_id);
-
-// Get available exams for this class
-$exams = getExamsForClass($conn, $class_id);
-
-// Get students in this class
-$students = getStudentsInClass($conn, $class_id);
-
-// Get existing marks if exam is selected
-$marks = [];
-if ($exam_id > 0) {
-    $marks = getStudentMarks($conn, $exam_id, $subject_id, $class_id);
-}
-
-// Process form submission
-$success_message = '';
-$error_message = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_marks'])) {
-    // Verify CSRF token
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        $error_message = "Invalid form submission.";
+try {
+    // Get teacher details
+    $teacher = getTeacherDetails($conn, $teacher_id);
+    
+    if (!$teacher) {
+        throw new Exception("Teacher information not found");
+    }
+    
+    // Get assigned classes
+    $assigned_classes = getTeacherAssignedClasses($conn, $teacher_id);
+    
+    // Check if class_id is provided in the URL
+    if (isset($_GET['class_id']) && !empty($_GET['class_id'])) {
+        $selected_class_id = intval($_GET['class_id']);
+        
+        // Verify that the teacher is assigned to this class
+        if (!isTeacherAssignedToClass($conn, $teacher_id, $selected_class_id)) {
+            throw new Exception("You are not assigned to this class");
+        }
+        
+        // Get subjects taught by the teacher in this class
+        $assigned_subjects = getTeacherSubjectsInClass($conn, $teacher_id, $selected_class_id);
+        
+        // Get exams for this class
+        $exams = getExamsForClass($conn, $selected_class_id);
     } else {
-        // Process and save marks
+        // If no class_id is provided, get all assigned subjects
+        $assigned_subjects = getTeacherAssignedSubjects($conn, $teacher_id);
+    }
+    
+    // Check if subject_id is provided in the URL
+    if (isset($_GET['subject_id']) && !empty($_GET['subject_id'])) {
+        $selected_subject_id = intval($_GET['subject_id']);
+        
+        // Verify that the teacher is assigned to this subject
+        if ($selected_class_id && !isTeacherAssignedToSubject($conn, $teacher_id, $selected_subject_id, $selected_class_id)) {
+            throw new Exception("You are not assigned to this subject");
+        }
+        
+        // Get subject details
+        $subject_details = getSubjectDetails($conn, $selected_subject_id);
+        
+        // If class_id is also provided, get students and their marks
+        if ($selected_class_id) {
+            // Get students in this class
+            $students = getStudentsInClass($conn, $selected_class_id);
+            
+            // Check if exam_id is provided
+            if (isset($_GET['exam_id']) && !empty($_GET['exam_id'])) {
+                $selected_exam_id = intval($_GET['exam_id']);
+                
+                // Get student marks for this exam and subject
+                $marks = getStudentMarks($conn, $selected_exam_id, $selected_subject_id, $selected_class_id);
+                
+                // Combine students with their marks
+                foreach ($students as &$student) {
+                    $student['marks'] = isset($marks[$student['student_id']]) ? $marks[$student['student_id']] : null;
+                }
+            }
+        }
+    }
+    
+    // Process form submission
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_marks'])) {
         $result = saveStudentMarks($conn, $_POST, $teacher_id);
         
         if ($result['success']) {
-            $success_message = "Marks saved successfully!";
-            // Refresh marks data
-            $marks = getStudentMarks($conn, $exam_id, $subject_id, $class_id);
+            $success_message = $result['message'];
             
             // Log activity
-            logTeacherActivity($conn, $teacher_id, 'marks_update', "Updated marks for {$subject['subject_name']} - {$class['class_name']} {$class['section']}");
+            logTeacherActivity($conn, $teacher_id, 'marks_update', "Updated marks for subject ID: {$_POST['subject_id']}, exam ID: {$_POST['exam_id']}");
+            
+            // Redirect to avoid form resubmission
+            header("Location: edit_marks.php?class_id={$_POST['class_id']}&subject_id={$_POST['subject_id']}&exam_id={$_POST['exam_id']}&success=1");
+            exit();
         } else {
-            $error_message = "Error: " . $result['message'];
+            $error_message = $result['message'];
         }
     }
+    
+    // Check for success message in URL
+    if (isset($_GET['success']) && $_GET['success'] == 1) {
+        $success_message = "Marks saved successfully.";
+    }
+    
+} catch (Exception $e) {
+    // Log the error
+    error_log("Edit Marks Error: " . $e->getMessage());
+    $error_message = $e->getMessage();
 }
-
-// Generate CSRF token
-$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-
-// Close connection
-$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -81,27 +127,55 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Marks | Result Management System</title>
+    <title>Edit Marks | Teacher Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css">
     <style>
-        .table-responsive {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
+        body {
+            background-color: #f8f9fa;
         }
-        .sticky-header {
-            position: sticky;
-            top: 0;
-            background: white;
-            z-index: 100;
-            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+        .sidebar {
+            min-height: 100vh;
+            background-color: #343a40;
+            color: white;
         }
-        .form-control-sm {
-            min-width: 80px;
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 5px;
+            border-radius: 5px;
+            padding: 8px 16px;
+        }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .card-header {
+            background-color: rgba(0, 0, 0, 0.03);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+            font-weight: 600;
+        }
+        .table th {
+            font-weight: 600;
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #4e73df;
+            box-shadow: 0 0 0 0.25rem rgba(78, 115, 223, 0.25);
+        }
+        .marks-input {
+            width: 80px;
         }
         .grade-badge {
-            min-width: 40px;
+            width: 30px;
+            display: inline-block;
+            text-align: center;
         }
     </style>
 </head>
@@ -109,301 +183,236 @@ $conn->close();
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            <?php include 'includes/teacher_sidebar.php'; ?>
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <div class="text-center mb-4">
+                        <img src="<?php echo !empty($teacher['profile_image']) ? htmlspecialchars($teacher['profile_image']) : '../assets/images/default-teacher.png'; ?>" 
+                             alt="Teacher Profile" class="img-fluid rounded-circle mb-2" style="width: 80px; height: 80px; object-fit: cover;">
+                        <h6 class="text-white"><?php echo isset($teacher['name']) ? htmlspecialchars($teacher['name']) : 'Teacher'; ?></h6>
+                        <span class="badge bg-success">Teacher</span>
+                    </div>
+                    
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="teacher_dashboard.php">
+                                <i class="bi bi-speedometer2 me-2"></i>
+                                Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="class_performance.php">
+                                <i class="bi bi-bar-chart me-2"></i>
+                                Class Performance
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="edit_marks.php">
+                                <i class="bi bi-pencil-square me-2"></i>
+                                Edit Marks
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="profile.php">
+                                <i class="bi bi-person-circle me-2"></i>
+                                My Profile
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="../includes/logout.php">
+                                <i class="bi bi-box-arrow-right me-2"></i>
+                                Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
             
             <!-- Main Content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Edit Marks</h1>
                     <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb mb-0">
+                        <ol class="breadcrumb">
                             <li class="breadcrumb-item"><a href="teacher_dashboard.php">Dashboard</a></li>
-                            <li class="breadcrumb-item"><a href="assigned_subjects.php">Assigned Subjects</a></li>
                             <li class="breadcrumb-item active" aria-current="page">Edit Marks</li>
                         </ol>
                     </nav>
                 </div>
-
-                <?php if ($success_message): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <?php echo $success_message; ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                <?php endif; ?>
-
-                <?php if ($error_message): ?>
+                
+                <?php if (isset($error_message)): ?>
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
                         <?php echo $error_message; ?>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 <?php endif; ?>
-
-                <!-- Subject and Class Info Card -->
-                <div class="card mb-4 shadow-sm">
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5 class="card-title"><?php echo htmlspecialchars($subject['subject_name']); ?> (<?php echo htmlspecialchars($subject['subject_code']); ?>)</h5>
-                                <p class="text-muted mb-0">
-                                    Class: <?php echo htmlspecialchars($class['class_name'] . ' ' . $class['section']); ?> | 
-                                    Credit Hours: <?php echo htmlspecialchars($subject['credit_hours']); ?> | 
-                                    Students: <?php echo count($students); ?>
-                                </p>
-                            </div>
-                            <div class="col-md-6 text-md-end">
-                                <p class="mb-0">
-                                    <span class="badge bg-primary">Theory: <?php echo $subject['theory_marks']; ?></span>
-                                    <span class="badge bg-info">Practical: <?php echo $subject['practical_marks']; ?></span>
-                                    <span class="badge bg-success">Total: <?php echo $subject['theory_marks'] + $subject['practical_marks']; ?></span>
-                                </p>
-                                <p class="text-muted mb-0">
-                                    Pass Marks: Theory <?php echo $subject['theory_pass_marks']; ?>, 
-                                    Practical <?php echo $subject['practical_pass_marks']; ?>
-                                </p>
-                            </div>
-                        </div>
+                
+                <?php if (isset($success_message)): ?>
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <?php echo $success_message; ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
-                </div>
-
-                <!-- Exam Selection Form -->
-                <div class="card mb-4 shadow-sm">
+                <?php endif; ?>
+                
+                <!-- Selection Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Select Class, Subject and Exam</h5>
+                    </div>
                     <div class="card-body">
-                        <form method="GET" action="edit_marks.php" class="row g-3">
-                            <input type="hidden" name="subject_id" value="<?php echo $subject_id; ?>">
-                            <input type="hidden" name="class_id" value="<?php echo $class_id; ?>">
-                            
-                            <div class="col-md-6">
-                                <label for="exam_id" class="form-label">Select Exam</label>
-                                <select class="form-select" id="exam_id" name="exam_id" required onchange="this.form.submit()">
-                                    <option value="">-- Select Exam --</option>
-                                    <?php foreach ($exams as $exam): ?>
-                                        <option value="<?php echo $exam['exam_id']; ?>" <?php echo ($exam_id == $exam['exam_id']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($exam['exam_name'] . ' (' . $exam['exam_type'] . ')'); ?>
+                        <form action="" method="get" class="row g-3">
+                            <div class="col-md-4">
+                                <label for="class_id" class="form-label">Class</label>
+                                <select class="form-select" id="class_id" name="class_id" required>
+                                    <option value="">Select Class</option>
+                                    <?php foreach ($assigned_classes as $class): ?>
+                                        <option value="<?php echo $class['class_id']; ?>" <?php echo ($selected_class_id == $class['class_id']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($class['class_name'] . ' ' . $class['section'] . ' (' . $class['academic_year'] . ')'); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            
-                            <div class="col-md-6 d-flex align-items-end">
-                                <a href="class_performance.php?class_id=<?php echo $class_id; ?>&subject_id=<?php echo $subject_id; ?>" class="btn btn-outline-info">
-                                    <i class="bi bi-bar-chart"></i> View Class Performance
-                                </a>
+                            <div class="col-md-4">
+                                <label for="subject_id" class="form-label">Subject</label>
+                                <select class="form-select" id="subject_id" name="subject_id" required <?php echo empty($selected_class_id) ? 'disabled' : ''; ?>>
+                                    <option value="">Select Subject</option>
+                                    <?php if ($selected_class_id): ?>
+                                        <?php foreach ($assigned_subjects as $subject): ?>
+                                            <option value="<?php echo $subject['subject_id']; ?>" <?php echo ($selected_subject_id == $subject['subject_id']) ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($subject['subject_name'] . ' (' . $subject['subject_code'] . ')'); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="exam_id" class="form-label">Exam</label>
+                                <select class="form-select" id="exam_id" name="exam_id" required <?php echo empty($selected_class_id) ? 'disabled' : ''; ?>>
+                                    <option value="">Select Exam</option>
+                                    <?php if ($selected_class_id): ?>
+                                        <?php foreach ($exams as $exam): ?>
+                                            <option value="<?php echo $exam['exam_id']; ?>" <?php echo ($selected_exam_id == $exam['exam_id']) ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($exam['exam_name'] . ' (' . date('M Y', strtotime($exam['start_date'])) . ')'); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-search me-2"></i> Load Students
+                                </button>
                             </div>
                         </form>
                     </div>
                 </div>
-
-                <?php if ($exam_id > 0): ?>
+                
+                <?php if ($selected_class_id && $selected_subject_id && $selected_exam_id && !empty($students)): ?>
                     <!-- Marks Entry Form -->
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-light">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">Student Marks</h5>
-                                <div>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="calculateAllGrades">
-                                        <i class="bi bi-calculator"></i> Calculate All Grades
-                                    </button>
-                                </div>
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                Enter Marks: 
+                                <?php echo htmlspecialchars($subject_details['subject_name']); ?>
+                            </h5>
+                            <div>
+                                <span class="badge bg-info">Theory: <?php echo $subject_details['full_marks_theory']; ?></span>
+                                <span class="badge bg-info">Practical: <?php echo $subject_details['full_marks_practical']; ?></span>
+                                <span class="badge bg-warning">Pass Marks (Theory): <?php echo $subject_details['theory_pass_marks']; ?></span>
+                                <span class="badge bg-warning">Pass Marks (Practical): <?php echo $subject_details['practical_pass_marks']; ?></span>
                             </div>
                         </div>
                         <div class="card-body">
-                            <form method="POST" action="edit_marks.php?subject_id=<?php echo $subject_id; ?>&class_id=<?php echo $class_id; ?>&exam_id=<?php echo $exam_id; ?>" id="marksForm">
-                                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                                <input type="hidden" name="exam_id" value="<?php echo $exam_id; ?>">
-                                <input type="hidden" name="subject_id" value="<?php echo $subject_id; ?>">
-                                <input type="hidden" name="class_id" value="<?php echo $class_id; ?>">
+                            <form action="" method="post">
+                                <input type="hidden" name="class_id" value="<?php echo $selected_class_id; ?>">
+                                <input type="hidden" name="subject_id" value="<?php echo $selected_subject_id; ?>">
+                                <input type="hidden" name="exam_id" value="<?php echo $selected_exam_id; ?>">
+                                <input type="hidden" name="full_marks_theory" value="<?php echo $subject_details['full_marks_theory']; ?>">
+                                <input type="hidden" name="full_marks_practical" value="<?php echo $subject_details['full_marks_practical']; ?>">
+                                <input type="hidden" name="pass_marks_theory" value="<?php echo $subject_details['theory_pass_marks']; ?>">
+                                <input type="hidden" name="pass_marks_practical" value="<?php echo $subject_details['practical_pass_marks']; ?>">
                                 
                                 <div class="table-responsive">
                                     <table class="table table-bordered table-hover">
-                                        <thead class="sticky-header">
-                                            <tr class="table-light">
-                                                <th rowspan="2" class="text-center align-middle">Roll No.</th>
-                                                <th rowspan="2" class="align-middle">Student Name</th>
-                                                <th colspan="3" class="text-center">Theory (<?php echo $subject['theory_marks']; ?>)</th>
-                                                <th colspan="3" class="text-center">Practical (<?php echo $subject['practical_marks']; ?>)</th>
-                                                <th colspan="3" class="text-center">Final</th>
-                                            </tr>
-                                            <tr class="table-light">
-                                                <th class="text-center">Marks</th>
-                                                <th class="text-center">Grade</th>
-                                                <th class="text-center">Status</th>
-                                                <th class="text-center">Marks</th>
-                                                <th class="text-center">Grade</th>
-                                                <th class="text-center">Status</th>
-                                                <th class="text-center">Total</th>
-                                                <th class="text-center">Grade</th>
-                                                <th class="text-center">Remarks</th>
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Roll No.</th>
+                                                <th>Student Name</th>
+                                                <th>Theory Marks (<?php echo $subject_details['full_marks_theory']; ?>)</th>
+                                                <th>Practical Marks (<?php echo $subject_details['full_marks_practical']; ?>)</th>
+                                                <th>Total</th>
+                                                <th>Grade</th>
+                                                <th>Status</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php if (empty($students)): ?>
+                                            <?php foreach ($students as $student): ?>
                                                 <tr>
-                                                    <td colspan="11" class="text-center">No students found in this class.</td>
+                                                    <td><?php echo htmlspecialchars($student['roll_number']); ?></td>
+                                                    <td><?php echo htmlspecialchars($student['full_name']); ?></td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm marks-input theory-marks" 
+                                                               name="marks[<?php echo $student['student_id']; ?>][theory_marks]" 
+                                                               value="<?php echo isset($student['marks']['theory_marks']) ? $student['marks']['theory_marks'] : ''; ?>"
+                                                               min="0" max="<?php echo $subject_details['full_marks_theory']; ?>" step="0.01"
+                                                               data-student-id="<?php echo $student['student_id']; ?>">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm marks-input practical-marks" 
+                                                               name="marks[<?php echo $student['student_id']; ?>][practical_marks]" 
+                                                               value="<?php echo isset($student['marks']['practical_marks']) ? $student['marks']['practical_marks'] : ''; ?>"
+                                                               min="0" max="<?php echo $subject_details['full_marks_practical']; ?>" step="0.01"
+                                                               data-student-id="<?php echo $student['student_id']; ?>">
+                                                    </td>
+                                                    <td>
+                                                        <span id="total-<?php echo $student['student_id']; ?>">
+                                                            <?php 
+                                                                if (isset($student['marks']['total_marks'])) {
+                                                                    echo $student['marks']['total_marks'];
+                                                                } else {
+                                                                    echo '-';
+                                                                }
+                                                            ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span id="grade-<?php echo $student['student_id']; ?>" class="badge bg-secondary grade-badge">
+                                                            <?php 
+                                                                if (isset($student['marks']['final_grade'])) {
+                                                                    echo $student['marks']['final_grade'];
+                                                                } else {
+                                                                    echo '-';
+                                                                }
+                                                            ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span id="status-<?php echo $student['student_id']; ?>" class="badge <?php echo (isset($student['marks']['status']) && $student['marks']['status'] == 'pass') ? 'bg-success' : 'bg-danger'; ?>">
+                                                            <?php 
+                                                                if (isset($student['marks']['status'])) {
+                                                                    echo ucfirst($student['marks']['status']);
+                                                                } else {
+                                                                    echo '-';
+                                                                }
+                                                            ?>
+                                                        </span>
+                                                    </td>
                                                 </tr>
-                                            <?php else: ?>
-                                                <?php foreach ($students as $index => $student): ?>
-                                                    <?php 
-                                                        $student_id = $student['student_id'];
-                                                        $student_marks = isset($marks[$student_id]) ? $marks[$student_id] : [
-                                                            'theory_marks' => '',
-                                                            'theory_grade' => '',
-                                                            'practical_marks' => '',
-                                                            'practical_grade' => '',
-                                                            'total_marks' => '',
-                                                            'final_grade' => '',
-                                                            'remarks' => ''
-                                                        ];
-                                                    ?>
-                                                    <tr>
-                                                        <td class="text-center">
-                                                            <?php echo htmlspecialchars($student['roll_number']); ?>
-                                                            <input type="hidden" name="marks[<?php echo $student_id; ?>][student_id]" value="<?php echo $student_id; ?>">
-                                                        </td>
-                                                        <td><?php echo htmlspecialchars($student['full_name']); ?></td>
-                                                        
-                                                        <!-- Theory Marks -->
-                                                        <td>
-                                                            <input type="number" class="form-control form-control-sm theory-marks" 
-                                                                   name="marks[<?php echo $student_id; ?>][theory_marks]" 
-                                                                   value="<?php echo htmlspecialchars($student_marks['theory_marks']); ?>" 
-                                                                   min="0" max="<?php echo $subject['theory_marks']; ?>" step="0.01"
-                                                                   data-student-id="<?php echo $student_id; ?>"
-                                                                   data-row="<?php echo $index; ?>">
-                                                        </td>
-                                                        <td class="text-center theory-grade">
-                                                            <span class="badge bg-secondary grade-badge">
-                                                                <?php echo htmlspecialchars($student_marks['theory_grade'] ?: '-'); ?>
-                                                            </span>
-                                                        </td>
-                                                        <td class="text-center theory-status">
-                                                            <?php 
-                                                                $theory_status = '';
-                                                                if (!empty($student_marks['theory_marks'])) {
-                                                                    $theory_status = $student_marks['theory_marks'] >= $subject['theory_pass_marks'] ? 'Pass' : 'Fail';
-                                                                    $theory_status_class = $theory_status == 'Pass' ? 'success' : 'danger';
-                                                                    echo "<span class='badge bg-$theory_status_class'>{$theory_status}</span>";
-                                                                } else {
-                                                                    echo "<span class='badge bg-secondary'>-</span>";
-                                                                }
-                                                            ?>
-                                                        </td>
-                                                        
-                                                        <!-- Practical Marks -->
-                                                        <td>
-                                                            <input type="number" class="form-control form-control-sm practical-marks" 
-                                                                   name="marks[<?php echo $student_id; ?>][practical_marks]" 
-                                                                   value="<?php echo htmlspecialchars($student_marks['practical_marks']); ?>" 
-                                                                   min="0" max="<?php echo $subject['practical_marks']; ?>" step="0.01"
-                                                                   data-student-id="<?php echo $student_id; ?>"
-                                                                   data-row="<?php echo $index; ?>">
-                                                        </td>
-                                                        <td class="text-center practical-grade">
-                                                            <span class="badge bg-secondary grade-badge">
-                                                                <?php echo htmlspecialchars($student_marks['practical_grade'] ?: '-'); ?>
-                                                            </span>
-                                                        </td>
-                                                        <td class="text-center practical-status">
-                                                            <?php 
-                                                                $practical_status = '';
-                                                                if (!empty($student_marks['practical_marks'])) {
-                                                                    $practical_status = $student_marks['practical_marks'] >= $subject['practical_pass_marks'] ? 'Pass' : 'Fail';
-                                                                    $practical_status_class = $practical_status == 'Pass' ? 'success' : 'danger';
-                                                                    echo "<span class='badge bg-$practical_status_class'>{$practical_status}</span>";
-                                                                } else {
-                                                                    echo "<span class='badge bg-secondary'>-</span>";
-                                                                }
-                                                            ?>
-                                                        </td>
-                                                        
-                                                        <!-- Final Marks -->
-                                                        <td class="text-center total-marks">
-                                                            <span class="fw-bold">
-                                                                <?php echo !empty($student_marks['total_marks']) ? htmlspecialchars($student_marks['total_marks']) : '-'; ?>
-                                                            </span>
-                                                        </td>
-                                                        <td class="text-center final-grade">
-                                                            <span class="badge bg-primary grade-badge">
-                                                                <?php echo htmlspecialchars($student_marks['final_grade'] ?: '-'); ?>
-                                                            </span>
-                                                        </td>
-                                                        <td class="text-center remarks">
-                                                            <?php echo htmlspecialchars($student_marks['remarks'] ?: '-'); ?>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            <?php endif; ?>
+                                            <?php endforeach; ?>
                                         </tbody>
                                     </table>
                                 </div>
                                 
-                                <div class="d-flex justify-content-between mt-4">
-                                    <a href="assigned_subjects.php" class="btn btn-outline-secondary">
-                                        <i class="bi bi-arrow-left"></i> Back to Subjects
-                                    </a>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
                                     <button type="submit" name="save_marks" class="btn btn-primary">
-                                        <i class="bi bi-save"></i> Save Marks
+                                        <i class="bi bi-save me-2"></i> Save Marks
                                     </button>
                                 </div>
                             </form>
                         </div>
                     </div>
-                    
-                    <!-- Grade Information Card -->
-                    <div class="card mt-4 shadow-sm">
-                        <div class="card-header bg-light">
-                            <h5 class="mb-0">Grade Information</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered">
-                                            <thead>
-                                                <tr class="table-light">
-                                                    <th>Grade</th>
-                                                    <th>Point</th>
-                                                    <th>Percentage</th>
-                                                    <th>Remarks</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr><td>A+</td><td>4.0</td><td>90% and above</td><td>Outstanding</td></tr>
-                                                <tr><td>A</td><td>3.6</td><td>80-89%</td><td>Excellent</td></tr>
-                                                <tr><td>B+</td><td>3.2</td><td>70-79%</td><td>Very Good</td></tr>
-                                                <tr><td>B</td><td>2.8</td><td>60-69%</td><td>Good</td></tr>
-                                                <tr><td>C+</td><td>2.4</td><td>50-59%</td><td>Satisfactory</td></tr>
-                                                <tr><td>C</td><td>2.0</td><td>40-49%</td><td>Acceptable</td></tr>
-                                                <tr><td>D+</td><td>1.6</td><td>30-39%</td><td>Partially Acceptable</td></tr>
-                                                <tr><td>D</td><td>1.2</td><td>20-29%</td><td>Insufficient</td></tr>
-                                                <tr><td>E</td><td>0.8</td><td>Below 20%</td><td>Very Insufficient</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="alert alert-info">
-                                        <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Grading Instructions</h6>
-                                        <hr>
-                                        <ol class="mb-0">
-                                            <li>Enter theory and practical marks for each student.</li>
-                                            <li>Grades will be automatically calculated based on NEB guidelines.</li>
-                                            <li>Students must pass both theory and practical components separately.</li>
-                                            <li>Final grade is calculated as per the weightage defined by the admin.</li>
-                                            <li>Click "Calculate All Grades" to update all grades at once.</li>
-                                            <li>Don't forget to save your changes after entering marks.</li>
-                                        </ol>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                <?php elseif (!empty($exams)): ?>
+                <?php elseif ($selected_class_id && $selected_subject_id && $selected_exam_id): ?>
                     <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> Please select an exam from the dropdown above to edit marks.
-                    </div>
-                <?php else: ?>
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle"></i> No exams have been scheduled for this class yet. Please contact the administrator.
+                        <i class="bi bi-info-circle me-2"></i> No students found in this class.
                     </div>
                 <?php endif; ?>
             </main>
@@ -413,119 +422,94 @@ $conn->close();
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Calculate grade based on marks and total marks
-            function calculateGrade(marks, totalMarks) {
-                if (marks === '' || marks === null) return '-';
+            // Handle class selection change
+            const classSelect = document.getElementById('class_id');
+            const subjectSelect = document.getElementById('subject_id');
+            const examSelect = document.getElementById('exam_id');
+            
+            classSelect.addEventListener('change', function() {
+                if (this.value) {
+                    // Enable subject select
+                    subjectSelect.disabled = false;
+                    examSelect.disabled = false;
+                    
+                    // Redirect to load subjects for this class
+                    window.location.href = 'edit_marks.php?class_id=' + this.value;
+                } else {
+                    // Disable subject and exam selects
+                    subjectSelect.disabled = true;
+                    examSelect.disabled = true;
+                }
+            });
+            
+            // Calculate total marks and grade on input change
+            const theoryInputs = document.querySelectorAll('.theory-marks');
+            const practicalInputs = document.querySelectorAll('.practical-marks');
+            
+            function updateTotalAndGrade(studentId) {
+                const theoryInput = document.querySelector(`.theory-marks[data-student-id="${studentId}"]`);
+                const practicalInput = document.querySelector(`.practical-marks[data-student-id="${studentId}"]`);
+                const totalSpan = document.getElementById(`total-${studentId}`);
+                const gradeSpan = document.getElementById(`grade-${studentId}`);
+                const statusSpan = document.getElementById(`status-${studentId}`);
                 
-                const percentage = (marks / totalMarks) * 100;
+                const theoryValue = parseFloat(theoryInput.value) || 0;
+                const practicalValue = parseFloat(practicalInput.value) || 0;
                 
-                if (percentage >= 90) return 'A+';
-                if (percentage >= 80) return 'A';
-                if (percentage >= 70) return 'B+';
-                if (percentage >= 60) return 'B';
-                if (percentage >= 50) return 'C+';
-                if (percentage >= 40) return 'C';
-                if (percentage >= 30) return 'D+';
-                if (percentage >= 20) return 'D';
-                return 'E';
+                if (theoryValue === 0 && practicalValue === 0) {
+                    totalSpan.textContent = '-';
+                    gradeSpan.textContent = '-';
+                    statusSpan.textContent = '-';
+                    statusSpan.className = 'badge bg-secondary';
+                    return;
+                }
+                
+                const total = theoryValue + practicalValue;
+                totalSpan.textContent = total.toFixed(2);
+                
+                // Simple grade calculation (this should match your server-side logic)
+                const fullMarksTheory = <?php echo $subject_details ? $subject_details['full_marks_theory'] : 0; ?>;
+                const fullMarksPractical = <?php echo $subject_details ? $subject_details['full_marks_practical'] : 0; ?>;
+                const passMarksTheory = <?php echo $subject_details ? $subject_details['theory_pass_marks'] : 0; ?>;
+                const passMarksPractical = <?php echo $subject_details ? $subject_details['practical_pass_marks'] : 0; ?>;
+                
+                const totalPossible = fullMarksTheory + fullMarksPractical;
+                const percentage = (total / totalPossible) * 100;
+                
+                let grade;
+                if (percentage >= 90) grade = 'A+';
+                else if (percentage >= 80) grade = 'A';
+                else if (percentage >= 70) grade = 'B+';
+                else if (percentage >= 60) grade = 'B';
+                else if (percentage >= 50) grade = 'C+';
+                else if (percentage >= 40) grade = 'C';
+                else if (percentage >= 30) grade = 'D+';
+                else if (percentage >= 20) grade = 'D';
+                else grade = 'E';
+                
+                gradeSpan.textContent = grade;
+                
+                // Determine pass/fail status
+                const isPassed = theoryValue >= passMarksTheory && 
+                                practicalValue >= passMarksPractical && 
+                                grade !== 'E';
+                
+                statusSpan.textContent = isPassed ? 'Pass' : 'Fail';
+                statusSpan.className = isPassed ? 'badge bg-success' : 'badge bg-danger';
             }
             
-            // Get remarks based on grade
-            function getRemarks(grade) {
-                switch (grade) {
-                    case 'A+': return 'Outstanding';
-                    case 'A': return 'Excellent';
-                    case 'B+': return 'Very Good';
-                    case 'B': return 'Good';
-                    case 'C+': return 'Satisfactory';
-                    case 'C': return 'Acceptable';
-                    case 'D+': return 'Partially Acceptable';
-                    case 'D': return 'Insufficient';
-                    case 'E': return 'Very Insufficient';
-                    default: return '-';
-                }
-            }
-            
-            // Update a single row's grades and status
-            function updateRowGrades(row) {
-                const theoryMarksInput = row.querySelector('.theory-marks');
-                const practicalMarksInput = row.querySelector('.practical-marks');
-                
-                if (!theoryMarksInput || !practicalMarksInput) return;
-                
-                const theoryMarks = parseFloat(theoryMarksInput.value) || 0;
-                const practicalMarks = parseFloat(practicalMarksInput.value) || 0;
-                const theoryTotal = <?php echo $subject['theory_marks']; ?>;
-                const practicalTotal = <?php echo $subject['practical_marks']; ?>;
-                const theoryPassMarks = <?php echo $subject['theory_pass_marks']; ?>;
-                const practicalPassMarks = <?php echo $subject['practical_pass_marks']; ?>;
-                
-                // Calculate theory grade and status
-                const theoryGrade = calculateGrade(theoryMarks, theoryTotal);
-                const theoryStatus = theoryMarks >= theoryPassMarks ? 'Pass' : 'Fail';
-                
-                // Calculate practical grade and status
-                const practicalGrade = calculateGrade(practicalMarks, practicalTotal);
-                const practicalStatus = practicalMarks >= practicalPassMarks ? 'Pass' : 'Fail';
-                
-                // Calculate total and final grade
-                const totalMarks = theoryMarks + practicalMarks;
-                const totalPossible = theoryTotal + practicalTotal;
-                const finalGrade = calculateGrade(totalMarks, totalPossible);
-                const remarks = getRemarks(finalGrade);
-                
-                // Update the UI
-                const theoryGradeCell = row.querySelector('.theory-grade');
-                const theoryStatusCell = row.querySelector('.theory-status');
-                const practicalGradeCell = row.querySelector('.practical-grade');
-                const practicalStatusCell = row.querySelector('.practical-status');
-                const totalMarksCell = row.querySelector('.total-marks');
-                const finalGradeCell = row.querySelector('.final-grade');
-                const remarksCell = row.querySelector('.remarks');
-                
-                if (theoryMarksInput.value) {
-                    theoryGradeCell.innerHTML = `<span class="badge bg-secondary grade-badge">${theoryGrade}</span>`;
-                    theoryStatusCell.innerHTML = `<span class="badge bg-${theoryStatus === 'Pass' ? 'success' : 'danger'}">${theoryStatus}</span>`;
-                } else {
-                    theoryGradeCell.innerHTML = `<span class="badge bg-secondary grade-badge">-</span>`;
-                    theoryStatusCell.innerHTML = `<span class="badge bg-secondary">-</span>`;
-                }
-                
-                if (practicalMarksInput.value) {
-                    practicalGradeCell.innerHTML = `<span class="badge bg-secondary grade-badge">${practicalGrade}</span>`;
-                    practicalStatusCell.innerHTML = `<span class="badge bg-${practicalStatus === 'Pass' ? 'success' : 'danger'}">${practicalStatus}</span>`;
-                } else {
-                    practicalGradeCell.innerHTML = `<span class="badge bg-secondary grade-badge">-</span>`;
-                    practicalStatusCell.innerHTML = `<span class="badge bg-secondary">-</span>`;
-                }
-                
-                if (theoryMarksInput.value && practicalMarksInput.value) {
-                    totalMarksCell.innerHTML = `<span class="fw-bold">${totalMarks.toFixed(2)}</span>`;
-                    finalGradeCell.innerHTML = `<span class="badge bg-primary grade-badge">${finalGrade}</span>`;
-                    remarksCell.textContent = remarks;
-                } else {
-                    totalMarksCell.innerHTML = `<span class="fw-bold">-</span>`;
-                    finalGradeCell.innerHTML = `<span class="badge bg-secondary grade-badge">-</span>`;
-                    remarksCell.textContent = '-';
-                }
-            }
-            
-            // Add event listeners to all mark inputs
-            document.querySelectorAll('.theory-marks, .practical-marks').forEach(input => {
+            theoryInputs.forEach(input => {
                 input.addEventListener('input', function() {
-                    const row = this.closest('tr');
-                    updateRowGrades(row);
+                    updateTotalAndGrade(this.dataset.studentId);
                 });
             });
             
-            // Calculate all grades button
-            document.getElementById('calculateAllGrades').addEventListener('click', function() {
-                document.querySelectorAll('tbody tr').forEach(row => {
-                    updateRowGrades(row);
+            practicalInputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    updateTotalAndGrade(this.dataset.studentId);
                 });
             });
         });
     </script>
 </body>
 </html>
-
