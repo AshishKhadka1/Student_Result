@@ -27,16 +27,3 @@ The **Student Result Management System** is a web-based application developed as
 - 📈 View Class-wise Performance
 - 📁 Export Result as PDF (optional)
 
----
-
-## 👨‍💼 User Roles
-
-### Admin
-- Add/Manage Students
-- Add Subjects and Classes
-- Enter and Update Student Marks
-- View and Print Result Reports
-
-### Student
-- View Result using Roll Number and Class
-- Print Individual Result Sheet
