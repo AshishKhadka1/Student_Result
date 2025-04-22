@@ -640,7 +640,7 @@ $conn->close();
                         </a>
                     </nav>
                     <div class="flex-shrink-0 block w-full">
-                        <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
+                        <a href="../login.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
                             <i class="fas fa-sign-out-alt mr-3"></i>
                             <span class="truncate">Logout</span>
                         </a>

@@ -52,8 +52,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($role == 'student') {
                 $roll_number = $_POST['roll_number'];
                 $registration_number = $_POST['registration_number'];
-                $class_id = $_POST['class_id'] ?? null;
                 $batch_year = $_POST['batch_year'];
+                
+                // Check if class_id is provided and not empty
+                if (isset($_POST['class_id']) && !empty($_POST['class_id'])) {
+                    $class_id = $_POST['class_id'];
+                    
+                    // Verify that the class_id exists in the classes table
+                    $stmt = $conn->prepare("SELECT class_id FROM classes WHERE class_id = ?");
+                    $stmt->bind_param("i", $class_id);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    
+                    if ($result->num_rows == 0) {
+                        throw new Exception("Selected class does not exist. Please select a valid class.");
+                    }
+                } else {
+                    // If class_id is not provided, set it to NULL
+                    $class_id = null;
+                }
                 
                 // Generate student ID (e.g., S001, S002, etc.)
                 $result = $conn->query("SELECT MAX(CAST(SUBSTRING(student_id, 2) AS UNSIGNED)) as max_id FROM students");
@@ -61,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $student_id = 'S' . str_pad($max_id + 1, 3, '0', STR_PAD_LEFT);
                 
                 $stmt = $conn->prepare("INSERT INTO students (student_id, user_id, roll_number, registration_number, class_id, batch_year) VALUES (?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("sisssi", $student_id, $user_id, $roll_number, $registration_number, $class_id, $batch_year);
+                $stmt->bind_param("sissii", $student_id, $user_id, $roll_number, $registration_number, $class_id, $batch_year);
                 $stmt->execute();
             }
             
@@ -380,6 +397,7 @@ $conn->close();
                                                 </option>
                                                 <?php endforeach; ?>
                                             </select>
+                                            <p class="mt-1 text-sm text-gray-500">A valid class must be selected for students</p>
                                         </div>
                                         
                                         <div>
@@ -431,12 +449,14 @@ $conn->close();
                 // Make student fields not required
                 document.getElementById('roll_number').required = false;
                 document.getElementById('registration_number').required = false;
+                document.getElementById('class_id').required = false;
             } else if (role === 'student') {
                 studentFields.classList.remove('hidden');
                 
                 // Make student fields required
                 document.getElementById('roll_number').required = true;
                 document.getElementById('registration_number').required = true;
+                document.getElementById('class_id').required = true;
                 
                 // Make teacher fields not required
                 document.getElementById('employee_id').required = false;

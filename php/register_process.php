@@ -152,14 +152,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Commit transaction
         $conn->commit();
         
-        // Set success message
+        // Set success message and handle redirection based on role
         if ($role == 'admin') {
             $_SESSION['success'] = "Registration successful! Your admin account is pending approval.";
+            // Admin accounts need approval, so redirect to login
+            header("Location: ../login.php");
         } else {
-            $_SESSION['success'] = "Registration successful! You can now login.";
+            // For students and teachers, automatically log them in and redirect to dashboard
+            $_SESSION['user_id'] = $user_id;
+            $_SESSION['username'] = $username;
+            $_SESSION['role'] = $role;
+            $_SESSION['full_name'] = $full_name;
+            
+            // Set a welcome message for the dashboard
+            $_SESSION['welcome_message'] = "Welcome to the Result Management System! Your account has been created successfully.";
+            
+            // Redirect based on role
+            if ($role == 'student') {
+                header("Location: ../Student/student_dashboard.php");
+            } elseif ($role == 'teacher') {
+                header("Location: ../Teacher/teacher_dashboard.php");
+            }
         }
-        
-        header("Location: ../login.php");
         exit();
         
     } catch (Exception $e) {

@@ -49,3 +49,180 @@ body {
 .login-container button:hover {
     background-color: #218838;
 }
+/* Custom styles for Result Management System */
+
+/* Sidebar styles */
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    padding: 48px 0 0;
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.1);
+  }
+  
+  .sidebar-sticky {
+    position: relative;
+    top: 0;
+    height: calc(100vh - 48px);
+    padding-top: .5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  
+  .sidebar .nav-link {
+    font-weight: 500;
+    color: #333;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    margin: 0.2rem 0;
+  }
+  
+  .sidebar .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .sidebar .nav-link.active {
+    color: #fff;
+  }
+  
+  /* Main content styles */
+  main {
+    padding-top: 1.5rem;
+  }
+  
+  /* Card styles */
+  .card {
+    border-radius: 0.5rem;
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  }
+  
+  .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+  }
+  
+  /* Table styles */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+  }
+  
+  .table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+  }
+  
+  /* Form styles */
+  .form-control:focus,
+  .form-select:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  }
+  
+  /* Badge styles */
+  .badge {
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+  }
+  
+  /* Button styles */
+  .btn {
+    font-weight: 500;
+    border-radius: 0.25rem;
+  }
+  
+  .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+  
+  .btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+  }
+  
+  /* Sticky header for tables */
+  .sticky-header {
+    position: sticky;
+    top: 0;
+    background-color: #fff;
+    z-index: 10;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Grade badge styles */
+  .grade-badge {
+    min-width: 2.5rem;
+    display: inline-block;
+    text-align: center;
+  }
+  
+  /* Chart container styles */
+  canvas {
+    max-width: 100%;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .table th,
+    .table td {
+      padding: 0.5rem;
+      font-size: 0.875rem;
+    }
+  
+    .form-control-sm,
+    .form-select-sm {
+      min-width: 60px;
+    }
+  
+    .card-title {
+      font-size: 1.1rem;
+    }
+  }
+  
+  /* Print styles */
+  @media print {
+    .sidebar,
+    .navbar,
+    .btn,
+    .no-print {
+      display: none !important;
+    }
+  
+    body {
+      padding: 0;
+      margin: 0;
+    }
+  
+    .container-fluid,
+    main {
+      width: 100%;
+      padding: 0;
+      margin: 0;
+    }
+  
+    .card {
+      box-shadow: none;
+      border: 1px solid #ddd;
+    }
+  
+    .table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+    }
+  
+    .table td,
+    .table th {
+      background-color: #fff !important;
+      border: 1px solid #ddd !important;
+    }
+  }
+  
+  
