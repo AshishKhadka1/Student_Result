@@ -1,7 +1,7 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student') {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 $conn = new mysqli('localhost', 'root', '', 'result_management');
@@ -54,114 +54,31 @@ while ($row = $results_clone->fetch_assoc()) {
 
 $gpa = $total_credit_hours > 0 ? round($total_grade_points / $total_credit_hours, 2) : 0;
 
-// Get historical performance data for charts
-$sql = "SELECT 
-            r.*, s.subject_name, 
-            YEAR(r.created_at) as year, 
-            MONTH(r.created_at) as month
-        FROM Results r
-        JOIN Subjects s ON r.subject_id = s.subject_id
-        WHERE r.student_id = ?
-        ORDER BY r.created_at";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("s", $student['student_id']);
-$stmt->execute();
-$historical_results = $stmt->get_result();
+$conn->close();
 
-// Format data for charts
-$chart_data = [];
-$subject_names = [];
-$time_periods = [];
-$gpa_trend = [];
-
-// Process historical data for charts
-if ($historical_results && $historical_results->num_rows > 0) {
-    $period_gpa = [];
-    $period_count = [];
-    
-    while ($row = $historical_results->fetch_assoc()) {
-        $period = date('M Y', strtotime($row['year'] . '-' . $row['month'] . '-01'));
-        
-        if (!in_array($row['subject_name'], $subject_names)) {
-            $subject_names[] = $row['subject_name'];
-        }
-        
-        if (!in_array($period, $time_periods)) {
-            $time_periods[] = $period;
-            $period_gpa[$period] = 0;
-            $period_count[$period] = 0;
-        }
-        
-        $period_gpa[$period] += $row['gpa'];
-        $period_count[$period]++;
-        
-        $chart_data[] = [
-            'subject' => $row['subject_name'],
-            'period' => $period,
-            'theory_marks' => $row['theory_marks'],
-            'practical_marks' => $row['practical_marks'],
-            'gpa' => $row['gpa']
-        ];
-    }
-    
-    // Calculate average GPA per period
-    foreach ($time_periods as $period) {
-        if ($period_count[$period] > 0) {
-            $gpa_trend[] = round($period_gpa[$period] / $period_count[$period], 2);
-        } else {
-            $gpa_trend[] = 0;
-        }
-    }
+// Helper function to convert marks to grade
+function convertToGrade($marks) {
+    if ($marks >= 90) return 'A+';
+    if ($marks >= 80) return 'A';
+    if ($marks >= 70) return 'B+';
+    if ($marks >= 60) return 'B';
+    if ($marks >= 50) return 'C+';
+    if ($marks >= 40) return 'C';
+    if ($marks >= 30) return 'D';
+    return 'F';
 }
 
-// If no historical data, create sample data
-if (empty($chart_data)) {
-    // Reset results pointer
-    $results->data_seek(0);
-    
-    // Create sample periods (last 3 terms)
-    $sample_periods = [
-        date('M Y', strtotime('-8 months')),
-        date('M Y', strtotime('-4 months')),
-        date('M Y')
-    ];
-    
-    $time_periods = $sample_periods;
-    
-    // Create sample data for each subject
-    while ($row = $results->fetch_assoc()) {
-        $subject = isset($row['subject_name']) ? $row['subject_name'] : 'Subject ' . $row['subject_id'];
-        
-        if (!in_array($subject, $subject_names)) {
-            $subject_names[] = $subject;
-        }
-        
-        // Create sample progress with improvement
-        $base_theory = isset($row['theory_marks']) ? max(40, $row['theory_marks'] - 15) : 65;
-        $base_practical = isset($row['practical_marks']) ? max(40, $row['practical_marks'] - 10) : 70;
-        $base_gpa = isset($row['gpa']) ? max(2.0, $row['gpa'] - 0.6) : 2.4;
-        
-        for ($i = 0; $i < 3; $i++) {
-            $theory = min(100, $base_theory + ($i * 7));
-            $practical = min(100, $base_practical + ($i * 5));
-            $sample_gpa = min(4.0, $base_gpa + ($i * 0.3));
-            
-            $chart_data[] = [
-                'subject' => $subject,
-                'period' => $sample_periods[$i],
-                'theory_marks' => $theory,
-                'practical_marks' => $practical,
-                'gpa' => $sample_gpa
-            ];
-        }
-    }
-    
-    // Create sample GPA trend
-    $gpa_trend = [2.6, 2.9, $gpa];
+// Helper function to convert marks to GPA
+function convertToGPA($marks) {
+    if ($marks >= 90) return 4.0;
+    if ($marks >= 80) return 3.6;
+    if ($marks >= 70) return 3.2;
+    if ($marks >= 60) return 2.8;
+    if ($marks >= 50) return 2.4;
+    if ($marks >= 40) return 2.0;
+    if ($marks >= 30) return 1.6;
+    return 0.0;
 }
-
-// Reset results pointer for the main display
-$results->data_seek(0);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -316,108 +233,108 @@ $results->data_seek(0);
 
     <!-- Result Tab Content -->
     <div id="result" class="tab-content active">
-        <div id="resultSheet" class="max-w-4xl mx-auto my-4 p-6 bg-white shadow-md">
-            <!-- Student Details Section -->
-            <div class="header-blue p-3 font-bold text-lg">
-                Student Details
-            </div>
-            
-            <div class="grid grid-cols-2 border border-gray-300">
-                <div class="p-3 border-r border-b border-gray-300">
-                    <span class="red-text font-bold">Symbol No:</span>
-                </div>
-                <div class="p-3 border-b border-gray-300">
-                    <span class="red-text font-bold"><?php echo $student['student_id']; ?></span>
-                </div>
-                <div class="p-3 border-r border-b border-gray-300">
-                    <span class="red-text font-bold">Student Name:</span>
-                </div>
-                <div class="p-3 border-b border-gray-300">
-                    <span class="red-text font-bold"><?php echo $student['full_name']; ?></span>
-                </div>
-                <div class="p-3 border-r border-gray-300">
-                    <span class="red-text font-bold">Date of Birth:</span>
-                </div>
-                <div class="p-3">
-                    <span class="red-text font-bold"><?php echo isset($student['dob']) ? $student['dob'] : date('Y/m/d'); ?></span>
-                </div>
-            </div>
+        <?php
+echo '<div id="resultSheet" class="max-w-4xl mx-auto my-4 p-6 bg-white shadow-md">
+    <!-- Student Details Section -->
+    <div class="header-blue p-3 font-bold text-lg">
+        Student Details
+    </div>
+    
+    <div class="grid grid-cols-2 border border-gray-300">
+        <div class="p-3 border-r border-b border-gray-300">
+            <span class="red-text font-bold">Symbol No:</span>
+        </div>
+        <div class="p-3 border-b border-gray-300">
+            <span class="red-text font-bold">'.$student['student_id'].'</span>
+        </div>
+        <div class="p-3 border-r border-b border-gray-300">
+            <span class="red-text font-bold">Student Name:</span>
+        </div>
+        <div class="p-3 border-b border-gray-300">
+            <span class="red-text font-bold">'.$student['full_name'].'</span>
+        </div>
+        <div class="p-3 border-r border-gray-300">
+            <span class="red-text font-bold">Date of Birth:</span>
+        </div>
+        <div class="p-3">
+            <span class="red-text font-bold">'.(isset($student['dob']) ? $student['dob'] : date('Y/m/d')).'</span>
+        </div>
+    </div>
 
-            <!-- Grade Details Section -->
-            <div class="mt-6">
-                <div class="header-blue p-3 font-bold text-lg">
-                    Grade Details
-                </div>
-                
-                <table class="result-table w-full border-collapse">
-                    <thead>
-                        <tr class="header-blue">
-                            <th>S. No.</th>
-                            <th>Subjects</th>
-                            <th>Credit Hour<sup>1</sup></th>
-                            <th colspan="2">Obtained Grade<sup>2</sup></th>
-                            <th>Final Grade</th>
-                            <th>Grade Point</th>
-                        </tr>
-                        <tr class="header-blue">
-                            <th></th>
-                            <th></th>
-                            <th></th>
-                            <th>TH</th>
-                            <th>PR</th>
-                            <th></th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        $sn = 1;
-                        while ($row = $results->fetch_assoc()) { 
-                            // Convert marks to grades if needed
-                            $theory_grade = isset($row['theory_grade']) ? $row['theory_grade'] : convertToGrade($row['theory_marks']);
-                            $practical_grade = isset($row['practical_grade']) ? $row['practical_grade'] : 
-                                            ($row['practical_marks'] > 0 ? convertToGrade($row['practical_marks']) : '');
-                        ?>
-                        <tr class="data-row">
-                            <td><?php echo $sn++; ?></td>
-                            <td><?php echo isset($row['subject_name']) ? $row['subject_name'] : $row['subject_id']; ?></td>
-                            <td><?php echo isset($row['credit_hours']) ? $row['credit_hours'] : 4; ?></td>
-                            <td><?php echo $theory_grade; ?></td>
-                            <td><?php echo $practical_grade; ?></td>
-                            <td><?php echo $row['grade']; ?></td>
-                            <td><?php echo $row['gpa']; ?></td>
-                        </tr>
-                        <?php } ?>
-                    </tbody>
-                    <tfoot>
-                        <tr class="bg-gray-200">
-                            <td colspan="6" class="text-right font-bold">GRADE POINT AVERAGE (GPA):</td>
-                            <td class="font-bold"><?php echo $gpa; ?></td>
-                        </tr>
-                    </tfoot>
-                </table>
-                
-                <div class="mt-4 text-xs">
-                    <p><sup>1</sup> Credit Hour represents the weight of the subject.</p>
-                    <p><sup>2</sup> TH = Theory, PR = Practical</p>
-                </div>
-                
-                <!-- GPA Scale Reference -->
-                <div class="mt-6 bg-gray-100 p-4 text-xs">
-                    <p class="font-bold mb-2">GPA Scale Reference:</p>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        <div>A+ (4.0): 90-100%</div>
-                        <div>A (3.6): 80-89%</div>
-                        <div>B+ (3.2): 70-79%</div>
-                        <div>B (2.8): 60-69%</div>
-                        <div>C+ (2.4): 50-59%</div>
-                        <div>C (2.0): 40-49%</div>
-                        <div>D (1.6): 30-39%</div>
-                        <div>F (0.0): Below 30%</div>
-                    </div>
-                </div>
+    <!-- Grade Details Section -->
+    <div class="mt-6">
+        <div class="header-blue p-3 font-bold text-lg">
+            Grade Details
+        </div>
+        
+        <table class="result-table w-full border-collapse">
+            <thead>
+                <tr class="header-blue">
+                    <th>S. No.</th>
+                    <th>Subjects</th>
+                    <th>Credit Hour<sup>1</sup></th>
+                    <th colspan="2">Obtained Grade<sup>2</sup></th>
+                    <th>Final Grade</th>
+                    <th>Grade Point</th>
+                </tr>
+                <tr class="header-blue">
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th>TH</th>
+                    <th>PR</th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>';
+                $sn = 1;
+                while ($row = $results->fetch_assoc()) { 
+                    // Convert marks to grades if needed
+                    $theory_grade = isset($row['theory_grade']) ? $row['theory_grade'] : convertToGrade($row['theory_marks']);
+                    $practical_grade = isset($row['practical_grade']) ? $row['practical_grade'] : 
+                                    ($row['practical_marks'] > 0 ? convertToGrade($row['practical_marks']) : '');
+                echo '<tr class="data-row">
+                    <td>'.$sn++.'</td>
+                    <td>'.(isset($row['subject_name']) ? $row['subject_name'] : $row['subject_id']).'</td>
+                    <td>'.(isset($row['credit_hours']) ? $row['credit_hours'] : 4).'</td>
+                    <td>'.$theory_grade.'</td>
+                    <td>'.$practical_grade.'</td>
+                    <td>'.$row['grade'].'</td>
+                    <td>'.$row['gpa'].'</td>
+                </tr>';
+                 } 
+            echo '</tbody>
+            <tfoot>
+                <tr class="bg-gray-200">
+                    <td colspan="6" class="text-right font-bold">GRADE POINT AVERAGE (GPA):</td>
+                    <td class="font-bold">'.$gpa.'</td>
+                </tr>
+            </tfoot>
+        </table>
+        
+        <div class="mt-4 text-xs">
+            <p><sup>1</sup> Credit Hour represents the weight of the subject.</p>
+            <p><sup>2</sup> TH = Theory, PR = Practical</p>
+        </div>
+        
+        <!-- GPA Scale Reference -->
+        <div class="mt-6 bg-gray-100 p-4 text-xs">
+            <p class="font-bold mb-2">GPA Scale Reference:</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div>A+ (4.0): 90-100%</div>
+                <div>A (3.6): 80-89%</div>
+                <div>B+ (3.2): 70-79%</div>
+                <div>B (2.8): 60-69%</div>
+                <div>C+ (2.4): 50-59%</div>
+                <div>C (2.0): 40-49%</div>
+                <div>D (1.6): 30-39%</div>
+                <div>F (0.0): Below 30%</div>
             </div>
         </div>
+    </div>
+</div>';
+?>
     </div>
 
     <!-- Progress Tracking Tab -->
@@ -998,29 +915,3 @@ $results->data_seek(0);
     </script>
 </body>
 </html>
-
-<?php
-// Helper function to convert marks to grade
-function convertToGrade($marks) {
-    if ($marks >= 90) return 'A+';
-    if ($marks >= 80) return 'A';
-    if ($marks >= 70) return 'B+';
-    if ($marks >= 60) return 'B';
-    if ($marks >= 50) return 'C+';
-    if ($marks >= 40) return 'C';
-    if ($marks >= 30) return 'D';
-    return 'F';
-}
-
-// Helper function to convert marks to GPA
-function convertToGPA($marks) {
-    if ($marks >= 90) return 4.0;
-    if ($marks >= 80) return 3.6;
-    if ($marks >= 70) return 3.2;
-    if ($marks >= 60) return 2.8;
-    if ($marks >= 50) return 2.4;
-    if ($marks >= 40) return 2.0;
-    if ($marks >= 30) return 1.6;
-    return 0.0;
-}
-?>

@@ -27,6 +27,11 @@ if ($result->num_rows > 0) {
 }
 $stmt->close();
 
+// If student data isn't found, use placeholder
+if (!$student) {
+    die("Student record not found. Please contact administrator.");
+}
+
 // Get subjects for the student's class
 $subjects = [];
 $stmt = $conn->prepare("SELECT s.* FROM subjects s 
@@ -160,29 +165,23 @@ $conn->close();
                             <i class="fas fa-tachometer-alt mr-3"></i>
                             Dashboard
                         </a>
-                        <a href="#" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                        <a href="view_result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
                             <i class="fas fa-clipboard-list mr-3"></i>
                             My Results
                         </a>
-                        <a href="#" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-calendar-alt mr-3"></i>
-                            Exam Schedule
+                        <a href="track_progress.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-chart-line mr-3"></i>
+                            Track Progress
                         </a>
-                        <a href="#" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-book mr-3"></i>
-                            Subjects
+                        <a href="download_options.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-download mr-3"></i>
+                            Download Options
                         </a>
-                        <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-cog mr-3"></i>
-                            Settings
-                        </a>
-                    </nav>
-                    <div class="flex-shrink-0 block w-full">
-                        <a href="../login.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                        <a href="../includes/logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
                             <i class="fas fa-sign-out-alt mr-3"></i>
                             Logout
                         </a>
-                    </div>
+                    </nav>
                 </div>
             </div>
         </div>
@@ -250,187 +249,61 @@ $conn->close();
                             </div>
                         </div>
 
-                        <!-- Performance Overview -->
-                        <div class="bg-white shadow rounded-lg overflow-hidden mb-6">
+                        <!-- Quick Links -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                            <a href="view_result.php" class="bg-blue-100 hover:bg-blue-200 rounded-lg p-6 flex items-center justify-center flex-col hover-scale">
+                                <i class="fas fa-clipboard-list text-blue-600 text-4xl mb-2"></i>
+                                <h3 class="text-lg font-medium text-blue-900">My Results</h3>
+                                <p class="text-sm text-gray-500 mt-1">View your exam results</p>
+                            </a>
+                            <a href="track_progress.php" class="bg-green-100 hover:bg-green-200 rounded-lg p-6 flex items-center justify-center flex-col hover-scale">
+                                <i class="fas fa-chart-line text-green-600 text-4xl mb-2"></i>
+                                <h3 class="text-lg font-medium text-green-900">Track Progress</h3>
+                                <p class="text-sm text-gray-500 mt-1">Monitor your academic progress</p>
+                            </a>
+                            <a href="download_options.php" class="bg-yellow-100 hover:bg-yellow-200 rounded-lg p-6 flex items-center justify-center flex-col hover-scale">
+                                <i class="fas fa-download text-yellow-600 text-4xl mb-2"></i>
+                                <h3 class="text-lg font-medium text-yellow-900">Download Options</h3>
+                                <p class="text-sm text-gray-500 mt-1">Download result sheets and reports</p>
+                            </a>
+                        </div>
+
+                        <!-- Notifications -->
+                        <div class="bg-white shadow rounded-lg overflow-hidden">
                             <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                <h3 class="text-lg font-medium text-gray-900">Performance Overview</h3>
+                                <h3 class="text-lg font-medium text-gray-900">Recent Notifications</h3>
                             </div>
-                            <div class="p-6">
-                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                    <div class="bg-blue-50 rounded-lg p-4">
-                                        <h4 class="text-sm font-medium text-blue-800 mb-2">Average Grade</h4>
-                                        <p class="text-3xl font-bold text-blue-600"><?php echo $overall_performance['average_grade']; ?></p>
-                                    </div>
-                                    <div class="bg-green-50 rounded-lg p-4">
-                                        <h4 class="text-sm font-medium text-green-800 mb-2">Average Percentage</h4>
-                                        <p class="text-3xl font-bold text-green-600"><?php echo number_format($overall_performance['average_percentage'], 2); ?>%</p>
-                                    </div>
-                                    <div class="bg-yellow-50 rounded-lg p-4">
-                                        <h4 class="text-sm font-medium text-yellow-800 mb-2">Subjects Passed</h4>
-                                        <p class="text-3xl font-bold text-yellow-600"><?php echo $overall_performance['pass_count']; ?>/<?php echo $overall_performance['subjects_with_results']; ?></p>
-                                    </div>
-                                    <div class="bg-purple-50 rounded-lg p-4">
-                                        <h4 class="text-sm font-medium text-purple-800 mb-2">Total Subjects</h4>
-                                        <p class="text-3xl font-bold text-purple-600"><?php echo $overall_performance['total_subjects']; ?></p>
-                                    </div>
-                                </div>
-                                
-                                <?php if (!empty($recent_results)): ?>
-                                <div class="mt-6">
-                                    <canvas id="performanceChart" height="100"></canvas>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-
-                        <!-- Recent Results and Upcoming Exams -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <!-- Recent Results -->
-                            <div class="bg-white shadow rounded-lg overflow-hidden">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Recent Results</h3>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <?php if (empty($recent_results)): ?>
-                                    <p class="text-gray-500">No results available yet.</p>
-                                    <?php else: ?>
-                                    <ul class="divide-y divide-gray-200">
-                                        <?php foreach ($recent_results as $result): ?>
-                                        <li class="py-4">
-                                            <div class="flex space-x-3">
-                                                <div class="flex-1 space-y-1">
-                                                    <div class="flex items-center justify-between">
-                                                        <h3 class="text-sm font-medium"><?php echo $result['subject_name']; ?></h3>
-                                                        <p class="text-sm text-gray-500"><?php echo date('M d, Y', strtotime($result['created_at'])); ?></p>
-                                                    </div>
-                                                    <p class="text-sm text-gray-500">
-                                                        <?php echo $result['exam_name']; ?> | 
-                                                        Theory: <?php echo $result['theory_marks']; ?> | 
-                                                        Practical: <?php echo $result['practical_marks'] ?? 'N/A'; ?>
-                                                    </p>
-                                                    <div class="mt-1">
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                            <?php 
-                                                            $grade = $result['grade'];
-                                                            if ($grade == 'A+' || $grade == 'A') echo 'bg-green-100 text-green-800';
-                                                            elseif ($grade == 'B+' || $grade == 'B') echo 'bg-blue-100 text-blue-800';
-                                                            elseif ($grade == 'C+' || $grade == 'C') echo 'bg-yellow-100 text-yellow-800';
-                                                            elseif ($grade == 'D') echo 'bg-orange-100 text-orange-800';
-                                                            else echo 'bg-red-100 text-red-800';
-                                                            ?>">
-                                                            Grade: <?php echo $grade; ?>
-                                                        </span>
-                                                    </div>
-                                                </div>
+                            <div class="px-4 py-5 sm:p-6">
+                                <ul class="divide-y divide-gray-200">
+                                    <li class="py-4">
+                                        <div class="flex space-x-3">
+                                            <div class="flex-shrink-0">
+                                                <i class="fas fa-info-circle text-blue-500"></i>
                                             </div>
-                                        </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-
-                            <!-- Upcoming Exams -->
-                            <div class="bg-white shadow rounded-lg overflow-hidden">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Upcoming Exams</h3>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <?php if (empty($upcoming_exams)): ?>
-                                    <p class="text-gray-500">No upcoming exams scheduled.</p>
-                                    <?php else: ?>
-                                    <ul class="divide-y divide-gray-200">
-                                        <?php foreach ($upcoming_exams as $exam): ?>
-                                        <li class="py-4">
-                                            <div class="flex space-x-3">
-                                                <div class="flex-1 space-y-1">
-                                                    <div class="flex items-center justify-between">
-                                                        <h3 class="text-sm font-medium"><?php echo $exam['exam_name']; ?></h3>
-                                                        <p class="text-sm text-gray-500"><?php echo date('M d, Y', strtotime($exam['start_date'])); ?></p>
-                                                    </div>
-                                                    <p class="text-sm text-gray-500">
-                                                        <?php echo ucfirst($exam['exam_type']); ?> | 
-                                                        Total Marks: <?php echo $exam['total_marks']; ?> | 
-                                                        Passing Marks: <?php echo $exam['passing_marks']; ?>
-                                                    </p>
-                                                    <?php if ($exam['start_date'] && $exam['end_date']): ?>
-                                                    <p class="text-sm text-gray-500">
-                                                        Duration: <?php echo date('M d', strtotime($exam['start_date'])); ?> - <?php echo date('M d, Y', strtotime($exam['end_date'])); ?>
-                                                    </p>
-                                                    <?php endif; ?>
+                                            <div class="flex-1 space-y-1">
+                                                <div class="flex items-center justify-between">
+                                                    <h3 class="text-sm font-medium">New Exam Scheduled</h3>
+                                                    <p class="text-sm text-gray-500">Mar 15, 2024</p>
                                                 </div>
+                                                <p class="text-sm text-gray-500">Your final exam has been scheduled for March 15th.</p>
                                             </div>
-                                        </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Subjects and Notifications -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <!-- Subjects -->
-                            <div class="bg-white shadow rounded-lg overflow-hidden">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">My Subjects</h3>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <?php if (empty($subjects)): ?>
-                                    <p class="text-gray-500">No subjects assigned yet.</p>
-                                    <?php else: ?>
-                                    <ul class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <?php foreach ($subjects as $subject): ?>
-                                        <li class="bg-gray-50 rounded-lg p-4">
-                                            <h3 class="text-sm font-medium text-gray-900"><?php echo $subject['subject_name']; ?></h3>
-                                            <p class="text-xs text-gray-500 mt-1">Subject ID: <?php echo $subject['subject_id']; ?></p>
-                                            <?php if (!empty($subject['description'])): ?>
-                                            <p class="text-xs text-gray-500 mt-1"><?php echo $subject['description']; ?></p>
-                                            <?php endif; ?>
-                                        </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-
-                            <!-- Notifications -->
-                            <div class="bg-white shadow rounded-lg overflow-hidden">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Recent Notifications</h3>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <?php if (empty($notifications)): ?>
-                                    <p class="text-gray-500">No notifications.</p>
-                                    <?php else: ?>
-                                    <ul class="divide-y divide-gray-200">
-                                        <?php foreach ($notifications as $notification): ?>
-                                        <li class="py-4">
-                                            <div class="flex space-x-3">
-                                                <div class="flex-shrink-0">
-                                                    <?php if ($notification['notification_type'] == 'system'): ?>
-                                                    <i class="fas fa-cog text-gray-400"></i>
-                                                    <?php elseif ($notification['notification_type'] == 'exam'): ?>
-                                                    <i class="fas fa-calendar-alt text-blue-500"></i>
-                                                    <?php elseif ($notification['notification_type'] == 'result'): ?>
-                                                    <i class="fas fa-clipboard-list text-green-500"></i>
-                                                    <?php else: ?>
-                                                    <i class="fas fa-bell text-yellow-500"></i>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <div class="flex-1 space-y-1">
-                                                    <div class="flex items-center justify-between">
-                                                        <h3 class="text-sm font-medium"><?php echo $notification['title']; ?></h3>
-                                                        <p class="text-sm text-gray-500"><?php echo date('M d, Y', strtotime($notification['created_at'])); ?></p>
-                                                    </div>
-                                                    <p class="text-sm text-gray-500"><?php echo $notification['message']; ?></p>
-                                                </div>
+                                        </div>
+                                    </li>
+                                    <li class="py-4">
+                                        <div class="flex space-x-3">
+                                            <div class="flex-shrink-0">
+                                                <i class="fas fa-clipboard-list text-green-500"></i>
                                             </div>
-                                        </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                    <?php endif; ?>
-                                </div>
+                                            <div class="flex-1 space-y-1">
+                                                <div class="flex items-center justify-between">
+                                                    <h3 class="text-sm font-medium">Results Published</h3>
+                                                    <p class="text-sm text-gray-500">Feb 28, 2024</p>
+                                                </div>
+                                                <p class="text-sm text-gray-500">Results for the mid-term exam have been published.</p>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </ul>
                             </div>
                         </div>
                     </div>
@@ -438,61 +311,6 @@ $conn->close();
             </main>
         </div>
     </div>
-
-    <script>
-        <?php if (!empty($recent_results)): ?>
-        // Performance Chart
-        const ctx = document.getElementById('performanceChart').getContext('2d');
-        const performanceChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: [
-                    <?php 
-                    foreach ($recent_results as $result) {
-                        echo "'" . $result['subject_name'] . "', ";
-                    }
-                    ?>
-                ],
-                datasets: [{
-                    label: 'Theory Marks',
-                    data: [
-                        <?php 
-                        foreach ($recent_results as $result) {
-                            echo $result['theory_marks'] . ", ";
-                        }
-                        ?>
-                    ],
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Practical Marks',
-                    data: [
-                        <?php 
-                        foreach ($recent_results as $result) {
-                            echo ($result['practical_marks'] ?? 0) . ", ";
-                        }
-                        ?>
-                    ],
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                }
-            }
-        });
-        <?php endif; ?>
-    </script>
 </body>
 </html>
 
