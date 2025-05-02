@@ -344,59 +344,10 @@ $conn->close();
 <body class="bg-gray-100">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <div class="hidden md:flex md:flex-shrink-0">
-            <div class="flex flex-col w-64 bg-gray-800">
-                <div class="flex items-center justify-center h-16 bg-gray-900">
-                    <span class="text-white text-lg font-semibold">Result Management</span>
-                </div>
-                <div class="flex flex-col flex-grow px-4 mt-5">
-                    <nav class="flex-1 space-y-1">
-                        <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-tachometer-alt mr-3"></i>
-                            Dashboard
-                        </a>
-                        <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-clipboard-list mr-3"></i>
-                            Results
-                        </a>
-                        <a href="bulk_upload.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-white bg-gray-700 rounded-md">
-                            <i class="fas fa-upload mr-3"></i>
-                            Bulk Upload
-                        </a>
-                        <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-users mr-3"></i>
-                            Users
-                        </a>
-                        <a href="classes.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-chalkboard mr-3"></i>
-                            Classes
-                        </a>
-                        <a href="subject.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-book mr-3"></i>
-                            Subjects
-                        </a>
-                        <a href="teachers.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-chalkboard-teacher mr-3"></i>
-                            Teachers
-                        </a>
-                        <a href="exams.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-calendar-alt mr-3"></i>
-                            Exams
-                        </a>
-                        <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-cog mr-3"></i>
-                            Settings
-                        </a>
-                    </nav>
-                    <div class="flex-shrink-0 block w-full">
-                        <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-sign-out-alt mr-3"></i>
-                            Logout
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <?php
+        // Include the file that processes form data
+        include 'sidebar.php';
+        ?>
 
         <!-- Mobile sidebar -->
         <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">

@@ -2,7 +2,7 @@
 session_start();
 // Check if user is logged in and is a student
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student') {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 
@@ -37,7 +37,7 @@ if ($result->num_rows > 0) {
 } else {
     // No student record found
     $_SESSION['error'] = "Student record not found. Please contact administrator.";
-    header("Location: dashboard.php");
+    header("Location: students_result.php"); // Changed from dashboard.php to students_result.php
     exit();
 }
 $stmt->close();
@@ -260,7 +260,7 @@ $conn->close();
                     <button class="btn btn-sm btn-light" onclick="window.print()">
                         <i class="bi bi-printer"></i> Print
                     </button>
-                    <a href="dashboard.php" class="btn btn-sm btn-light ms-2">
+                    <a href="students_result.php" class="btn btn-sm btn-light ms-2">
                         <i class="bi bi-house"></i> Dashboard
                     </a>
                 </div>
@@ -285,8 +285,7 @@ $conn->close();
                 <ul class="nav nav-pills mb-4 no-print">
                     <?php foreach ($exam_types as $type => $name): ?>
                         <li class="nav-item">
-                            <a class="nav-link <?php echo ($selected_exam == $type) ? 'active' : ''; ?>" 
-                               href="student_results.php?exam_type=<?php echo $type; ?>">
+                                href="students_result.php?exam_type=<?php echo $type; ?>">
                                 <?php echo $name; ?>
                             </a>
                         </li>

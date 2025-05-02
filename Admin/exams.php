@@ -326,78 +326,10 @@ $conn->close();
 <body class="bg-gray-100" id="body">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <div class="hidden md:flex md:flex-shrink-0">
-            <div class="flex flex-col w-64 bg-gray-800">
-                <div class="flex items-center justify-center h-16 bg-gray-900">
-                    <span class="text-white text-lg font-semibold">Result Management</span>
-                </div>
-                <div class="flex flex-col flex-grow px-4 mt-5 overflow-y-auto">
-                    <nav class="flex-1 space-y-1">
-                        <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-tachometer-alt mr-3"></i>
-                            <span class="truncate">Dashboard</span>
-                        </a>
-                        <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-clipboard-list mr-3"></i>
-                            <span class="truncate">Manage Results</span>
-                        </a>
-                        <a href="view_student_results.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-user-graduate mr-3"></i>
-                            <span class="truncate">Student Results</span>
-                        </a>
-                        <a href="bulk_upload.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-upload mr-3"></i>
-                            <span class="truncate">Bulk Upload</span>
-                        </a>
-                        
-                        <div class="mt-4">
-                            <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Management</p>
-                        </div>
-                        
-                        <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-users mr-3"></i>
-                            <span class="truncate">Users</span>
-                        </a>
-                        <a href="students.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-user-graduate mr-3"></i>
-                            <span class="truncate">Students</span>
-                        </a>
-                        <a href="teachers.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-chalkboard-teacher mr-3"></i>
-                            <span class="truncate">Teachers</span>
-                        </a>
-                        <a href="classes.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-chalkboard mr-3"></i>
-                            <span class="truncate">Classes</span>
-                        </a>
-                        <a href="exams.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-white bg-gray-700 rounded-md group">
-                            <i class="fas fa-calendar-alt mr-3"></i>
-                            <span class="truncate">Exams</span>
-                        </a>
-                        <a href="reports.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-chart-bar mr-3"></i>
-                            <span class="truncate">Reports</span>
-                        </a>
-                        <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-cog mr-3"></i>
-                            <span class="truncate">Settings</span>
-                        </a>
-                    </nav>
-                    <div class="flex-shrink-0 block w-full">
-                        <div class="flex items-center justify-between px-4 py-2 mt-2">
-                            <span class="text-sm text-gray-400">Dark Mode</span>
-                            <button id="dark-mode-toggle" class="w-10 h-5 rounded-full bg-gray-700 flex items-center transition duration-300 focus:outline-none">
-                                <div id="dark-mode-toggle-dot" class="w-4 h-4 bg-white rounded-full transform translate-x-0.5 transition duration-300"></div>
-                            </button>
-                        </div>
-                        <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200">
-                            <i class="fas fa-sign-out-alt mr-3"></i>
-                            <span class="truncate">Logout</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <?php
+        // Include the file that processes form data
+        include 'sidebar.php';
+        ?>
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
@@ -556,7 +488,6 @@ $conn->close();
                                     <select id="filter_type" name="filter_type" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                                         <option value="">All Types</option>
                                         <?php foreach ($exam_types as $type): ?>
-                                        <option value="<?php echo $type; ?>" <?php echo ($filter_type == $type)  ?>
                                         <option value="<?php echo $type; ?>" <?php echo ($filter_type == $type) ? 'selected' : ''; ?>>
                                             <?php echo $type; ?>
                                         </option>
@@ -724,6 +655,10 @@ $conn->close();
                         <label for="exam_type" class="block text-sm font-medium text-gray-700 mb-1">Exam Type</label>
                         <select id="exam_type" name="exam_type" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                             <option value="">Select Type</option>
+                            <option value="First Terminal">First Terminal</option>
+                            <option value="Second Terminal">Second Terminal</option>
+                            <option value="Third Terminal">Third Terminal</option>
+                            <option value="Final Terminal">Final Terminal</option>
                             <option value="Midterm">Midterm</option>
                             <option value="Final">Final</option>
                             <option value="Unit Test">Unit Test</option>
@@ -805,6 +740,10 @@ $conn->close();
                         <label for="edit_exam_type" class="block text-sm font-medium text-gray-700 mb-1">Exam Type</label>
                         <select id="edit_exam_type" name="exam_type" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                             <option value="">Select Type</option>
+                            <option value="First Terminal">First Terminal</option>
+                            <option value="Second Terminal">Second Terminal</option>
+                            <option value="Third Terminal">Third Terminal</option>
+                            <option value="Final Terminal">Final Terminal</option>
                             <option value="Midterm">Midterm</option>
                             <option value="Final">Final</option>
                             <option value="Unit Test">Unit Test</option>

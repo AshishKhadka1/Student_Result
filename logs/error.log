@@ -105,3 +105,7 @@ Stack trace:
 [22-Apr-2025 17:08:44 Europe/Berlin] Teacher Dashboard Error: Unknown column 'c.class_teacher_id' in 'where clause' in C:\xampp\htdocs\Student_Result\Teacher\includes\functions.php on line 72
 [22-Apr-2025 17:08:49 Europe/Berlin] Edit Marks Error: Unknown column 'c.class_teacher_id' in 'where clause'
 [22-Apr-2025 17:13:37 Europe/Berlin] Edit Marks Error: Unknown column 'c.class_teacher_id' in 'where clause'
+[24-Apr-2025 03:57:34 Europe/Berlin] Teacher Dashboard Error: Unknown column 'c.class_teacher_id' in 'where clause' in C:\xampp\htdocs\Student_Result\Teacher\includes\functions.php on line 72
+[24-Apr-2025 03:58:08 Europe/Berlin] Teacher Dashboard Error: Unknown column 'c.class_teacher_id' in 'where clause' in C:\xampp\htdocs\Student_Result\Teacher\includes\functions.php on line 72
+[24-Apr-2025 03:58:11 Europe/Berlin] Teacher Dashboard Error: Unknown column 'c.class_teacher_id' in 'where clause' in C:\xampp\htdocs\Student_Result\Teacher\includes\functions.php on line 72
+[24-Apr-2025 03:58:17 Europe/Berlin] Teacher Dashboard Error: Unknown column 'c.class_teacher_id' in 'where clause' in C:\xampp\htdocs\Student_Result\Teacher\includes\functions.php on line 72

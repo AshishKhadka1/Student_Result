@@ -28,13 +28,14 @@ SET time_zone = "+00:00";
 --
 
 CREATE TABLE `classes` (
-  `class_id` int(11) NOT NULL,
+  `class_id` int(11) NOT NULL AUTO_INCREMENT,
   `class_name` varchar(100) NOT NULL,
   `section` varchar(10) DEFAULT NULL,
   `academic_year` varchar(20) NOT NULL,
   `description` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`class_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -56,7 +57,7 @@ INSERT INTO `classes` (`class_id`, `class_name`, `section`, `academic_year`, `de
 --
 
 CREATE TABLE `exams` (
-  `exam_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL AUTO_INCREMENT,
   `exam_name` varchar(100) NOT NULL,
   `exam_type` enum('midterm','final','quiz','assignment','project','other') NOT NULL,
   `class_id` int(11) DEFAULT NULL,
@@ -69,7 +70,9 @@ CREATE TABLE `exams` (
   `status` enum('upcoming','ongoing','completed','cancelled') DEFAULT 'upcoming',
   `exam_date` date DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`exam_id`),
+  KEY `class_id` (`class_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -86,27 +89,29 @@ INSERT INTO `exams` (`exam_id`, `exam_name`, `exam_type`, `class_id`, `start_dat
 --
 
 CREATE TABLE `grading_system` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `grade` varchar(5) NOT NULL,
   `min_percentage` decimal(5,2) NOT NULL,
   `gpa` decimal(3,2) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `grade` (`grade`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `grading_system`
 --
 
-INSERT INTO `grading_system` (`id`, `grade`, `min_percentage`, `gpa`, `created_at`, `updated_at`) VALUES
-(1, 'A+', 90.00, 4.00, '2025-04-01 04:47:11', '2025-04-03 13:58:45'),
-(2, 'A', 80.00, 3.70, '2025-04-01 04:47:11', '2025-04-03 13:58:45'),
-(3, 'B+', 70.00, 3.30, '2025-04-01 04:47:11', '2025-04-03 13:58:45'),
-(4, 'B', 60.00, 3.00, '2025-04-01 04:47:11', '2025-04-03 13:58:45'),
-(5, 'C+', 50.00, 2.70, '2025-04-01 04:47:11', '2025-04-03 13:58:45'),
-(6, 'C', 40.00, 2.30, '2025-04-01 04:47:11', '2025-04-03 13:58:45'),
-(7, 'D', 33.00, 1.00, '2025-04-01 04:47:11', '2025-04-03 13:58:45'),
-(8, 'F', 0.00, 0.00, '2025-04-01 04:47:11', '2025-04-03 13:58:45');
+INSERT INTO `grading_system` (`grade`, `min_percentage`, `gpa`) VALUES
+('A+', 90.00, 4.00),
+('A', 80.00, 3.70),
+('B+', 70.00, 3.30),
+('B', 60.00, 3.00),
+('C+', 50.00, 2.70),
+('C', 40.00, 2.30),
+('D', 33.00, 1.00),
+('F', 0.00, 0.00);
 
 -- --------------------------------------------------------
 
@@ -115,13 +120,15 @@ INSERT INTO `grading_system` (`id`, `grade`, `min_percentage`, `gpa`, `created_a
 --
 
 CREATE TABLE `loginlogs` (
-  `log_id` int(11) NOT NULL,
+  `log_id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `ip_address` varchar(45) NOT NULL,
   `user_agent` text NOT NULL,
   `login_time` datetime NOT NULL,
   `logout_time` datetime DEFAULT NULL,
-  `session_duration` int(11) DEFAULT NULL
+  `session_duration` int(11) DEFAULT NULL,
+  PRIMARY KEY (`log_id`),
+  KEY `user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -170,7 +177,7 @@ INSERT INTO `loginlogs` (`log_id`, `user_id`, `ip_address`, `user_agent`, `login
 --
 
 CREATE TABLE `notifications` (
-  `notification_id` int(11) NOT NULL,
+  `notification_id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `sender_id` int(11) DEFAULT NULL COMMENT 'User who triggered the notification',
   `title` varchar(255) NOT NULL,
@@ -180,7 +187,11 @@ CREATE TABLE `notifications` (
   `is_read` tinyint(1) DEFAULT 0,
   `priority` enum('low','medium','high') DEFAULT 'medium',
   `expires_at` datetime DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`notification_id`),
+  KEY `sender_id` (`sender_id`),
+  KEY `idx_notifications_user` (`user_id`,`is_read`),
+  KEY `idx_notifications_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -201,7 +212,7 @@ INSERT INTO `notifications` (`notification_id`, `user_id`, `sender_id`, `title`,
 --
 
 CREATE TABLE `results` (
-  `result_id` int(11) NOT NULL,
+  `result_id` int(11) NOT NULL AUTO_INCREMENT,
   `student_id` varchar(20) NOT NULL,
   `exam_id` int(11) NOT NULL,
   `subject_id` varchar(20) NOT NULL,
@@ -209,16 +220,21 @@ CREATE TABLE `results` (
   `practical_marks` int(11) DEFAULT NULL CHECK (`practical_marks` between 0 and 100),
   `grade` varchar(2) DEFAULT NULL,
   `gpa` decimal(3,2) DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`result_id`),
+  KEY `student_id` (`student_id`),
+  KEY `exam_id` (`exam_id`),
+  KEY `subject_id` (`subject_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `results`
 --
 
-INSERT INTO `results` (`result_id`, `student_id`, `exam_id`, `subject_id`, `theory_marks`, `practical_marks`, `grade`, `gpa`, `created_at`, `updated_at`) VALUES
-(1, 'S001', 1, '101', 85, 90, 'A+', 4.00, '2025-03-28 04:26:17', '2025-04-03 13:58:45');
+INSERT INTO `results` (`result_id`, `student_id`, `exam_id`, `subject_id`, `theory_marks`, `practical_marks`, `grade`, `gpa`, `remarks`, `created_at`, `updated_at`) VALUES
+(1, 'S001', 1, '101', 85, 90, 'A+', 4.00, NULL, '2025-03-28 04:26:17', '2025-04-03 13:58:45');
 
 -- --------------------------------------------------------
 
@@ -227,27 +243,32 @@ INSERT INTO `results` (`result_id`, `student_id`, `exam_id`, `subject_id`, `theo
 --
 
 CREATE TABLE `settings` (
-  `setting_id` int(11) NOT NULL,
+  `setting_id` int(11) NOT NULL AUTO_INCREMENT,
   `setting_key` varchar(50) NOT NULL,
   `setting_value` text NOT NULL,
   `description` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`setting_id`),
+  UNIQUE KEY `setting_key` (`setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `settings`
 --
 
-INSERT INTO `settings` (`setting_id`, `setting_key`, `setting_value`, `description`, `created_at`, `updated_at`) VALUES
-(1, 'school_name', 'ABC School', 'Name of the school', '2025-04-03 13:58:45', '2025-04-03 13:58:45'),
-(2, 'school_address', '123 Main Street, City, Country', 'Address of the school', '2025-04-03 13:58:45', '2025-04-03 13:58:45'),
-(3, 'school_phone', '+1234567890', 'Contact number of the school', '2025-04-03 13:58:45', '2025-04-03 13:58:45'),
-(4, 'school_email', 'info@abcschool.com', 'Email address of the school', '2025-04-03 13:58:45', '2025-04-03 13:58:45'),
-(5, 'school_website', 'www.abcschool.com', 'Website of the school', '2025-04-03 13:58:45', '2025-04-03 13:58:45'),
-(6, 'grading_system', 'A:90-100,B:80-89,C:70-79,D:60-69,F:0-59', 'Grading system of the school', '2025-04-03 13:58:45', '2025-04-03 13:58:45'),
-(7, 'academic_year', '2023-2024', 'Current academic year', '2025-04-03 13:58:45', '2025-04-03 13:58:45'),
-(8, 'result_publish_date', '2024-03-15', 'Date when results will be published', '2025-04-03 13:58:45', '2025-04-03 13:58:45');
+INSERT INTO `settings` (`setting_key`, `setting_value`, `description`) VALUES
+('school_name', 'ABC School', 'Name of the school'),
+('school_address', '123 Main Street, City, Country', 'Address of the school'),
+('school_phone', '+1234567890', 'Contact number of the school'),
+('school_email', 'info@abcschool.com', 'Email address of the school'),
+('school_website', 'www.abcschool.com', 'Website of the school'),
+('grading_system', 'A:90-100,B:80-89,C:70-79,D:60-69,F:0-59', 'Grading system of the school'),
+('academic_year', '2023-2024', 'Current academic year'),
+('result_publish_date', '2024-03-15', 'Date when results will be published'),
+('school_logo', '', 'Path to school logo image'),
+('result_header', 'SECONDARY EDUCATION EXAMINATION', 'Header text for result sheets'),
+('result_footer', 'This is a computer-generated document. No signature is required.', 'Footer text for result sheets');
 
 -- --------------------------------------------------------
 
@@ -269,7 +290,12 @@ CREATE TABLE `students` (
   `parent_name` varchar(100) DEFAULT NULL,
   `parent_phone` varchar(20) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`student_id`),
+  UNIQUE KEY `roll_number` (`roll_number`),
+  UNIQUE KEY `registration_number` (`registration_number`),
+  KEY `user_id` (`user_id`),
+  KEY `class_id` (`class_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -287,7 +313,7 @@ INSERT INTO `students` (`student_id`, `user_id`, `roll_number`, `registration_nu
 --
 
 CREATE TABLE `student_performance` (
-  `performance_id` int(11) NOT NULL,
+  `performance_id` int(11) NOT NULL AUTO_INCREMENT,
   `student_id` varchar(20) NOT NULL,
   `exam_id` int(11) NOT NULL,
   `average_marks` decimal(5,2) DEFAULT NULL,
@@ -297,7 +323,11 @@ CREATE TABLE `student_performance` (
   `rank` int(11) DEFAULT NULL,
   `remarks` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`performance_id`),
+  UNIQUE KEY `student_exam_unique` (`student_id`,`exam_id`),
+  KEY `student_id` (`student_id`),
+  KEY `exam_id` (`exam_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -318,7 +348,8 @@ CREATE TABLE `subjects` (
   `subject_name` varchar(100) NOT NULL,
   `description` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`subject_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -342,7 +373,7 @@ INSERT INTO `subjects` (`subject_id`, `subject_name`, `description`, `created_at
 --
 
 CREATE TABLE `teachers` (
-  `teacher_id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `employee_id` varchar(20) NOT NULL,
   `qualification` varchar(100) DEFAULT NULL,
@@ -351,7 +382,10 @@ CREATE TABLE `teachers` (
   `phone` varchar(20) DEFAULT NULL,
   `address` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`teacher_id`),
+  UNIQUE KEY `employee_id` (`employee_id`),
+  KEY `user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -369,11 +403,14 @@ INSERT INTO `teachers` (`teacher_id`, `user_id`, `employee_id`, `qualification`,
 --
 
 CREATE TABLE `teachersubjects` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `teacher_id` int(11) NOT NULL,
   `subject_id` varchar(20) NOT NULL,
   `academic_year` varchar(20) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `teacher_id` (`teacher_id`,`subject_id`,`academic_year`),
+  KEY `subject_id` (`subject_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -390,11 +427,13 @@ INSERT INTO `teachersubjects` (`id`, `teacher_id`, `subject_id`, `academic_year`
 --
 
 CREATE TABLE `teacher_activities` (
-  `activity_id` int(11) NOT NULL,
+  `activity_id` int(11) NOT NULL AUTO_INCREMENT,
   `teacher_id` int(11) NOT NULL,
   `activity_type` enum('login','logout','marks_update','view_performance','print_report','other') NOT NULL,
   `description` text NOT NULL,
-  `timestamp` datetime NOT NULL DEFAULT current_timestamp()
+  `timestamp` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`activity_id`),
+  KEY `teacher_id` (`teacher_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -404,7 +443,7 @@ CREATE TABLE `teacher_activities` (
 --
 
 CREATE TABLE `users` (
-  `user_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL AUTO_INCREMENT,
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
   `full_name` varchar(100) NOT NULL,
@@ -414,7 +453,10 @@ CREATE TABLE `users` (
   `profile_image` varchar(255) DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -428,193 +470,6 @@ INSERT INTO `users` (`user_id`, `username`, `password`, `full_name`, `email`, `r
 (4, 'teacher1', '$2y$10$8zUUpfvHvJqMnJ4gJk.Cj.Z/BvWQS1zNFW9CMhbRvDpRRUL2jEjGK', 'Jane Smith', 'teacher1@example.com', 'teacher', 'active', NULL, NULL, '2025-03-28 04:26:17', '2025-04-03 13:58:45'),
 (5, 'teacher_1', '$2y$10$ytNjhLEEsIHFtuusMcUSwuRsUqvG8KK2wKxhcoVw1BR/7ibtQnHWm', 'Teacher_1', 'hero@mailinator.com', 'teacher', 'active', NULL, NULL, '2025-04-04 03:55:48', '2025-04-04 03:55:48'),
 (8, 'Student', '$2y$10$Ww5b6yZAta13M63z3Jn80e2CZXgK59.d/u1eT/ZdkXPhmp9Q4wcaG', 'Student', 'nykesi@mailinator.com', 'student', 'active', NULL, NULL, '2025-04-22 01:33:09', '2025-04-22 01:33:09');
-
---
--- Indexes for dumped tables
---
-
---
--- Indexes for table `classes`
---
-ALTER TABLE `classes`
-  ADD PRIMARY KEY (`class_id`);
-
---
--- Indexes for table `exams`
---
-ALTER TABLE `exams`
-  ADD PRIMARY KEY (`exam_id`),
-  ADD KEY `class_id` (`class_id`);
-
---
--- Indexes for table `grading_system`
---
-ALTER TABLE `grading_system`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indexes for table `loginlogs`
---
-ALTER TABLE `loginlogs`
-  ADD PRIMARY KEY (`log_id`),
-  ADD KEY `user_id` (`user_id`);
-
---
--- Indexes for table `notifications`
---
-ALTER TABLE `notifications`
-  ADD PRIMARY KEY (`notification_id`),
-  ADD KEY `sender_id` (`sender_id`),
-  ADD KEY `idx_notifications_user` (`user_id`,`is_read`),
-  ADD KEY `idx_notifications_created` (`created_at`);
-
---
--- Indexes for table `results`
---
-ALTER TABLE `results`
-  ADD PRIMARY KEY (`result_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `exam_id` (`exam_id`),
-  ADD KEY `subject_id` (`subject_id`);
-
---
--- Indexes for table `settings`
---
-ALTER TABLE `settings`
-  ADD PRIMARY KEY (`setting_id`),
-  ADD UNIQUE KEY `setting_key` (`setting_key`);
-
---
--- Indexes for table `students`
---
-ALTER TABLE `students`
-  ADD PRIMARY KEY (`student_id`),
-  ADD UNIQUE KEY `roll_number` (`roll_number`),
-  ADD UNIQUE KEY `registration_number` (`registration_number`),
-  ADD KEY `user_id` (`user_id`),
-  ADD KEY `class_id` (`class_id`);
-
---
--- Indexes for table `student_performance`
---
-ALTER TABLE `student_performance`
-  ADD PRIMARY KEY (`performance_id`),
-  ADD UNIQUE KEY `student_exam_unique` (`student_id`,`exam_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `exam_id` (`exam_id`);
-
---
--- Indexes for table `subjects`
---
-ALTER TABLE `subjects`
-  ADD PRIMARY KEY (`subject_id`);
-
---
--- Indexes for table `teachers`
---
-ALTER TABLE `teachers`
-  ADD PRIMARY KEY (`teacher_id`),
-  ADD UNIQUE KEY `employee_id` (`employee_id`),
-  ADD KEY `user_id` (`user_id`);
-
---
--- Indexes for table `teachersubjects`
---
-ALTER TABLE `teachersubjects`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `teacher_id` (`teacher_id`,`subject_id`,`academic_year`),
-  ADD KEY `subject_id` (`subject_id`);
-
---
--- Indexes for table `teacher_activities`
---
-ALTER TABLE `teacher_activities`
-  ADD PRIMARY KEY (`activity_id`),
-  ADD KEY `teacher_id` (`teacher_id`);
-
---
--- Indexes for table `users`
---
-ALTER TABLE `users`
-  ADD PRIMARY KEY (`user_id`),
-  ADD UNIQUE KEY `username` (`username`),
-  ADD UNIQUE KEY `email` (`email`);
-
---
--- AUTO_INCREMENT for dumped tables
---
-
---
--- AUTO_INCREMENT for table `classes`
---
-ALTER TABLE `classes`
-  MODIFY `class_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
-
---
--- AUTO_INCREMENT for table `exams`
---
-ALTER TABLE `exams`
-  MODIFY `exam_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `grading_system`
---
-ALTER TABLE `grading_system`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
-
---
--- AUTO_INCREMENT for table `loginlogs`
---
-ALTER TABLE `loginlogs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
-
---
--- AUTO_INCREMENT for table `notifications`
---
-ALTER TABLE `notifications`
-  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
-
---
--- AUTO_INCREMENT for table `results`
---
-ALTER TABLE `results`
-  MODIFY `result_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `settings`
---
-ALTER TABLE `settings`
-  MODIFY `setting_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
-
---
--- AUTO_INCREMENT for table `student_performance`
---
-ALTER TABLE `student_performance`
-  MODIFY `performance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `teachers`
---
-ALTER TABLE `teachers`
-  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- AUTO_INCREMENT for table `teachersubjects`
---
-ALTER TABLE `teachersubjects`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `teacher_activities`
---
-ALTER TABLE `teacher_activities`
-  MODIFY `activity_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `users`
---
-ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- Constraints for dumped tables
@@ -679,6 +534,11 @@ ALTER TABLE `teachersubjects`
 --
 ALTER TABLE `teacher_activities`
   ADD CONSTRAINT `teacher_activities_ibfk_1` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`teacher_id`) ON DELETE CASCADE;
+
+-- Add indexes to improve query performance
+CREATE INDEX IF NOT EXISTS idx_results_student_exam ON results(student_id, exam_id);
+CREATE INDEX IF NOT EXISTS idx_students_class ON students(class_id);
+CREATE INDEX IF NOT EXISTS idx_exams_class ON exams(class_id);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -12,7 +12,8 @@ if ($conn->connect_error) {
 }
 
 // Function to get dashboard counts with error handling
-function getDashboardCounts($conn) {
+function getDashboardCounts($conn)
+{
     $counts = [
         'students' => 0,
         'teachers' => 0,
@@ -23,7 +24,7 @@ function getDashboardCounts($conn) {
         'active_users' => 0,
         'inactive_users' => 0
     ];
-    
+
     $tables = [
         'students' => "SELECT COUNT(*) as count FROM students",
         'teachers' => "SELECT COUNT(*) as count FROM teachers",
@@ -34,7 +35,7 @@ function getDashboardCounts($conn) {
         'active_users' => "SELECT COUNT(*) as count FROM users WHERE status = 'active'",
         'inactive_users' => "SELECT COUNT(*) as count FROM users WHERE status = 'inactive'"
     ];
-    
+
     foreach ($tables as $key => $query) {
         try {
             $result = $conn->query($query);
@@ -46,12 +47,13 @@ function getDashboardCounts($conn) {
             error_log("Error fetching count for $key: " . $e->getMessage());
         }
     }
-    
+
     return $counts;
 }
 
 // Get notifications with prepared statement
-function getNotifications($conn, $user_id, $limit = 5) {
+function getNotifications($conn, $user_id, $limit = 5)
+{
     $notifications = [];
     try {
         $stmt = $conn->prepare("SELECT * FROM notifications WHERE user_id = ? OR user_id IS NULL ORDER BY created_at DESC LIMIT ?");
@@ -69,7 +71,8 @@ function getNotifications($conn, $user_id, $limit = 5) {
 }
 
 // Get recent users with error handling
-function getRecentUsers($conn, $limit = 5) {
+function getRecentUsers($conn, $limit = 5)
+{
     $recent_users = [];
     try {
         $result = $conn->query("SELECT u.user_id, u.username, u.full_name, u.email, u.role, u.created_at FROM users u ORDER BY u.created_at DESC LIMIT $limit");
@@ -85,7 +88,8 @@ function getRecentUsers($conn, $limit = 5) {
 }
 
 // Get upcoming exams with error handling
-function getUpcomingExams($conn, $limit = 5) {
+function getUpcomingExams($conn, $limit = 5)
+{
     $upcoming_exams = [];
     try {
         $result = $conn->query("SELECT e.*, c.class_name, c.section FROM exams e JOIN classes c ON e.class_id = c.class_id WHERE e.status = 'upcoming' ORDER BY e.start_date ASC LIMIT $limit");
@@ -101,7 +105,8 @@ function getUpcomingExams($conn, $limit = 5) {
 }
 
 // Get class toppers with error handling
-function getClassToppers($conn, $limit = 10) {
+function getClassToppers($conn, $limit = 10)
+{
     $class_toppers = [];
     try {
         $result = $conn->query("
@@ -157,7 +162,8 @@ function getClassToppers($conn, $limit = 10) {
 }
 
 // Get academic progress with error handling
-function getAcademicProgress($conn, $limit = 10) {
+function getAcademicProgress($conn, $limit = 10)
+{
     $academic_progress = [];
     try {
         $result = $conn->query("
@@ -196,7 +202,8 @@ function getAcademicProgress($conn, $limit = 10) {
 }
 
 // Get recent activities with error handling
-function getRecentActivities($conn, $limit = 10) {
+function getRecentActivities($conn, $limit = 10)
+{
     $recent_activities = [];
     try {
         $result = $conn->query("
@@ -256,7 +263,8 @@ function getRecentActivities($conn, $limit = 10) {
 }
 
 // Get subject performance data for charts with error handling
-function getSubjectPerformance($conn, $limit = 5) {
+function getSubjectPerformance($conn, $limit = 5)
+{
     $subject_performance = [];
     try {
         $result = $conn->query("
@@ -286,7 +294,8 @@ function getSubjectPerformance($conn, $limit = 5) {
 }
 
 // Get class-wise GPA data for charts with error handling
-function getClassGPA($conn, $limit = 5) {
+function getClassGPA($conn, $limit = 5)
+{
     $class_gpa = [];
     try {
         $result = $conn->query("
@@ -318,7 +327,8 @@ function getClassGPA($conn, $limit = 5) {
 }
 
 // Get system health metrics with error handling
-function getSystemHealth($conn) {
+function getSystemHealth($conn)
+{
     $system_health = [
         'database_size' => 0,
         'last_backup' => 'Never',
@@ -413,28 +423,28 @@ $conn->close();
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
+
     <style>
         /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
-        
+
         ::-webkit-scrollbar-track {
             background: #f1f1f1;
             border-radius: 10px;
         }
-        
+
         ::-webkit-scrollbar-thumb {
             background: #888;
             border-radius: 10px;
         }
-        
+
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
-        
+
         /* Responsive grid */
         @media (max-width: 640px) {
             .stats-grid {
@@ -447,21 +457,24 @@ $conn->close();
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
-        
+
         /* Animations */
         .animate-pulse {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
 
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 1;
             }
+
             50% {
                 opacity: .5;
             }
         }
-        
+
         .hover-scale {
             transition: all 0.3s ease;
         }
@@ -470,39 +483,40 @@ $conn->close();
             transform: scale(1.03);
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
-        
+
         /* Card hover effects */
         .card-hover {
             transition: all 0.3s ease;
         }
-        
+
         .card-hover:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
-        
+
         /* Skeleton loading */
         .skeleton {
             background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
             background-size: 200% 100%;
             animation: skeleton-loading 1.5s infinite;
         }
-        
+
         @keyframes skeleton-loading {
             0% {
                 background-position: 200% 0;
             }
+
             100% {
                 background-position: -200% 0;
             }
         }
-        
+
         /* Tooltip */
         .tooltip {
             position: relative;
             display: inline-block;
         }
-        
+
         .tooltip .tooltip-text {
             visibility: hidden;
             width: 120px;
@@ -519,12 +533,12 @@ $conn->close();
             opacity: 0;
             transition: opacity 0.3s;
         }
-        
+
         .tooltip:hover .tooltip-text {
             visibility: visible;
             opacity: 1;
         }
-        
+
         /* Badge notification */
         .badge {
             position: absolute;
@@ -536,31 +550,31 @@ $conn->close();
             color: white;
             font-size: 10px;
         }
-        
+
         /* Dark mode toggle */
         .dark-mode {
             background-color: #1a202c;
             color: #e2e8f0;
         }
-        
+
         .dark-mode .bg-white {
             background-color: #2d3748 !important;
             color: #e2e8f0;
         }
-        
+
         .dark-mode .bg-gray-50 {
             background-color: #4a5568 !important;
             color: #e2e8f0;
         }
-        
+
         .dark-mode .text-gray-900 {
             color: #e2e8f0 !important;
         }
-        
+
         .dark-mode .text-gray-500 {
             color: #a0aec0 !important;
         }
-        
+
         .dark-mode .border-gray-200 {
             border-color: #4a5568 !important;
         }
@@ -570,223 +584,18 @@ $conn->close();
 <body class="bg-gray-100" id="body">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <div class="hidden md:flex md:flex-shrink-0">
-            <div class="flex flex-col w-64 bg-gray-800">
-                <div class="flex items-center justify-center h-16 bg-gray-900">
-                    <span class="text-white text-lg font-semibold">Result Management</span>
-                </div>
-                <div class="flex flex-col flex-grow px-4 mt-5 overflow-y-auto">
-                    <nav class="flex-1 space-y-1">
-                        <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-white bg-gray-700 rounded-md group">
-                            <i class="fas fa-tachometer-alt mr-3"></i>
-                            <span class="truncate">Dashboard</span>
-                        </a>
-                        <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-clipboard-list mr-3"></i>
-                            <span class="truncate">Results</span>
-                        </a>
-                        <a href="bulk_upload.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-upload mr-3"></i>
-                            <span class="truncate">Bulk Upload</span>
-                        </a>
-                        <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-users mr-3"></i>
-                            <span class="truncate">Users</span>
-                        </a>
-
-                        <div class="mt-4">
-                            <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Academic</p>
-                        </div>
-
-                        <a href="subject.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-book mr-3"></i>
-                            <span class="truncate">Subjects</span>
-                        </a>
-
-                        <a href="exam_result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-file-alt mr-3"></i>
-                            <span class="truncate">Exam Result</span>
-                        </a>
-
-                        <a href="result_sheet_template.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-file-invoice mr-3"></i>
-                            <span class="truncate">Result Sheet</span>
-                        </a>
-
-                        <a href="students_result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-user-graduate mr-3"></i>
-                            <span class="truncate">Student Result</span>
-                        </a>
-
-                        <div class="mt-4">
-                            <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Management</p>
-                        </div>
-
-                        <a href="classes.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-chalkboard mr-3"></i>
-                            <span class="truncate">Classes</span>
-                        </a>
-                        <a href="exams.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-calendar-alt mr-3"></i>
-                            <span class="truncate">Exams</span>
-                        </a>
-                        <a href="reports.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-chart-bar mr-3"></i>
-                            <span class="truncate">Reports</span>
-                        </a>
-                        <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-cog mr-3"></i>
-                            <span class="truncate">Settings</span>
-                        </a>
-                    </nav>
-                    <div class="flex-shrink-0 block w-full">
-                        <a href="../login.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-200 group">
-                            <i class="fas fa-sign-out-alt mr-3"></i>
-                            <span class="truncate">Logout</span>
-                        </a>
-                        <div class="flex items-center justify-between px-4 py-2 mt-2">
-                            <span class="text-sm text-gray-400">Dark Mode</span>
-                            <button id="dark-mode-toggle" class="w-10 h-5 rounded-full bg-gray-700 flex items-center transition duration-300 focus:outline-none">
-                                <div id="dark-mode-toggle-dot" class="w-4 h-4 bg-white rounded-full transform translate-x-0.5 transition duration-300"></div>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <?php
+        // Include the file that processes form data
+        include 'sidebar.php';
+        ?>
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
             <!-- Top Navigation -->
-            <div class="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
-                <button class="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:bg-gray-100 focus:text-gray-600 md:hidden" id="sidebar-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="flex-1 px-4 flex justify-between">
-                    <div class="flex-1 flex">
-                        <div class="w-full flex md:ml-0">
-                            <h1 class="text-2xl font-semibold text-gray-900 my-auto">Admin Dashboard</h1>
-                        </div>
-                    </div>
-                    <div class="ml-4 flex items-center md:ml-6">
-                        <!-- Search button -->
-                        <button class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-3" id="search-button">
-                            <span class="sr-only">Search</span>
-                            <i class="fas fa-search"></i>
-                        </button>
-                        
-                        <!-- Search modal -->
-                        <div class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden" id="search-modal">
-                            <div class="flex items-center justify-center min-h-screen p-4">
-                                <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-                                    <div class="flex justify-between items-center mb-4">
-                                        <h3 class="text-lg font-medium">Search</h3>
-                                        <button id="close-search" class="text-gray-400 hover:text-gray-500">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                    <div class="relative">
-                                        <input type="text" id="global-search" class="w-full border border-gray-300 rounded-md py-2 px-4 pl-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Search for students, classes, exams...">
-                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <i class="fas fa-search text-gray-400"></i>
-                                        </div>
-                                    </div>
-                                    <div class="mt-4 max-h-60 overflow-y-auto" id="search-results">
-                                        <!-- Search results will be populated here -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Dark mode toggle for mobile -->
-                        <button class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-3 md:hidden" id="mobile-dark-mode-toggle">
-                            <span class="sr-only">Toggle dark mode</span>
-                            <i class="fas fa-moon"></i>
-                        </button>
-                        
-                        <!-- Notification button -->
-                        <button class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 relative" id="notification-button">
-                            <span class="sr-only">View notifications</span>
-                            <i class="fas fa-bell"></i>
-                            <?php if (!empty($notifications)): ?>
-                                <span class="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
-                            <?php endif; ?>
-                        </button>
-
-                        <!-- Notification dropdown -->
-                        <div class="hidden origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none" id="notification-dropdown" style="top: 3rem; right: 1rem;">
-                            <div class="px-4 py-2 border-b border-gray-200">
-                                <h3 class="text-sm font-medium text-gray-700">Notifications</h3>
-                            </div>
-                            <div class="max-h-60 overflow-y-auto">
-                                <?php if (empty($notifications)): ?>
-                                    <p class="px-4 py-2 text-sm text-gray-500">No new notifications.</p>
-                                <?php else: ?>
-                                    <?php foreach ($notifications as $notification): ?>
-                                        <div class="px-4 py-2 hover:bg-gray-50 border-b border-gray-100">
-                                            <p class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($notification['title']); ?></p>
-                                            <p class="text-xs text-gray-500"><?php echo htmlspecialchars($notification['message']); ?></p>
-                                            <p class="text-xs text-gray-400 mt-1"><?php echo date('M d, Y H:i', strtotime($notification['created_at'])); ?></p>
-                                        </div>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </div>
-                            <div class="px-4 py-2 border-t border-gray-200">
-                                <a href="notifications.php" class="text-xs text-blue-600 hover:text-blue-500">View all notifications</a>
-                            </div>
-                        </div>
-
-                        <!-- Profile dropdown -->
-                        <div class="ml-3 relative">
-                            <div>
-                                <button type="button"
-                                    class="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                    id="user-menu-button"
-                                    aria-expanded="false"
-                                    aria-haspopup="true">
-                                    <span class="sr-only">Open user menu</span>
-                                    <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-600">
-                                        <span class="text-sm font-medium leading-none text-white">
-                                            <?php echo isset($_SESSION['full_name']) ? substr($_SESSION['full_name'], 0, 1) : 'A'; ?>
-                                        </span>
-                                    </span>
-                                </button>
-                            </div>
-
-                            <!-- Profile dropdown menu -->
-                            <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none"
-                                id="user-menu"
-                                role="menu"
-                                aria-orientation="vertical"
-                                aria-labelledby="user-menu-button"
-                                tabindex="-1">
-                                <div class="px-4 py-2 border-b border-gray-100">
-                                    <p class="text-sm font-medium text-gray-900"><?php echo isset($_SESSION['full_name']) ? htmlspecialchars($_SESSION['full_name']) : 'Admin User'; ?></p>
-                                    <p class="text-xs text-gray-500"><?php echo isset($_SESSION['email']) ? htmlspecialchars($_SESSION['email']) : 'admin@example.com'; ?></p>
-                                </div>
-                                <a href="profile.php"
-                                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                    role="menuitem"
-                                    tabindex="-1">
-                                    <i class="fas fa-user mr-2"></i> Your Profile
-                                </a>
-                                <a href="settings.php"
-                                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                    role="menuitem"
-                                    tabindex="-1">
-                                    <i class="fas fa-cog mr-2"></i> Settings
-                                </a>
-                                <a href="logout.php"
-                                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                    role="menuitem"
-                                    tabindex="-1">
-                                    <i class="fas fa-sign-out-alt mr-2"></i> Sign out
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <?php
+        // Include the file that processes form data
+        include 'topBar.php';
+        ?>
 
             <!-- Mobile sidebar -->
             <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
@@ -1156,375 +965,375 @@ $conn->close();
                                                                     if ($performance_percentage >= 70) {
                                                                         $color_class = 'bg-green-500';
                                                                     } elseif ($performance_percentage >= 40) {
-                                                                $color_class = 'bg-yellow-500';
-                                                            }
-                                                            ?>
-                                                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                                                <div class="<?php echo $color_class; ?> h-2.5 rounded-full" style="width: <?php echo $performance_percentage; ?>%"></div>
+                                                                        $color_class = 'bg-yellow-500';
+                                                                    }
+                                                                    ?>
+                                                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                                                        <div class="<?php echo $color_class; ?> h-2.5 rounded-full" style="width: <?php echo $performance_percentage; ?>%"></div>
+                                                                    </div>
+                                                                    <span class="ml-2 text-xs text-gray-500">
+                                                                        <?php echo $progress['high_performers']; ?>/<?php echo $progress['student_count']; ?>
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    <?php endforeach; ?>
+                                                <?php endif; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Activities and Upcoming Exams -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            <!-- Recent Activities -->
+                            <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
+                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                                    <h3 class="text-lg font-medium text-gray-900">Recent Activities</h3>
+                                    <p class="mt-1 text-sm text-gray-500">Latest actions in the system</p>
+                                </div>
+                                <div class="px-4 py-5 sm:p-6">
+                                    <div class="flow-root">
+                                        <ul role="list" class="-mb-8">
+                                            <?php if (empty($recent_activities)): ?>
+                                                <li class="py-4">
+                                                    <div class="text-center text-sm text-gray-500">No recent activities.</div>
+                                                </li>
+                                            <?php else: ?>
+                                                <?php foreach ($recent_activities as $index => $activity): ?>
+                                                    <li>
+                                                        <div class="relative pb-8">
+                                                            <?php if ($index !== count($recent_activities) - 1): ?>
+                                                                <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                                                            <?php endif; ?>
+                                                            <div class="relative flex space-x-3">
+                                                                <div>
+                                                                    <?php
+                                                                    $icon_class = 'bg-gray-400';
+                                                                    $icon = '<i class="fas fa-info text-white"></i>';
+
+                                                                    if ($activity['type'] === 'result') {
+                                                                        $icon_class = 'bg-green-500';
+                                                                        $icon = '<i class="fas fa-clipboard-check text-white"></i>';
+                                                                    } elseif ($activity['type'] === 'user') {
+                                                                        $icon_class = 'bg-blue-500';
+                                                                        $icon = '<i class="fas fa-user-plus text-white"></i>';
+                                                                    } elseif ($activity['type'] === 'exam') {
+                                                                        $icon_class = 'bg-purple-500';
+                                                                        $icon = '<i class="fas fa-calendar-plus text-white"></i>';
+                                                                    }
+                                                                    ?>
+                                                                    <span class="h-8 w-8 rounded-full <?php echo $icon_class; ?> flex items-center justify-center ring-8 ring-white">
+                                                                        <?php echo $icon; ?>
+                                                                    </span>
+                                                                </div>
+                                                                <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
+                                                                    <div>
+                                                                        <p class="text-sm text-gray-500"><?php echo htmlspecialchars($activity['description']); ?></p>
+                                                                    </div>
+                                                                    <div class="text-right text-sm whitespace-nowrap text-gray-500">
+                                                                        <time datetime="<?php echo $activity['timestamp']; ?>"><?php echo date('M d, H:i', strtotime($activity['timestamp'])); ?></time>
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            <span class="ml-2 text-xs text-gray-500">
-                                                                <?php echo $progress['high_performers']; ?>/<?php echo $progress['student_count']; ?>
-                                                            </span>
                                                         </div>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
+                                                    </li>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Upcoming Exams -->
+                            <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
+                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                                    <h3 class="text-lg font-medium text-gray-900">Upcoming Exams</h3>
+                                    <p class="mt-1 text-sm text-gray-500">Scheduled examinations</p>
+                                </div>
+                                <div class="px-4 py-5 sm:p-6">
+                                    <div class="overflow-x-auto">
+                                        <?php if (empty($upcoming_exams)): ?>
+                                            <p class="text-center text-sm text-gray-500">No upcoming exams scheduled.</p>
+                                        <?php else: ?>
+                                            <table class="min-w-full divide-y divide-gray-200">
+                                                <thead class="bg-gray-50">
+                                                    <tr>
+                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Name</th>
+                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="bg-white divide-y divide-gray-200">
+                                                    <?php foreach ($upcoming_exams as $exam): ?>
+                                                        <tr class="hover:bg-gray-50">
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                                <a href="exam_details.php?id=<?php echo $exam['exam_id']; ?>" class="text-blue-600 hover:text-blue-900">
+                                                                    <?php echo htmlspecialchars($exam['exam_name']); ?>
+                                                                </a>
+                                                            </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                <?php echo htmlspecialchars($exam['class_name'] . ' ' . $exam['section']); ?>
+                                                            </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                <?php echo date('M d, Y', strtotime($exam['start_date'])); ?>
+                                                            </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                                    Upcoming
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    <?php endforeach; ?>
+                                                </tbody>
+                                            </table>
                                         <?php endif; ?>
-                                    </tbody>
-                                </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Recent Activities and Upcoming Exams -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <!-- Recent Activities -->
-                    <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
-                        <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                            <h3 class="text-lg font-medium text-gray-900">Recent Activities</h3>
-                            <p class="mt-1 text-sm text-gray-500">Latest actions in the system</p>
-                        </div>
-                        <div class="px-4 py-5 sm:p-6">
-                            <div class="flow-root">
-                                <ul role="list" class="-mb-8">
-                                    <?php if (empty($recent_activities)): ?>
-                                        <li class="py-4">
-                                            <div class="text-center text-sm text-gray-500">No recent activities.</div>
-                                        </li>
-                                    <?php else: ?>
-                                        <?php foreach ($recent_activities as $index => $activity): ?>
-                                            <li>
-                                                <div class="relative pb-8">
-                                                    <?php if ($index !== count($recent_activities) - 1): ?>
-                                                        <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
-                                                    <?php endif; ?>
-                                                    <div class="relative flex space-x-3">
-                                                        <div>
-                                                            <?php 
-                                                            $icon_class = 'bg-gray-400';
-                                                            $icon = '<i class="fas fa-info text-white"></i>';
-                                                            
-                                                            if ($activity['type'] === 'result') {
-                                                                $icon_class = 'bg-green-500';
-                                                                $icon = '<i class="fas fa-clipboard-check text-white"></i>';
-                                                            } elseif ($activity['type'] === 'user') {
-                                                                $icon_class = 'bg-blue-500';
-                                                                $icon = '<i class="fas fa-user-plus text-white"></i>';
-                                                            } elseif ($activity['type'] === 'exam') {
-                                                                $icon_class = 'bg-purple-500';
-                                                                $icon = '<i class="fas fa-calendar-plus text-white"></i>';
-                                                            }
-                                                            ?>
-                                                            <span class="h-8 w-8 rounded-full <?php echo $icon_class; ?> flex items-center justify-center ring-8 ring-white">
-                                                                <?php echo $icon; ?>
-                                                            </span>
-                                                        </div>
-                                                        <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                                                            <div>
-                                                                <p class="text-sm text-gray-500"><?php echo htmlspecialchars($activity['description']); ?></p>
-                                                            </div>
-                                                            <div class="text-right text-sm whitespace-nowrap text-gray-500">
-                                                                <time datetime="<?php echo $activity['timestamp']; ?>"><?php echo date('M d, H:i', strtotime($activity['timestamp'])); ?></time>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </li>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Upcoming Exams -->
-                    <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
-                        <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                            <h3 class="text-lg font-medium text-gray-900">Upcoming Exams</h3>
-                            <p class="mt-1 text-sm text-gray-500">Scheduled examinations</p>
-                        </div>
-                        <div class="px-4 py-5 sm:p-6">
-                            <div class="overflow-x-auto">
-                                <?php if (empty($upcoming_exams)): ?>
-                                    <p class="text-center text-sm text-gray-500">No upcoming exams scheduled.</p>
-                                <?php else: ?>
-                                    <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Name</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200">
-                                            <?php foreach ($upcoming_exams as $exam): ?>
-                                                <tr class="hover:bg-gray-50">
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                        <a href="exam_details.php?id=<?php echo $exam['exam_id']; ?>" class="text-blue-600 hover:text-blue-900">
-                                                            <?php echo htmlspecialchars($exam['exam_name']); ?>
-                                                        </a>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo htmlspecialchars($exam['class_name'] . ' ' . $exam['section']); ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo date('M d, Y', strtotime($exam['start_date'])); ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                                            Upcoming
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                <?php endif; ?>
+                        <!-- System Health -->
+                        <div class="bg-white shadow rounded-lg overflow-hidden mb-6 hover-scale card-hover">
+                            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                                <h3 class="text-lg font-medium text-gray-900">System Health</h3>
+                                <p class="mt-1 text-sm text-gray-500">System status and metrics</p>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- System Health -->
-                <div class="bg-white shadow rounded-lg overflow-hidden mb-6 hover-scale card-hover">
-                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                        <h3 class="text-lg font-medium text-gray-900">System Health</h3>
-                        <p class="mt-1 text-sm text-gray-500">System status and metrics</p>
-                    </div>
-                    <div class="px-4 py-5 sm:p-6">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                                        <i class="fas fa-database text-white text-xl"></i>
+                            <div class="px-4 py-5 sm:p-6">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                                                <i class="fas fa-database text-white text-xl"></i>
+                                            </div>
+                                            <div class="ml-5">
+                                                <p class="text-sm font-medium text-gray-500">Database Size</p>
+                                                <p class="text-lg font-semibold text-gray-900"><?php echo $system_health['database_size']; ?> MB</p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="ml-5">
-                                        <p class="text-sm font-medium text-gray-500">Database Size</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo $system_health['database_size']; ?> MB</p>
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
+                                                <i class="fas fa-save text-white text-xl"></i>
+                                            </div>
+                                            <div class="ml-5">
+                                                <p class="text-sm font-medium text-gray-500">Last Backup</p>
+                                                <p class="text-lg font-semibold text-gray-900"><?php echo date('M d, Y H:i', strtotime($system_health['last_backup'])); ?></p>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
-                                        <i class="fas fa-save text-white text-xl"></i>
-                                    </div>
-                                    <div class="ml-5">
-                                        <p class="text-sm font-medium text-gray-500">Last Backup</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo date('M d, Y H:i', strtotime($system_health['last_backup'])); ?></p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-yellow-500 rounded-md p-3">
-                                        <i class="fas fa-tasks text-white text-xl"></i>
-                                    </div>
-                                    <div class="ml-5">
-                                        <p class="text-sm font-medium text-gray-500">Pending Tasks</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo $system_health['pending_tasks']; ?></p>
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 bg-yellow-500 rounded-md p-3">
+                                                <i class="fas fa-tasks text-white text-xl"></i>
+                                            </div>
+                                            <div class="ml-5">
+                                                <p class="text-sm font-medium text-gray-500">Pending Tasks</p>
+                                                <p class="text-lg font-semibold text-gray-900"><?php echo $system_health['pending_tasks']; ?></p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
-    </main>
-</div>
 
-<script>
-    // Initialize live clock
-    function updateClock() {
-        const now = new Date();
-        document.getElementById('live-clock').textContent = now.toLocaleTimeString();
-    }
-    
-    updateClock();
-    setInterval(updateClock, 1000);
+        <script>
+            // Initialize live clock
+            function updateClock() {
+                const now = new Date();
+                document.getElementById('live-clock').textContent = now.toLocaleTimeString();
+            }
 
-    // Performance Chart
-    const ctx = document.getElementById('performanceChart').getContext('2d');
-    const performanceChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: <?php echo json_encode($chart_labels); ?>,
-            datasets: [{
-                label: 'Average Marks',
-                data: <?php echo json_encode($chart_data); ?>,
-                backgroundColor: <?php echo json_encode($chart_colors); ?>,
-                borderColor: <?php echo json_encode($chart_borders); ?>,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            // Performance Chart
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            const performanceChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: <?php echo json_encode($chart_labels); ?>,
+                    datasets: [{
+                        label: 'Average Marks',
+                        data: <?php echo json_encode($chart_data); ?>,
+                        backgroundColor: <?php echo json_encode($chart_colors); ?>,
+                        borderColor: <?php echo json_encode($chart_borders); ?>,
+                        borderWidth: 1
+                    }]
                 },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    }
                 }
-            }
-        }
-    });
+            });
 
-    // GPA Chart
-    const gpaCtx = document.getElementById('gpaChart').getContext('2d');
-    const gpaChart = new Chart(gpaCtx, {
-        type: 'bar',
-        data: {
-            labels: <?php echo json_encode($gpa_labels); ?>,
-            datasets: [{
-                label: 'Average GPA',
-                data: <?php echo json_encode($gpa_data); ?>,
-                backgroundColor: [
-                    'rgba(54, 162, 235, 0.6)',
-                    'rgba(255, 99, 132, 0.6)',
-                    'rgba(255, 206, 86, 0.6)',
-                    'rgba(75, 192, 192, 0.6)',
-                    'rgba(153, 102, 255, 0.6)'
-                ],
-                borderColor: [
-                    'rgba(54, 162, 235, 1)',
-                    'rgba(255, 99, 132, 1)',
-                    'rgba(255, 206, 86, 1)',
-                    'rgba(75, 192, 192, 1)',
-                    'rgba(153, 102, 255, 1)'
-                ],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 4
-                }
-            },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
+            // GPA Chart
+            const gpaCtx = document.getElementById('gpaChart').getContext('2d');
+            const gpaChart = new Chart(gpaCtx, {
+                type: 'bar',
+                data: {
+                    labels: <?php echo json_encode($gpa_labels); ?>,
+                    datasets: [{
+                        label: 'Average GPA',
+                        data: <?php echo json_encode($gpa_data); ?>,
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(255, 206, 86, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
                 },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 4
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    }
                 }
-            }
-        }
-    });
+            });
 
-    // Chart filters
-    document.querySelectorAll('.chart-filter').forEach(button => {
-        button.addEventListener('click', function() {
-            document.querySelectorAll('.chart-filter').forEach(btn => btn.classList.remove('active', 'text-blue-600', 'font-medium'));
-            this.classList.add('active', 'text-blue-600', 'font-medium');
-            
-            // Simulate data change (in a real app, you'd fetch new data via AJAX)
-            const period = this.dataset.period;
-            let newData = [];
-            
-            if (period === 'week') {
-                newData = <?php echo json_encode($chart_data); ?>;
-            } else if (period === 'month') {
-                // Simulate different data for month view
-                newData = <?php echo json_encode($chart_data); ?>.map(val => val * (0.8 + Math.random() * 0.4));
-            } else if (period === 'year') {
-                // Simulate different data for year view
-                newData = <?php echo json_encode($chart_data); ?>.map(val => val * (0.6 + Math.random() * 0.8));
-            }
-            
-            performanceChart.data.datasets[0].data = newData;
-            performanceChart.update();
-        });
-    });
+            // Chart filters
+            document.querySelectorAll('.chart-filter').forEach(button => {
+                button.addEventListener('click', function() {
+                    document.querySelectorAll('.chart-filter').forEach(btn => btn.classList.remove('active', 'text-blue-600', 'font-medium'));
+                    this.classList.add('active', 'text-blue-600', 'font-medium');
 
-    // GPA filters
-    document.querySelectorAll('.gpa-filter').forEach(button => {
-        button.addEventListener('click', function() {
-            document.querySelectorAll('.gpa-filter').forEach(btn => btn.classList.remove('active', 'text-blue-600', 'font-medium'));
-            this.classList.add('active', 'text-blue-600', 'font-medium');
-            
-            // Simulate data change
-            const period = this.dataset.period;
-            let newData = [];
-            
-            if (period === 'current') {
-                newData = <?php echo json_encode($gpa_data); ?>;
-            } else if (period === 'previous') {
-                // Simulate different data for previous period
-                newData = <?php echo json_encode($gpa_data); ?>.map(val => val * (0.85 + Math.random() * 0.3));
-            }
-            
-            gpaChart.data.datasets[0].data = newData;
-            gpaChart.update();
-        });
-    });
+                    // Simulate data change (in a real app, you'd fetch new data via AJAX)
+                    const period = this.dataset.period;
+                    let newData = [];
 
-    // Mobile sidebar toggle
-    document.getElementById('sidebar-toggle').addEventListener('click', function() {
-        document.getElementById('mobile-sidebar').classList.remove('-translate-x-full');
-    });
+                    if (period === 'week') {
+                        newData = <?php echo json_encode($chart_data); ?>;
+                    } else if (period === 'month') {
+                        // Simulate different data for month view
+                        newData = <?php echo json_encode($chart_data); ?>.map(val => val * (0.8 + Math.random() * 0.4));
+                    } else if (period === 'year') {
+                        // Simulate different data for year view
+                        newData = <?php echo json_encode($chart_data); ?>.map(val => val * (0.6 + Math.random() * 0.8));
+                    }
 
-    document.getElementById('close-sidebar').addEventListener('click', function() {
-        document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
-    });
+                    performanceChart.data.datasets[0].data = newData;
+                    performanceChart.update();
+                });
+            });
 
-    document.getElementById('sidebar-backdrop').addEventListener('click', function() {
-        document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
-    });
+            // GPA filters
+            document.querySelectorAll('.gpa-filter').forEach(button => {
+                button.addEventListener('click', function() {
+                    document.querySelectorAll('.gpa-filter').forEach(btn => btn.classList.remove('active', 'text-blue-600', 'font-medium'));
+                    this.classList.add('active', 'text-blue-600', 'font-medium');
 
-    // User menu toggle
-    document.getElementById('user-menu-button').addEventListener('click', function() {
-        document.getElementById('user-menu').classList.toggle('hidden');
-    });
+                    // Simulate data change
+                    const period = this.dataset.period;
+                    let newData = [];
 
-    // Notification dropdown toggle
-    document.getElementById('notification-button').addEventListener('click', function() {
-        document.getElementById('notification-dropdown').classList.toggle('hidden');
-    });
+                    if (period === 'current') {
+                        newData = <?php echo json_encode($gpa_data); ?>;
+                    } else if (period === 'previous') {
+                        // Simulate different data for previous period
+                        newData = <?php echo json_encode($gpa_data); ?>.map(val => val * (0.85 + Math.random() * 0.3));
+                    }
 
-    // Search modal
-    document.getElementById('search-button').addEventListener('click', function() {
-        document.getElementById('search-modal').classList.remove('hidden');
-    });
-    
-    document.getElementById('close-search').addEventListener('click', function() {
-        document.getElementById('search-modal').classList.add('hidden');
-    });
-    
-    // Global search functionality
-    document.getElementById('global-search').addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        const resultsContainer = document.getElementById('search-results');
-        
-        if (searchTerm.length < 2) {
-            resultsContainer.innerHTML = '<p class="text-sm text-gray-500 p-2">Type at least 2 characters to search</p>';
-            return;
-        }
-        
-        // Simulate search results (in a real app, you'd fetch results via AJAX)
-        resultsContainer.innerHTML = '<div class="p-2 text-sm text-gray-500">Searching...</div>';
-        
-        setTimeout(() => {
-            // Mock search results
-            if (searchTerm.includes('student') || searchTerm.includes('class') || searchTerm.includes('exam')) {
-                resultsContainer.innerHTML = `
+                    gpaChart.data.datasets[0].data = newData;
+                    gpaChart.update();
+                });
+            });
+
+            // Mobile sidebar toggle
+            document.getElementById('sidebar-toggle').addEventListener('click', function() {
+                document.getElementById('mobile-sidebar').classList.remove('-translate-x-full');
+            });
+
+            document.getElementById('close-sidebar').addEventListener('click', function() {
+                document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
+            });
+
+            document.getElementById('sidebar-backdrop').addEventListener('click', function() {
+                document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
+            });
+
+            // User menu toggle
+            document.getElementById('user-menu-button').addEventListener('click', function() {
+                document.getElementById('user-menu').classList.toggle('hidden');
+            });
+
+            // Notification dropdown toggle
+            document.getElementById('notification-button').addEventListener('click', function() {
+                document.getElementById('notification-dropdown').classList.toggle('hidden');
+            });
+
+            // Search modal
+            document.getElementById('search-button').addEventListener('click', function() {
+                document.getElementById('search-modal').classList.remove('hidden');
+            });
+
+            document.getElementById('close-search').addEventListener('click', function() {
+                document.getElementById('search-modal').classList.add('hidden');
+            });
+
+            // Global search functionality
+            document.getElementById('global-search').addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const resultsContainer = document.getElementById('search-results');
+
+                if (searchTerm.length < 2) {
+                    resultsContainer.innerHTML = '<p class="text-sm text-gray-500 p-2">Type at least 2 characters to search</p>';
+                    return;
+                }
+
+                // Simulate search results (in a real app, you'd fetch results via AJAX)
+                resultsContainer.innerHTML = '<div class="p-2 text-sm text-gray-500">Searching...</div>';
+
+                setTimeout(() => {
+                    // Mock search results
+                    if (searchTerm.includes('student') || searchTerm.includes('class') || searchTerm.includes('exam')) {
+                        resultsContainer.innerHTML = `
                     <div class="p-2 border-b">
                         <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Students</h4>
                         <a href="#" class="block py-1 text-sm text-blue-600 hover:bg-gray-50">John Doe (Class 10A)</a>
@@ -1541,65 +1350,65 @@ $conn->close();
                         <a href="#" class="block py-1 text-sm text-blue-600 hover:bg-gray-50">Mid-term Exam 2023</a>
                     </div>
                 `;
-            } else {
-                resultsContainer.innerHTML = '<p class="text-sm text-gray-500 p-2">No results found for "' + searchTerm + '"</p>';
+                    } else {
+                        resultsContainer.innerHTML = '<p class="text-sm text-gray-500 p-2">No results found for "' + searchTerm + '"</p>';
+                    }
+                }, 500);
+            });
+
+            // Dark mode toggle
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const darkModeToggleDot = document.getElementById('dark-mode-toggle-dot');
+            const mobileDarkModeToggle = document.getElementById('mobile-dark-mode-toggle');
+            const body = document.getElementById('body');
+
+            function toggleDarkMode() {
+                if (body.classList.contains('dark-mode')) {
+                    body.classList.remove('dark-mode');
+                    darkModeToggleDot.classList.remove('translate-x-5');
+                    darkModeToggleDot.classList.add('translate-x-0.5');
+                    localStorage.setItem('darkMode', 'false');
+                } else {
+                    body.classList.add('dark-mode');
+                    darkModeToggleDot.classList.remove('translate-x-0.5');
+                    darkModeToggleDot.classList.add('translate-x-5');
+                    localStorage.setItem('darkMode', 'true');
+                }
             }
-        }, 500);
-    });
 
-    // Dark mode toggle
-    const darkModeToggle = document.getElementById('dark-mode-toggle');
-    const darkModeToggleDot = document.getElementById('dark-mode-toggle-dot');
-    const mobileDarkModeToggle = document.getElementById('mobile-dark-mode-toggle');
-    const body = document.getElementById('body');
-    
-    function toggleDarkMode() {
-        if (body.classList.contains('dark-mode')) {
-            body.classList.remove('dark-mode');
-            darkModeToggleDot.classList.remove('translate-x-5');
-            darkModeToggleDot.classList.add('translate-x-0.5');
-            localStorage.setItem('darkMode', 'false');
-        } else {
-            body.classList.add('dark-mode');
-            darkModeToggleDot.classList.remove('translate-x-0.5');
-            darkModeToggleDot.classList.add('translate-x-5');
-            localStorage.setItem('darkMode', 'true');
-        }
-    }
-    
-    // Check for saved dark mode preference
-    if (localStorage.getItem('darkMode') === 'true') {
-        body.classList.add('dark-mode');
-        darkModeToggleDot.classList.remove('translate-x-0.5');
-        darkModeToggleDot.classList.add('translate-x-5');
-    }
-    
-    darkModeToggle.addEventListener('click', toggleDarkMode);
-    mobileDarkModeToggle.addEventListener('click', toggleDarkMode);
+            // Check for saved dark mode preference
+            if (localStorage.getItem('darkMode') === 'true') {
+                body.classList.add('dark-mode');
+                darkModeToggleDot.classList.remove('translate-x-0.5');
+                darkModeToggleDot.classList.add('translate-x-5');
+            }
 
-    // Close dropdowns when clicking outside
-    document.addEventListener('click', function(event) {
-        const userMenu = document.getElementById('user-menu');
-        const userMenuButton = document.getElementById('user-menu-button');
-        const notificationDropdown = document.getElementById('notification-dropdown');
-        const notificationButton = document.getElementById('notification-button');
-        const searchModal = document.getElementById('search-modal');
+            darkModeToggle.addEventListener('click', toggleDarkMode);
+            mobileDarkModeToggle.addEventListener('click', toggleDarkMode);
 
-        if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
-            userMenu.classList.add('hidden');
-        }
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', function(event) {
+                const userMenu = document.getElementById('user-menu');
+                const userMenuButton = document.getElementById('user-menu-button');
+                const notificationDropdown = document.getElementById('notification-dropdown');
+                const notificationButton = document.getElementById('notification-button');
+                const searchModal = document.getElementById('search-modal');
 
-        if (!notificationButton.contains(event.target) && !notificationDropdown.contains(event.target)) {
-            notificationDropdown.classList.add('hidden');
-        }
-        
-        if (searchModal.classList.contains('hidden') === false && 
-            !searchModal.querySelector('div > div').contains(event.target) && 
-            !document.getElementById('search-button').contains(event.target)) {
-            searchModal.classList.add('hidden');
-        }
-    });
+                if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
+                    userMenu.classList.add('hidden');
+                }
 
-</script>
+                if (!notificationButton.contains(event.target) && !notificationDropdown.contains(event.target)) {
+                    notificationDropdown.classList.add('hidden');
+                }
+
+                if (searchModal.classList.contains('hidden') === false &&
+                    !searchModal.querySelector('div > div').contains(event.target) &&
+                    !document.getElementById('search-button').contains(event.target)) {
+                    searchModal.classList.add('hidden');
+                }
+            });
+        </script>
 </body>
+
 </html>
