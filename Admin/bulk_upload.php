@@ -656,7 +656,6 @@ $conn->close();
             // You can add logic here to filter subjects based on class if needed
         });
     </script>
-        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
+    
 </body>
 </html>

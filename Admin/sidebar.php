@@ -2,6 +2,7 @@
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 <div class="hidden md:flex md:flex-shrink-0">
     <div class="flex flex-col w-60 bg-gray-900 text-white">
         <div class="flex items-center justify-center h-16 bg-gray-800 shadow">

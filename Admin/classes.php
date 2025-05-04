@@ -1,147 +1,203 @@
 <?php
 session_start();
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    header("Location: login.php");
+include_once('../includes/db_connetc.php');
+
+// Check if user is logged in and is an admin
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header("Location: ../login.php");
     exit();
 }
 
-$conn = new mysqli('localhost', 'root', '', 'result_management');
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// Handle form submissions
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['action'])) {
-        // Add new class
-        if ($_POST['action'] == 'add_class') {
-            $class_name = $_POST['class_name'];
-            $section = $_POST['section'];
-            $academic_year = $_POST['academic_year'];
-            $description = $_POST['description'] ?? '';
-            
-            $stmt = $conn->prepare("INSERT INTO classes (class_name, section, academic_year, description) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("ssss", $class_name, $section, $academic_year, $description);
-            
-            if ($stmt->execute()) {
-                $_SESSION['success'] = "Class added successfully!";
-            } else {
-                $_SESSION['error'] = "Error adding class: " . $conn->error;
-            }
-            $stmt->close();
-        }
+// Process class creation
+if (isset($_POST['create_class'])) {
+    $class_name = mysqli_real_escape_string($conn, $_POST['class_name']);
+    $class_numeric = mysqli_real_escape_string($conn, $_POST['class_numeric']);
+    $class_teacher = mysqli_real_escape_string($conn, $_POST['class_teacher']);
+    $academic_year = mysqli_real_escape_string($conn, $_POST['academic_year']);
+    
+    // Check if class already exists
+    $check_query = "SELECT * FROM classes WHERE class_name = '$class_name' AND academic_year = '$academic_year'";
+    $check_result = mysqli_query($conn, $check_query);
+    
+    if (mysqli_num_rows($check_result) > 0) {
+        $error_msg = "Class already exists for the selected academic year!";
+    } else {
+        $insert_query = "INSERT INTO classes (class_name, class_numeric, class_teacher_id, academic_year, created_at) 
+                        VALUES ('$class_name', '$class_numeric', '$class_teacher', '$academic_year', NOW())";
         
-        // Update class
-        elseif ($_POST['action'] == 'update_class') {
-            $class_id = $_POST['class_id'];
-            $class_name = $_POST['class_name'];
-            $section = $_POST['section'];
-            $academic_year = $_POST['academic_year'];
-            $description = $_POST['description'] ?? '';
-            
-            $stmt = $conn->prepare("UPDATE classes SET class_name = ?, section = ?, academic_year = ?, description = ? WHERE class_id = ?");
-            $stmt->bind_param("ssssi", $class_name, $section, $academic_year, $description, $class_id);
-            
-            if ($stmt->execute()) {
-                $_SESSION['success'] = "Class updated successfully!";
-            } else {
-                $_SESSION['error'] = "Error updating class: " . $conn->error;
-            }
-            $stmt->close();
+        if (mysqli_query($conn, $insert_query)) {
+            $success_msg = "Class created successfully!";
+        } else {
+            $error_msg = "Error creating class: " . mysqli_error($conn);
         }
-        
-        // Delete class
-        elseif ($_POST['action'] == 'delete_class') {
-            $class_id = $_POST['class_id'];
-            
-            // Check if there are students in this class
-            $stmt = $conn->prepare("SELECT COUNT(*) as count FROM students WHERE class_id = ?");
-            $stmt->bind_param("i", $class_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $student_count = $result->fetch_assoc()['count'];
-            $stmt->close();
-            
-            if ($student_count > 0) {
-                $_SESSION['error'] = "Cannot delete class. There are students assigned to this class.";
-            } else {
-                $stmt = $conn->prepare("DELETE FROM classes WHERE class_id = ?");
-                $stmt->bind_param("i", $class_id);
-                
-                if ($stmt->execute()) {
-                    $_SESSION['success'] = "Class deleted successfully!";
-                } else {
-                    $_SESSION['error'] = "Error deleting class: " . $conn->error;
-                }
-                $stmt->close();
-            }
-        }
-        
-        // Assign students to class
-        elseif ($_POST['action'] == 'assign_students') {
-            $class_id = $_POST['class_id'];
-            $student_ids = $_POST['student_ids'] ?? [];
-            
-            if (!empty($student_ids)) {
-                // Begin transaction
-                $conn->begin_transaction();
-                try {
-                    // First, remove all students from this class
-                    $stmt = $conn->prepare("UPDATE students SET class_id = NULL WHERE class_id = ?");
-                    $stmt->bind_param("i", $class_id);
-                    $stmt->execute();
-                    $stmt->close();
-                    
-                    // Then, assign selected students to this class
-                    $stmt = $conn->prepare("UPDATE students SET class_id = ? WHERE student_id = ?");
-                    foreach ($student_ids as $student_id) {
-                        $stmt->bind_param("is", $class_id, $student_id);
-                        $stmt->execute();
-                    }
-                    $stmt->close();
-                    
-                    // Commit transaction
-                    $conn->commit();
-                    $_SESSION['success'] = "Students assigned to class successfully!";
-                } catch (Exception $e) {
-                    // Rollback transaction on error
-                    $conn->rollback();
-                    $_SESSION['error'] = "Error assigning students: " . $e->getMessage();
-                }
-            } else {
-                $_SESSION['error'] = "No students selected for assignment.";
-            }
-        }
-        
-        // Redirect to prevent form resubmission
-        header("Location: classes.php");
-        exit();
     }
 }
 
+// Process class update
+if (isset($_POST['update_class'])) {
+    $class_id = mysqli_real_escape_string($conn, $_POST['class_id']);
+    $class_name = mysqli_real_escape_string($conn, $_POST['class_name']);
+    $class_numeric = mysqli_real_escape_string($conn, $_POST['class_numeric']);
+    $class_teacher = mysqli_real_escape_string($conn, $_POST['class_teacher']);
+    $academic_year = mysqli_real_escape_string($conn, $_POST['academic_year']);
+    
+    // Check if class already exists (excluding the current class)
+    $check_query = "SELECT * FROM classes WHERE class_name = '$class_name' AND academic_year = '$academic_year' AND class_id != '$class_id'";
+    $check_result = mysqli_query($conn, $check_query);
+    
+    if (mysqli_num_rows($check_result) > 0) {
+        $error_msg = "Another class with the same name already exists for the selected academic year!";
+    } else {
+        $update_query = "UPDATE classes SET 
+                        class_name = '$class_name', 
+                        class_numeric = '$class_numeric', 
+                        class_teacher_id = '$class_teacher', 
+                        academic_year = '$academic_year', 
+                        updated_at = NOW() 
+                        WHERE class_id = '$class_id'";
+        
+        if (mysqli_query($conn, $update_query)) {
+            $success_msg = "Class updated successfully!";
+        } else {
+            $error_msg = "Error updating class: " . mysqli_error($conn);
+        }
+    }
+}
+
+// Process section creation
+if (isset($_POST['create_section'])) {
+    $class_id = mysqli_real_escape_string($conn, $_POST['class_id']);
+    $section_name = mysqli_real_escape_string($conn, $_POST['section_name']);
+    $section_capacity = mysqli_real_escape_string($conn, $_POST['section_capacity']);
+    $section_teacher = mysqli_real_escape_string($conn, $_POST['section_teacher']);
+    
+    // Check if section already exists for this class
+    $check_query = "SELECT * FROM sections WHERE class_id = '$class_id' AND section_name = '$section_name'";
+    $check_result = mysqli_query($conn, $check_query);
+    
+    if (mysqli_num_rows($check_result) > 0) {
+        $error_msg = "Section already exists for the selected class!";
+    } else {
+        $insert_query = "INSERT INTO sections (class_id, section_name, capacity, teacher_id, created_at) 
+                        VALUES ('$class_id', '$section_name', '$section_capacity', '$section_teacher', NOW())";
+        
+        if (mysqli_query($conn, $insert_query)) {
+            $success_msg = "Section created successfully!";
+        } else {
+            $error_msg = "Error creating section: " . mysqli_error($conn);
+        }
+    }
+}
+
+// Process section update
+if (isset($_POST['update_section'])) {
+    $section_id = mysqli_real_escape_string($conn, $_POST['section_id']);
+    $section_name = mysqli_real_escape_string($conn, $_POST['section_name']);
+    $section_capacity = mysqli_real_escape_string($conn, $_POST['section_capacity']);
+    $section_teacher = mysqli_real_escape_string($conn, $_POST['section_teacher']);
+    $class_id = mysqli_real_escape_string($conn, $_POST['class_id']);
+    
+    // Check if section already exists (excluding the current section)
+    $check_query = "SELECT * FROM sections WHERE class_id = '$class_id' AND section_name = '$section_name' AND id != '$section_id'";
+    $check_result = mysqli_query($conn, $check_query);
+    
+    if (mysqli_num_rows($check_result) > 0) {
+        $error_msg = "Another section with the same name already exists for the selected class!";
+    } else {
+        $update_query = "UPDATE sections SET 
+                        section_name = '$section_name', 
+                        capacity = '$section_capacity', 
+                        teacher_id = '$section_teacher', 
+                        updated_at = NOW() 
+                        WHERE id = '$section_id'";
+        
+        if (mysqli_query($conn, $update_query)) {
+            $success_msg = "Section updated successfully!";
+        } else {
+            $error_msg = "Error updating section: " . mysqli_error($conn);
+        }
+    }
+}
+
+// Delete class
+if (isset($_GET['delete_class'])) {
+    $class_id = mysqli_real_escape_string($conn, $_GET['delete_class']);
+    
+    // Check if there are students in this class
+    $check_query = "SELECT COUNT(*) as student_count FROM students WHERE class_id = '$class_id'";
+    $check_result = mysqli_query($conn, $check_query);
+    $row = mysqli_fetch_assoc($check_result);
+    
+    if ($row['student_count'] > 0) {
+        $error_msg = "Cannot delete class. There are students assigned to this class!";
+    } else {
+        // Delete sections first
+        $delete_sections = "DELETE FROM sections WHERE class_id = '$class_id'";
+        mysqli_query($conn, $delete_sections);
+        
+        // Delete class
+        $delete_query = "DELETE FROM classes WHERE class_id = '$class_id'";
+        if (mysqli_query($conn, $delete_query)) {
+            $success_msg = "Class deleted successfully!";
+        } else {
+            $error_msg = "Error deleting class: " . mysqli_error($conn);
+        }
+    }
+}
+
+// Delete section
+if (isset($_GET['delete_section'])) {
+    $section_id = mysqli_real_escape_string($conn, $_GET['delete_section']);
+    
+    // Check if there are students in this section
+    $check_query = "SELECT COUNT(*) as student_count FROM students WHERE section_id = '$section_id'";
+    $check_result = mysqli_query($conn, $check_query);
+    $row = mysqli_fetch_assoc($check_result);
+    
+    if ($row['student_count'] > 0) {
+        $error_msg = "Cannot delete section. There are students assigned to this section!";
+    } else {
+        $delete_query = "DELETE FROM sections WHERE id = '$section_id'";
+        if (mysqli_query($conn, $delete_query)) {
+            $success_msg = "Section deleted successfully!";
+        } else {
+            $error_msg = "Error deleting section: " . mysqli_error($conn);
+        }
+    }
+}
+
+// Load class for editing
+$edit_class = null;
+if (isset($_GET['edit_class'])) {
+    $class_id = mysqli_real_escape_string($conn, $_GET['edit_class']);
+    $query = "SELECT * FROM classes WHERE class_id = '$class_id'";
+    $result = mysqli_query($conn, $query);
+    $edit_class = mysqli_fetch_assoc($result);
+}
+
+// Load section for editing
+$edit_section = null;
+if (isset($_GET['edit_section'])) {
+    $section_id = mysqli_real_escape_string($conn, $_GET['edit_section']);
+    $query = "SELECT * FROM sections WHERE id = '$section_id'";
+    $result = mysqli_query($conn, $query);
+    $edit_section = mysqli_fetch_assoc($result);
+}
+
+// Get all teachers for dropdown
+$teachers_query = "SELECT user_id, full_name FROM users WHERE role = 'teacher'";
+$teachers_result = mysqli_query($conn, $teachers_query);
+
 // Get all classes
-$classes = [];
-$result = $conn->query("SELECT * FROM classes ORDER BY academic_year DESC, class_name, section");
-while ($row = $result->fetch_assoc()) {
-    $classes[] = $row;
-}
+$classes_query = "SELECT c.*, u.full_name 
+                 FROM classes c 
+                 LEFT JOIN users u ON c.class_teacher_id = u.user_id 
+                 ORDER BY c.class_numeric ASC";
+$classes_result = mysqli_query($conn, $classes_query);
 
-// Get all students
-$students = [];
-$result = $conn->query("SELECT s.student_id, s.roll_number, s.registration_number, s.class_id, u.full_name 
-                        FROM students s 
-                        JOIN users u ON s.user_id = u.user_id 
-                        ORDER BY u.full_name");
-while ($row = $result->fetch_assoc()) {
-    $students[] = $row;
-}
-
-// Get current academic year
-$current_year = date('Y');
-$next_year = $current_year + 1;
-$current_academic_year = $current_year . '-' . $next_year;
-
-$conn->close();
+// Get academic years
+$years_query = "SELECT DISTINCT academic_year FROM academic_years ORDER BY academic_year DESC";
+$years_result = mysqli_query($conn, $years_query);
 ?>
 
 <!DOCTYPE html>
@@ -149,437 +205,315 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Classes | Result Management System</title>
-    <link href="https://cdn.tailwindcss.com" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <title>Manage Classes - Result Management System</title>
+    <link rel="stylesheet" href="../css/tailwind.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-100">
-    <div class="flex h-screen overflow-hidden">
+<body class="bg-gray-50">
+    <div class="flex h-screen bg-gray-100">
+        
         <!-- Sidebar -->
-        <?php
-        // Include the file that processes form data
-        include 'sidebar.php';
-        ?>
-
+        <?php include('sidebar.php'); ?>
+        
         <!-- Main Content -->
-        <div class="flex flex-col flex-1 w-0 overflow-hidden">
-            <!-- Top Navigation -->
-            <?php
-        // Include the file that processes form data
-        include 'topBar.php';
-        ?>
-
-        <!-- Mobile sidebar -->
-        <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
-            <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
-            <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
-                <div class="absolute top-0 right-0 -mr-12 pt-2">
-                    <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
-                        <span class="sr-only">Close sidebar</span>
-                        <i class="fas fa-times text-white"></i>
-                    </button>
-                </div>
-                <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                    <div class="flex-shrink-0 flex items-center px-4">
-                        <span class="text-white text-lg font-semibold">Result Management</span>
+        <div class="flex-1 overflow-auto">
+            <div class="p-6">
+                <h1 class="text-3xl font-semibold text-gray-800 mb-6">Manage Classes & Sections</h1>
+                
+                <!-- Notification Messages -->
+                <?php if(isset($success_msg)): ?>
+                    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
+                        <p><?php echo $success_msg; ?></p>
                     </div>
-                    <nav class="mt-5 px-2 space-y-1">
-                        <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-tachometer-alt mr-3"></i>
-                            Dashboard
-                        </a>
-                        <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-clipboard-list mr-3"></i>
-                            Results
-                        </a>
-                        <a href="bulk_upload.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-upload mr-3"></i>
-                            Bulk Upload
-                        </a>
-                        <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-users mr-3"></i>
-                            Users
-                        </a>
-                        <a href="classes.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-white bg-gray-700 rounded-md">
-                            <i class="fas fa-chalkboard mr-3"></i>
-                            Classes
-                        </a>
-                        <a href="subject.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-book mr-3"></i>
-                            Subjects
-                        </a>
-                        <a href="teachers.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-chalkboard-teacher mr-3"></i>
-                            Teachers
-                        </a>
-                        <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-cog mr-3"></i>
-                            Settings
-                        </a>
-                        <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-sign-out-alt mr-3"></i>
-                            Logout
-                        </a>
-                    </nav>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="flex flex-col flex-1 w-0 overflow-hidden">
-            <!-- Top Navigation -->
-            <div class="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
-                <button class="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:bg-gray-100 focus:text-gray-600 md:hidden" id="sidebar-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="flex-1 px-4 flex justify-between">
-                    <div class="flex-1 flex">
-                        <div class="w-full flex md:ml-0">
-                            <h1 class="text-2xl font-semibold text-gray-900 my-auto">Manage Classes</h1>
-                        </div>
+                <?php endif; ?>
+                
+                <?php if(isset($error_msg)): ?>
+                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+                        <p><?php echo $error_msg; ?></p>
                     </div>
-                    <div class="ml-4 flex items-center md:ml-6">
-                        <button class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <span class="sr-only">View notifications</span>
-                            <i class="fas fa-bell"></i>
-                        </button>
-
-                        <!-- Profile dropdown -->
-                        <div class="ml-3 relative">
-                            <div>
-                                <button type="button" class="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" id="user-menu-button">
-                                    <span class="sr-only">Open user menu</span>
-                                    <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-600">
-                                        <span class="text-sm font-medium leading-none text-white"><?php echo substr($_SESSION['full_name'], 0, 1); ?></span>
-                                    </span>
-                                </button>
+                <?php endif; ?>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Create/Edit Class Card -->
+                    <div class="bg-white rounded-lg shadow-md p-6 transition-all duration-300 hover:shadow-lg">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <?php echo $edit_class ? 'Edit Class' : 'Create New Class'; ?>
+                        </h2>
+                        <form action="" method="POST">
+                            <?php if($edit_class): ?>
+                                <input type="hidden" name="class_id" value="<?php echo $edit_class['class_id']; ?>">
+                            <?php endif; ?>
+                            
+                            <div class="mb-4">
+                                <label for="class_name" class="block text-gray-700 text-sm font-bold mb-2">Class Name*</label>
+                                <input type="text" name="class_name" id="class_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="<?php echo $edit_class ? $edit_class['class_name'] : ''; ?>" required>
+                                <p class="text-xs text-gray-500 mt-1">Example: Class 10, Grade 12, etc.</p>
                             </div>
-
-                            <!-- Profile dropdown menu -->
-                            <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none" id="user-menu" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" tabindex="-1">
-                                <a href="profile.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Your Profile</a>
-                                <a href="settings.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Settings</a>
-                                <a href="logout.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Sign out</a>
+                            
+                            <div class="mb-4">
+                                <label for="class_numeric" class="block text-gray-700 text-sm font-bold mb-2">Class Numeric Value*</label>
+                                <input type="number" name="class_numeric" id="class_numeric" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="<?php echo $edit_class ? $edit_class['class_numeric'] : ''; ?>" required>
+                                <p class="text-xs text-gray-500 mt-1">For sorting purposes (e.g., 10 for Class 10)</p>
                             </div>
-                        </div>
+                            
+                            <div class="mb-4">
+                                <label for="class_teacher" class="block text-gray-700 text-sm font-bold mb-2">Class Teacher</label>
+                                <select name="class_teacher" id="class_teacher" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                                    <option value="">Select Class Teacher</option>
+                                    <?php 
+                                    mysqli_data_seek($teachers_result, 0);
+                                    while($teacher = mysqli_fetch_assoc($teachers_result)): 
+                                        $selected = ($edit_class && $edit_class['class_teacher_id'] == $teacher['user_id']) ? 'selected' : '';
+                                    ?>
+                                        <option value="<?php echo $teacher['user_id']; ?>" <?php echo $selected; ?>>
+                                            <?php echo $teacher['full_name']; ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="academic_year" class="block text-gray-700 text-sm font-bold mb-2">Academic Year*</label>
+                                <select name="academic_year" id="academic_year" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                                    <?php 
+                                    mysqli_data_seek($years_result, 0);
+                                    while($year = mysqli_fetch_assoc($years_result)): 
+                                        $selected = ($edit_class && $edit_class['academic_year'] == $year['academic_year']) ? 'selected' : '';
+                                    ?>
+                                        <option value="<?php echo $year['academic_year']; ?>" <?php echo $selected; ?>>
+                                            <?php echo $year['academic_year']; ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
+                            </div>
+                            
+                            <div class="flex items-center justify-end">
+                                <?php if($edit_class): ?>
+                                    <a href="classes.php" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300 mr-2">
+                                        Cancel
+                                    </a>
+                                    <button type="submit" name="update_class" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300">
+                                        Update Class
+                                    </button>
+                                <?php else: ?>
+                                    <button type="submit" name="create_class" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300">
+                                        Create Class
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Create/Edit Section Card -->
+                    <div class="bg-white rounded-lg shadow-md p-6 transition-all duration-300 hover:shadow-lg">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                            <?php echo $edit_section ? 'Edit Section' : 'Create New Section'; ?>
+                        </h2>
+                        <form action="" method="POST">
+                            <?php if($edit_section): ?>
+                                <input type="hidden" name="section_id" value="<?php echo $edit_section['id']; ?>">
+                            <?php endif; ?>
+                            
+                            <div class="mb-4">
+                                <label for="class_id" class="block text-gray-700 text-sm font-bold mb-2">Select Class*</label>
+                                <select name="class_id" id="class_id" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                                    <option value="">Select Class</option>
+                                    <?php 
+                                    mysqli_data_seek($classes_result, 0);
+                                    while($class = mysqli_fetch_assoc($classes_result)): 
+                                        $selected = ($edit_section && $edit_section['class_id'] == $class['class_id']) ? 'selected' : '';
+                                    ?>
+                                        <option value="<?php echo $class['class_id']; ?>" <?php echo $selected; ?>>
+                                            <?php echo $class['class_name'] . ' (' . $class['academic_year'] . ')'; ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="section_name" class="block text-gray-700 text-sm font-bold mb-2">Section Name*</label>
+                                <input type="text" name="section_name" id="section_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="<?php echo $edit_section ? $edit_section['section_name'] : ''; ?>" required>
+                                <p class="text-xs text-gray-500 mt-1">Example: A, B, Science, Commerce, etc.</p>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="section_capacity" class="block text-gray-700 text-sm font-bold mb-2">Section Capacity</label>
+                                <input type="number" name="section_capacity" id="section_capacity" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="<?php echo $edit_section ? $edit_section['capacity'] : ''; ?>">
+                                <p class="text-xs text-gray-500 mt-1">Maximum number of students</p>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="section_teacher" class="block text-gray-700 text-sm font-bold mb-2">Section Teacher</label>
+                                <select name="section_teacher" id="section_teacher" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                                    <option value="">Select Section Teacher</option>
+                                    <?php 
+                                    mysqli_data_seek($teachers_result, 0);
+                                    while($teacher = mysqli_fetch_assoc($teachers_result)): 
+                                        $selected = ($edit_section && $edit_section['teacher_id'] == $teacher['user_id']) ? 'selected' : '';
+                                    ?>
+                                        <option value="<?php echo $teacher['user_id']; ?>" <?php echo $selected; ?>>
+                                            <?php echo $teacher['full_name']; ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
+                            </div>
+                            
+                            <div class="flex items-center justify-end">
+                                <?php if($edit_section): ?>
+                                    <a href="classes.php" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300 mr-2">
+                                        Cancel
+                                    </a>
+                                    <button type="submit" name="update_section" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300">
+                                        Update Section
+                                    </button>
+                                <?php else: ?>
+                                    <button type="submit" name="create_section" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300">
+                                        Create Section
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </form>
                     </div>
                 </div>
-            </div>
-
-            <!-- Main Content -->
-            <main class="flex-1 relative overflow-y-auto focus:outline-none">
-                <div class="py-6">
-                    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-                        <!-- Notification Messages -->
-                        <?php if(isset($_SESSION['success'])): ?>
-                        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-check-circle text-green-500"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm text-green-700">
-                                        <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
-
-                        <?php if(isset($_SESSION['error'])): ?>
-                        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-exclamation-circle text-red-500"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm text-red-700">
-                                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
-
-                        <!-- Add Class Section -->
-                        <div class="bg-white shadow rounded-lg p-6 mb-6">
-                            <h2 class="text-lg font-medium text-gray-900 mb-4">Add New Class</h2>
-                            <form action="classes.php" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <input type="hidden" name="action" value="add_class">
-                                
-                                <div>
-                                    <label for="class_name" class="block text-sm font-medium text-gray-700 mb-1">Class Name</label>
-                                    <input type="text" id="class_name" name="class_name" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
-                                </div>
-                                
-                                <div>
-                                    <label for="section" class="block text-sm font-medium text-gray-700 mb-1">Section</label>
-                                    <input type="text" id="section" name="section" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
-                                </div>
-                                
-                                <div>
-                                    <label for="academic_year" class="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
-                                    <select id="academic_year" name="academic_year" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                
+                <!-- Classes List -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6 transition-all duration-300 hover:shadow-lg">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Existing Classes</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white">
+                            <thead>
+                                <tr>
+                                    <th class="py-3 px-4 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Class Name</th>
+                                    <th class="py-3 px-4 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Numeric Value</th>
+                                    <th class="py-3 px-4 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Class Teacher</th>
+                                    <th class="py-3 px-4 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Academic Year</th>
+                                    <th class="py-3 px-4 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sections</th>
+                                    <th class="py-3 px-4 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-gray-700">
+                                <?php 
+                                mysqli_data_seek($classes_result, 0);
+                                if (mysqli_num_rows($classes_result) > 0) {
+                                    while($class = mysqli_fetch_assoc($classes_result)): 
+                                        // Get sections for this class
+                                        $class_id = $class['class_id'];
+                                        $sections_query = "SELECT s.*, u.full_name 
+                                                          FROM sections s 
+                                                          LEFT JOIN users u ON s.teacher_id = u.user_id 
+                                                          WHERE s.class_id = '$class_id'";
+                                        $sections_result = mysqli_query($conn, $sections_query);
+                                        $sections_count = mysqli_num_rows($sections_result);
+                                ?>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4 border-b border-gray-200"><?php echo $class['class_name']; ?></td>
+                                    <td class="py-3 px-4 border-b border-gray-200"><?php echo $class['class_numeric']; ?></td>
+                                    <td class="py-3 px-4 border-b border-gray-200">
                                         <?php 
-                                        for ($i = 0; $i < 3; $i++) {
-                                            $year = $current_year - $i;
-                                            $next_year = $year + 1;
-                                            $academic_year = $year . '-' . $next_year;
-                                            $selected = ($academic_year == $current_academic_year) ? 'selected' : '';
-                                            echo "<option value=\"$academic_year\" $selected>$academic_year</option>";
+                                        if ($class['full_name']) {
+                                            echo $class['full_name'];
+                                        } else {
+                                            echo '<span class="text-gray-400">Not Assigned</span>';
                                         }
                                         ?>
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                                    <textarea id="description" name="description" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"></textarea>
-                                </div>
-                                
-                                <div class="md:col-span-2">
-                                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                        <i class="fas fa-plus mr-2"></i> Add Class
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-
-                        <!-- Classes Table -->
-                        <div class="bg-white shadow rounded-lg overflow-hidden mb-6">
-                            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
-                                <h2 class="text-lg font-medium text-gray-900">Class List</h2>
-                            </div>
-                            <div class="px-4 py-5 sm:p-6">
-                                <div class="overflow-x-auto">
-                                    <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class Name</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Academic Year</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200">
-                                            <?php if (empty($classes)): ?>
-                                            <tr>
-                                                <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No classes found.</td>
-                                            </tr>
+                                    </td>
+                                    <td class="py-3 px-4 border-b border-gray-200"><?php echo $class['academic_year']; ?></td>
+                                    <td class="py-3 px-4 border-b border-gray-200">
+                                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">
+                                            <?php echo $sections_count; ?> section(s)
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 border-b border-gray-200">
+                                        <div class="flex space-x-2">
+                                            <a href="?edit_class=<?php echo $class_id; ?>" class="text-blue-600 hover:text-blue-800">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button onclick="toggleSections('sections-<?php echo $class_id; ?>')" class="text-green-600 hover:text-green-800">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <a href="?delete_class=<?php echo $class_id; ?>" onclick="return confirm('Are you sure you want to delete this class? This will also delete all sections in this class.')" class="text-red-600 hover:text-red-800">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- Sections for this class -->
+                                <tr id="sections-<?php echo $class_id; ?>" class="hidden bg-gray-50">
+                                    <td colspan="6" class="py-3 px-4 border-b border-gray-200">
+                                        <div class="pl-4 border-l-2 border-blue-500">
+                                            <h3 class="font-semibold text-sm text-gray-700 mb-2">Sections for <?php echo $class['class_name']; ?></h3>
+                                            <?php if ($sections_count > 0): ?>
+                                                <table class="min-w-full bg-white border border-gray-200">
+                                                    <thead>
+                                                        <tr>
+                                                            <th class="py-2 px-3 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Section Name</th>
+                                                            <th class="py-2 px-3 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Capacity</th>
+                                                            <th class="py-2 px-3 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Teacher</th>
+                                                            <th class="py-2 px-3 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php while($section = mysqli_fetch_assoc($sections_result)): ?>
+                                                            <tr class="hover:bg-gray-50">
+                                                                <td class="py-2 px-3 border-b border-gray-200"><?php echo $section['section_name']; ?></td>
+                                                                <td class="py-2 px-3 border-b border-gray-200">
+                                                                    <?php 
+                                                                    if ($section['capacity']) {
+                                                                        echo $section['capacity'];
+                                                                    } else {
+                                                                        echo '<span class="text-gray-400">Not Set</span>';
+                                                                    }
+                                                                    ?>
+                                                                </td>
+                                                                <td class="py-2 px-3 border-b border-gray-200">
+                                                                    <?php 
+                                                                    if ($section['full_name']) {
+                                                                        echo $section['full_name'];
+                                                                    } else {
+                                                                        echo '<span class="text-gray-400">Not Assigned</span>';
+                                                                    }
+                                                                    ?>
+                                                                </td>
+                                                                <td class="py-2 px-3 border-b border-gray-200">
+                                                                    <div class="flex space-x-2">
+                                                                        <a href="?edit_section=<?php echo $section['id']; ?>" class="text-blue-600 hover:text-blue-800">
+                                                                            <i class="fas fa-edit"></i>
+                                                                        </a>
+                                                                        <a href="?delete_section=<?php echo $section['id']; ?>" onclick="return confirm('Are you sure you want to delete this section?')" class="text-red-600 hover:text-red-800">
+                                                                            <i class="fas fa-trash"></i>
+                                                                        </a>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        <?php endwhile; ?>
+                                                    </tbody>
+                                                </table>
                                             <?php else: ?>
-                                                <?php foreach ($classes as $class): ?>
-                                                <tr>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $class['class_name']; ?></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $class['section']; ?></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $class['academic_year']; ?></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                        <?php 
-                                                        // Count students in this class
-                                                        $student_count = 0;
-                                                        foreach ($students as $student) {
-                                                            if ($student['class_id'] == $class['class_id']) {
-                                                                $student_count++;
-                                                            }
-                                                        }
-                                                        echo $student_count;
-                                                        ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                        <button type="button" onclick="editClass(<?php echo $class['class_id']; ?>, '<?php echo $class['class_name']; ?>', '<?php echo $class['section']; ?>', '<?php echo $class['academic_year']; ?>', '<?php echo addslashes($class['description'] ?? ''); ?>')" class="text-blue-600 hover:text-blue-900 mr-3">
-                                                            <i class="fas fa-edit"></i>
-                                                        </button>
-                                                        <button type="button" onclick="assignStudents(<?php echo $class['class_id']; ?>, '<?php echo $class['class_name']; ?> <?php echo $class['section']; ?>')" class="text-green-600 hover:text-green-900 mr-3">
-                                                            <i class="fas fa-user-plus"></i>
-                                                        </button>
-                                                        <form action="classes.php" method="POST" class="inline-block">
-                                                            <input type="hidden" name="action" value="delete_class">
-                                                            <input type="hidden" name="class_id" value="<?php echo $class['class_id']; ?>">
-                                                            <button type="submit" onclick="return confirm('Are you sure you want to delete this class?')" class="text-red-600 hover:text-red-900">
-                                                                <i class="fas fa-trash"></i>
-                                                            </button>
-                                                        </form>
-                                                    </td>
-                                                </tr>
-                                                <?php endforeach; ?>
+                                                <p class="text-sm text-gray-500">No sections created for this class yet.</p>
                                             <?php endif; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php 
+                                    endwhile;
+                                } else {
+                                ?>
+                                <tr>
+                                    <td colspan="6" class="py-4 px-4 text-center text-gray-500">No classes found. Create your first class using the form above.</td>
+                                </tr>
+                                <?php } ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
-
-    <!-- Edit Class Modal -->
-    <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Edit Class</h3>
-                <button onclick="closeModal('editModal')" class="text-gray-400 hover:text-gray-500">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <form action="classes.php" method="POST">
-                <input type="hidden" name="action" value="update_class">
-                <input type="hidden" name="class_id" id="edit_class_id">
                 
-                <div class="space-y-4">
-                    <div>
-                        <label for="edit_class_name" class="block text-sm font-medium text-gray-700 mb-1">Class Name</label>
-                        <input type="text" id="edit_class_name" name="class_name" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_section" class="block text-sm font-medium text-gray-700 mb-1">Section</label>
-                        <input type="text" id="edit_section" name="section" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_academic_year" class="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
-                        <select id="edit_academic_year" name="academic_year" required class="w-full rounded-md border-gray-300 shadow-sm focus  name="academic_year" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
-                        <select id="edit_academic_year" name="academic_year" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
-                            <?php 
-                            for ($i = 0; $i < 3; $i++) {
-                                $year = $current_year - $i;
-                                $next_year = $year + 1;
-                                $academic_year = $year . '-' . $next_year;
-                                echo "<option value=\"$academic_year\">$academic_year</option>";
-                            }
-                            ?>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label for="edit_description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                        <textarea id="edit_description" name="description" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"></textarea>
-                    </div>
-                    
-                    <div class="flex justify-end space-x-3 pt-4">
-                        <button type="button" onclick="closeModal('editModal')" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            Cancel
-                        </button>
-                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            Update Class
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
 
-    <!-- Assign Students Modal -->
-    <div id="assignModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Assign Students to <span id="assign_class_name"></span></h3>
-                <button onclick="closeModal('assignModal')" class="text-gray-400 hover:text-gray-500">
-                    <i class="fas fa-times"></i>
-                </button>
             </div>
-            <form action="classes.php" method="POST">
-                <input type="hidden" name="action" value="assign_students">
-                <input type="hidden" name="class_id" id="assign_class_id">
-                
-                <div class="space-y-4">
-                    <div>
-                        <label for="student_ids" class="block text-sm font-medium text-gray-700 mb-1">Select Students</label>
-                        <select id="student_ids" name="student_ids[]" multiple class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
-                            <?php foreach ($students as $student): ?>
-                                <option value="<?php echo $student['student_id']; ?>" data-class="<?php echo $student['class_id']; ?>">
-                                    <?php echo $student['full_name'] . ' (' . $student['roll_number'] . ')'; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <p class="text-xs text-gray-500 mt-1">Hold Ctrl (or Cmd) to select multiple students</p>
-                    </div>
-                    
-                    <div class="flex justify-end space-x-3 pt-4">
-                        <button type="button" onclick="closeModal('assignModal')" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            Cancel
-                        </button>
-                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            Assign Students
-                        </button>
-                    </div>
-                </div>
-            </form>
         </div>
     </div>
 
-    <script>
-        // Function to edit class
-        function editClass(classId, className, section, academicYear, description) {
-            document.getElementById('edit_class_id').value = classId;
-            document.getElementById('edit_class_name').value = className;
-            document.getElementById('edit_section').value = section;
-            
-            // Set academic year dropdown
-            const academicYearSelect = document.getElementById('edit_academic_year');
-            for (let i = 0; i < academicYearSelect.options.length; i++) {
-                if (academicYearSelect.options[i].value === academicYear) {
-                    academicYearSelect.selectedIndex = i;
-                    break;
-                }
-            }
-            
-            document.getElementById('edit_description').value = description;
-            document.getElementById('editModal').classList.remove('hidden');
-        }
-        
-        // Function to assign students
-        function assignStudents(classId, className) {
-            document.getElementById('assign_class_id').value = classId;
-            document.getElementById('assign_class_name').textContent = className;
-            
-            // Pre-select students already in this class
-            const studentSelect = document.getElementById('student_ids');
-            for (let i = 0; i < studentSelect.options.length; i++) {
-                const option = studentSelect.options[i];
-                option.selected = option.getAttribute('data-class') == classId;
-            }
-            
-            document.getElementById('assignModal').classList.remove('hidden');
-        }
-        
-        // Function to close modal
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.add('hidden');
-        }
-        
-        // Mobile sidebar toggle
-        document.getElementById('sidebar-toggle').addEventListener('click', function() {
-            document.getElementById('mobile-sidebar').classList.remove('-translate-x-full');
-        });
-        
-        document.getElementById('close-sidebar').addEventListener('click', function() {
-            document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
-        });
-        
-        document.getElementById('sidebar-backdrop').addEventListener('click', function() {
-            document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
-        });
-        
-        // User menu toggle
-        document.getElementById('user-menu-button').addEventListener('click', function() {
-            document.getElementById('user-menu').classList.toggle('hidden');
-        });
-        
-        // Initialize Select2 for better dropdown experience
-        $(document).ready(function() {
-            $('#student_ids').select2({
-                placeholder: 'Select students',
-                width: '100%'
-            });
-        });
-    </script>
-        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
+    
 </body>
 </html>

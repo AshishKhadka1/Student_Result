@@ -1077,7 +1077,6 @@ $conn->close();
             window.print();
         }
     </script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 
 </body>
 </html>
