@@ -1,13 +1,41 @@
+
 <?php
 session_start();
+require_once '../includes/db_connetc.php';
+
+// Check if user is logged in and is an admin
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: ../login.php");
     exit();
 }
 
-$conn = new mysqli('localhost', 'root', '', 'result_management');
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+// Function to log actions
+function logAction($conn, $user_id, $action, $details) {
+    try {
+        $stmt = $conn->prepare("INSERT INTO activity_logs (user_id, action, details, created_at) VALUES (?, ?, ?, NOW())");
+        $stmt->bind_param("iss", $user_id, $action, $details);
+        $stmt->execute();
+        $stmt->close();
+    } catch (Exception $e) {
+        // Create activity_logs table if it doesn't exist
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS `activity_logs` (
+              `log_id` int(11) NOT NULL AUTO_INCREMENT,
+              `user_id` int(11) NOT NULL,
+              `action` varchar(255) NOT NULL,
+              `details` text DEFAULT NULL,
+              `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+              PRIMARY KEY (`log_id`),
+              KEY `user_id` (`user_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+        
+        // Try again
+        $stmt = $conn->prepare("INSERT INTO activity_logs (user_id, action, details, created_at) VALUES (?, ?, ?, NOW())");
+        $stmt->bind_param("iss", $user_id, $action, $details);
+        $stmt->execute();
+        $stmt->close();
+    }
 }
 
 // Get classes for dropdown
@@ -31,166 +59,6 @@ while ($row = $result->fetch_assoc()) {
     $subjects[] = $row;
 }
 
-// Process form submission
-$success_message = '';
-$error_message = '';
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_result'])) {
-    // Validate inputs
-    $student_id = $_POST['student_id'] ?? '';
-    $exam_id = $_POST['exam_id'] ?? '';
-    $subject_ids = $_POST['subject_id'] ?? [];
-    $theory_marks = $_POST['theory_marks'] ?? [];
-    $practical_marks = $_POST['practical_marks'] ?? [];
-    $remarks = $_POST['remarks'] ?? [];
-    
-    // Basic validation
-    if (empty($student_id) || empty($exam_id) || empty($subject_ids)) {
-        $error_message = "Please fill all required fields.";
-    } else {
-        // Start transaction
-        $conn->begin_transaction();
-        
-        try {
-            // Process each subject
-            for ($i = 0; $i < count($subject_ids); $i++) {
-                if (empty($subject_ids[$i])) continue;
-                
-                $subject_id = $subject_ids[$i];
-                $theory = isset($theory_marks[$i]) && is_numeric($theory_marks[$i]) ? $theory_marks[$i] : 0;
-                $practical = isset($practical_marks[$i]) && is_numeric($practical_marks[$i]) ? $practical_marks[$i] : 0;
-                $remark = $remarks[$i] ?? '';
-                
-                // Calculate total and grade
-                $total_marks = $theory + $practical;
-                
-                // Determine grade based on percentage
-                $percentage = ($total_marks / 100) * 100; // Assuming total possible marks is 100
-                $grade = '';
-                
-                if ($percentage >= 90) {
-                    $grade = 'A+';
-                } elseif ($percentage >= 80) {
-                    $grade = 'A';
-                } elseif ($percentage >= 70) {
-                    $grade = 'B+';
-                } elseif ($percentage >= 60) {
-                    $grade = 'B';
-                } elseif ($percentage >= 50) {
-                    $grade = 'C+';
-                } elseif ($percentage >= 40) {
-                    $grade = 'C';
-                } elseif ($percentage >= 33) {
-                    $grade = 'D';
-                } else {
-                    $grade = 'F';
-                }
-                
-                // Check if result already exists
-                $stmt = $conn->prepare("SELECT result_id FROM results WHERE student_id = ? AND exam_id = ? AND subject_id = ?");
-                $stmt->bind_param("sis", $student_id, $exam_id, $subject_id);
-                $stmt->execute();
-                $existing_result = $stmt->get_result();
-                $stmt->close();
-                
-                if ($existing_result->num_rows > 0) {
-                    // Update existing result
-                    $result_row = $existing_result->fetch_assoc();
-                    $stmt = $conn->prepare("UPDATE results SET theory_marks = ?, practical_marks = ?, grade = ?, remarks = ?, updated_at = NOW() WHERE result_id = ?");
-                    $stmt->bind_param("ddssi", $theory, $practical, $grade, $remark, $result_row['result_id']);
-                    $stmt->execute();
-                    $stmt->close();
-                } else {
-                    // Insert new result
-                    $stmt = $conn->prepare("INSERT INTO results (student_id, exam_id, subject_id, theory_marks, practical_marks, grade, remarks, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
-                    $stmt->bind_param("sisdds", $student_id, $exam_id, $subject_id, $theory, $practical, $grade, $remark);
-                    $stmt->execute();
-                    $stmt->close();
-                }
-            }
-            
-            // Commit transaction
-            $conn->commit();
-            
-            // Update student performance summary
-            updateStudentPerformance($student_id, $exam_id, $conn);
-            
-            $success_message = "Results saved successfully!";
-        } catch (Exception $e) {
-            // Rollback on error
-            $conn->rollback();
-            $error_message = "Error saving results: " . $e->getMessage();
-        }
-    }
-}
-
-// Function to update student performance summary
-function updateStudentPerformance($student_id, $exam_id, $conn) {
-    // Get all results for this student and exam
-    $stmt = $conn->prepare("
-        SELECT r.*, s.subject_name
-        FROM results r
-        JOIN subjects s ON r.subject_id = s.subject_id
-        WHERE r.student_id = ? AND r.exam_id = ?
-    ");
-    $stmt->bind_param("si", $student_id, $exam_id);
-    $stmt->execute();
-    $results = $stmt->get_result();
-    $stmt->close();
-    
-    $total_marks = 0;
-    $total_subjects = 0;
-    $subjects_passed = 0;
-    $total_gpa = 0;
-    
-    while ($row = $results->fetch_assoc()) {
-        $total_marks += ($row['theory_marks'] + $row['practical_marks']);
-        $total_gpa += $row['gpa'] ?? 0;
-        $total_subjects++;
-        
-        if (($row['theory_marks'] + $row['practical_marks']) >= 33) {
-            $subjects_passed++;
-        }
-    }
-    
-    // Calculate average marks and GPA
-    $average_marks = $total_subjects > 0 ? $total_marks / $total_subjects : 0;
-    $gpa = $total_subjects > 0 ? $total_gpa / $total_subjects : 0;
-    
-    // Check if performance record exists
-    $stmt = $conn->prepare("SELECT performance_id FROM student_performance WHERE student_id = ? AND exam_id = ?");
-    $stmt->bind_param("si", $student_id, $exam_id);
-    $stmt->execute();
-    $performance = $stmt->get_result();
-    $stmt->close();
-    
-    if ($performance->num_rows > 0) {
-        // Update existing performance record
-        $performance_row = $performance->fetch_assoc();
-        $stmt = $conn->prepare("
-            UPDATE student_performance 
-            SET average_marks = ?, gpa = ?, total_subjects = ?, subjects_passed = ?, updated_at = NOW() 
-            WHERE performance_id = ?
-        ");
-        $stmt->bind_param("ddiii", $average_marks, $gpa, $total_subjects, $subjects_passed, $performance_row['performance_id']);
-        $stmt->execute();
-        $stmt->close();
-    } else {
-        // Insert new performance record
-        $stmt = $conn->prepare("
-            INSERT INTO student_performance 
-            (student_id, exam_id, average_marks, gpa, total_subjects, subjects_passed, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-        ");
-        $stmt->bind_param("siddii", $student_id, $exam_id, $average_marks, $gpa, $total_subjects, $subjects_passed);
-        $stmt->execute();
-        $stmt->close();
-    }
-    
-    // Update ranks (optional, can be complex)
-    // This would require ordering all students by average marks or GPA and assigning ranks
-}
-
 // Get student data if ID is provided
 $student_data = null;
 if (isset($_GET['student_id']) && !empty($_GET['student_id'])) {
@@ -207,6 +75,15 @@ if (isset($_GET['student_id']) && !empty($_GET['student_id'])) {
     $student_data = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 }
+
+// Get list of students
+$students = $conn->query("SELECT s.student_id, u.full_name as student_name 
+                         FROM Students s 
+                         JOIN users u ON s.user_id = u.user_id 
+                         ORDER BY u.full_name");
+
+// Get list of subjects
+$subjects = $conn->query("SELECT subject_id, subject_name FROM Subjects ORDER BY subject_name");
 
 $conn->close();
 ?>
@@ -237,77 +114,44 @@ $conn->close();
 <body class="bg-gray-100">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <?php
-        // Include the file that processes form data
-        include 'sidebar.php';
-        ?>
+        <?php include 'sidebar.php'; ?>
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
             <!-- Top Navigation -->
-            <?php
-        // Include the file that processes form data
-        include 'topBar.php';
-        ?>
-
-        <!-- Main Content -->
-        <div class="flex flex-col flex-1 w-0 overflow-hidden">
-            <!-- Top Navigation -->
-            <div class="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
-                <button class="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:bg-gray-100 focus:text-gray-600 md:hidden" id="sidebar-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="flex-1 px-4 flex justify-between">
-                    <div class="flex-1 flex">
-                        <div class="w-full flex md:ml-0">
-                            <h1 class="text-2xl font-semibold text-gray-900 my-auto">Manual Result Entry</h1>
-                        </div>
-                    </div>
-                    <div class="ml-4 flex items-center md:ml-6">
-                        <!-- Profile dropdown -->
-                        <div class="ml-3 relative">
-                            <div>
-                                <button type="button" class="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" id="user-menu-button">
-                                    <span class="sr-only">Open user menu</span>
-                                    <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-600">
-                                        <span class="text-sm font-medium leading-none text-white"><?php echo substr($_SESSION['full_name'], 0, 1); ?></span>
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <?php include 'topBar.php'; ?>
 
             <!-- Main Content -->
             <main class="flex-1 relative overflow-y-auto focus:outline-none">
                 <div class="py-6">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
                         <!-- Success/Error Messages -->
-                        <?php if (!empty($success_message)): ?>
+                        <?php if (isset($_SESSION['success_message'])): ?>
                             <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
                                 <div class="flex">
                                     <div class="flex-shrink-0">
                                         <i class="fas fa-check-circle text-green-400"></i>
                                     </div>
                                     <div class="ml-3">
-                                        <p class="text-sm text-green-700"><?php echo $success_message; ?></p>
+                                        <p class="text-sm text-green-700"><?php echo $_SESSION['success_message']; ?></p>
                                     </div>
                                 </div>
                             </div>
+                            <?php unset($_SESSION['success_message']); ?>
                         <?php endif; ?>
 
-                        <?php if (!empty($error_message)): ?>
+                        <?php if (isset($_SESSION['error_message'])): ?>
                             <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
                                 <div class="flex">
                                     <div class="flex-shrink-0">
                                         <i class="fas fa-exclamation-circle text-red-400"></i>
                                     </div>
                                     <div class="ml-3">
-                                        <p class="text-sm text-red-700"><?php echo $error_message; ?></p>
+                                        <p class="text-sm text-red-700"><?php echo $_SESSION['error_message']; ?></p>
                                     </div>
                                 </div>
                             </div>
+                            <?php unset($_SESSION['error_message']); ?>
                         <?php endif; ?>
 
                         <!-- Manual Entry Form -->
@@ -317,7 +161,7 @@ $conn->close();
                                 <p class="mt-1 text-sm text-gray-500">Enter student results manually for individual subjects.</p>
                             </div>
                             <div class="px-4 py-5 sm:p-6">
-                                <form action="manual_entry.php" method="POST" id="resultForm">
+                                <form action="process_manual_entry.php" method="POST" id="resultForm">
                                     <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                                         <!-- Student Selection -->
                                         <div class="sm:col-span-3">
@@ -439,7 +283,7 @@ $conn->close();
                                         <button type="button" id="previewButton" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                                             <i class="fas fa-eye mr-2"></i> Preview
                                         </button>
-                                        <button type="submit" name="save_result" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        <button type="submit" name="save_result" class="inline-flex justify-center py-2 px-4 border border-transparent  name="save_result" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                             <i class="fas fa-save mr-2"></i> Save Results
                                         </button>
                                     </div>

@@ -694,15 +694,15 @@ $conn->close();
                         <div class="mb-6">
                             <h2 class="text-lg font-medium text-gray-900 mb-3">Quick Actions</h2>
                             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                <a href="bulk_upload.php" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
+                                <a href="manual_entry.php" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
                                     <i class="fas fa-upload text-2xl mb-2"></i>
-                                    <p class="text-sm">Bulk Upload</p>
+                                    <p class="text-sm">Upload</p>
                                 </a>
                                 <a href="add_user.php" class="bg-green-600 hover:bg-green-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
                                     <i class="fas fa-user-plus text-2xl mb-2"></i>
                                     <p class="text-sm">Add User</p>
                                 </a>
-                                <a href="add_exam.php" class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
+                                <a href="exams.php" class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
                                     <i class="fas fa-calendar-plus text-2xl mb-2"></i>
                                     <p class="text-sm">Add Exam</p>
                                 </a>

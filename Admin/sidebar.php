@@ -15,8 +15,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="result.php" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 <?= ($current_page == 'result.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-clipboard-list"></i> Results
             </a>
-            <a href="bulk_upload.php" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 <?= ($current_page == 'bulk_upload.php') ? 'bg-gray-700' : '' ?>">
-                <i class="fas fa-upload"></i> Bulk Upload
+            <a href="manage_results.php" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 <?= ($current_page == 'bulk_upload.php') ? 'bg-gray-700' : '' ?>">
+                <i class="fas fa-upload"></i> Manage Results
             </a>
             <a href="users.php" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 <?= ($current_page == 'users.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-users"></i> Users

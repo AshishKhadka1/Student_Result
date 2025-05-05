@@ -1,9 +1,6 @@
 <?php
 session_start();
-
-// Check if user is logged in and is an admin
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    $_SESSION['error'] = "You do not have permission to access this page.";
     header("Location: login.php");
     exit();
 }
@@ -15,19 +12,76 @@ if ($conn->connect_error) {
 }
 
 // Get all result uploads
-$uploadsQuery = "SELECT * FROM ResultUploads ORDER BY upload_date DESC";
+$uploadsQuery = "SELECT ru.*, u.full_name as uploaded_by_name, e.exam_name, c.class_name, c.section 
+                FROM result_uploads ru
+                LEFT JOIN users u ON ru.uploaded_by = u.user_id
+                LEFT JOIN exams e ON ru.exam_id = e.exam_id
+                LEFT JOIN classes c ON ru.class_id = c.class_id
+                ORDER BY ru.upload_date DESC";
 $uploads = $conn->query($uploadsQuery);
 
 // Get subjects for manual entry
-$subjectsQuery = "SELECT * FROM Subjects ORDER BY subject_name";
+$subjectsQuery = "SELECT * FROM subjects ORDER BY subject_name";
 $subjects = $conn->query($subjectsQuery);
 
 // Get students for manual entry
-$studentsQuery = "SELECT s.student_id, u.full_name 
-                 FROM Students s 
-                 JOIN Users u ON s.user_id = u.user_id 
-                 ORDER BY u.full_name";
+$studentsQuery = "SELECT s.student_id, u.full_name, s.roll_number, c.class_name, c.section 
+                FROM students s 
+                JOIN users u ON s.user_id = u.user_id 
+                LEFT JOIN classes c ON s.class_id = c.class_id
+                ORDER BY u.full_name";
 $students = $conn->query($studentsQuery);
+
+// Get classes for dropdown
+$classesQuery = "SELECT class_id, class_name, section FROM classes ORDER BY class_name, section";
+$classes = $conn->query($classesQuery);
+
+// Get exams for dropdown
+$examsQuery = "SELECT exam_id, exam_name, exam_type, class_id FROM exams ORDER BY created_at DESC";
+$exams = $conn->query($examsQuery);
+
+// Get student data if ID is provided
+$student_data = null;
+if (isset($_GET['student_id']) && !empty($_GET['student_id'])) {
+    $student_id = $_GET['student_id'];
+    $stmt = $conn->prepare("
+       SELECT s.*, u.full_name, c.class_name, c.section 
+       FROM students s
+       JOIN users u ON s.user_id = u.user_id
+       JOIN classes c ON s.class_id = c.class_id
+       WHERE s.student_id = ?
+   ");
+    $stmt->bind_param("s", $student_id);
+    $stmt->execute();
+    $student_data = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+}
+
+// Get active tab from URL parameter or default to 'upload'
+$activeTab = isset($_GET['tab']) ? $_GET['tab'] : 'upload';
+
+// Handle search functionality
+$searchResults = [];
+if (isset($_GET['search']) && !empty($_GET['search'])) {
+    $search = '%' . $_GET['search'] . '%';
+    $stmt = $conn->prepare("
+        SELECT s.student_id, s.roll_number, u.full_name, c.class_name, c.section
+        FROM students s
+        JOIN users u ON s.user_id = u.user_id
+        LEFT JOIN classes c ON s.class_id = c.class_id
+        WHERE s.student_id LIKE ? OR s.roll_number LIKE ? OR u.full_name LIKE ?
+        LIMIT 10
+    ");
+    $stmt->bind_param("sss", $search, $search, $search);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $searchResults[] = $row;
+    }
+}
+
+// Include header
+// 
 ?>
 
 <!DOCTYPE html>
@@ -36,373 +90,749 @@ $students = $conn->query($studentsQuery);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Results - Admin Dashboard</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Manage Results | Result Management System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Hover effects */
+        .hover-scale {
+            transition: all 0.3s ease;
+        }
+
+        .hover-scale:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Tab styles */
+        .tab-button {
+            @apply px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300;
+        }
+
+        .tab-button.active {
+            @apply border-b-2 border-blue-500 text-blue-600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Dark mode */
+        .dark-mode {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+
+        .dark-mode .bg-white {
+            background-color: #2d3748 !important;
+            color: #e2e8f0;
+        }
+
+        .dark-mode .bg-gray-50 {
+            background-color: #4a5568 !important;
+            color: #e2e8f0;
+        }
+
+        .dark-mode .text-gray-900 {
+            color: #e2e8f0 !important;
+        }
+
+        .dark-mode .text-gray-500 {
+            color: #a0aec0 !important;
+        }
+
+        .dark-mode .border-gray-200 {
+            border-color: #4a5568 !important;
+        }
+    </style>
 </head>
 
-<body class="bg-gray-100 font-light">
-    <div class="min-h-screen flex">
+<body class="bg-gray-100" id="body">
+    <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <?php
-        // Include the file that processes form data
-        include 'sidebar.php';
-        ?>
+        <?php include 'sidebar.php'; ?>
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
             <!-- Top Navigation -->
-            <?php
-        // Include the file that processes form data
-        include 'topBar.php';
-        ?>
+            <?php include 'topBar.php'; ?>
 
-        <div class="flex-1 overflow-x-hidden overflow-y-auto">
-            <!-- Top Navigation -->
-            <header class="bg-white shadow-sm">
-                <div class="flex items-center justify-between px-6 py-4">
-                    <h2 class="text-xl font-semibold text-gray-800">Manage Results</h2>
-                    <div class="flex items-center space-x-4">
-                        <div class="flex items-center space-x-2">
-                            <div class="h-8 w-8 rounded-full bg-blue-700 flex items-center justify-center text-white">
-                                <?php echo substr($_SESSION['username'] ?? 'A', 0, 1); ?>
-                            </div>
-                            <span class="text-gray-700"><?php echo $_SESSION['username'] ?? 'Admin'; ?></span>
-                        </div>
+            <!-- Mobile sidebar -->
+            <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
+                <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
+                <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
+                    <div class="absolute top-0 right-0 -mr-12 pt-2">
+                        <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
+                            <span class="sr-only">Close sidebar</span>
+                            <i class="fas fa-times text-white"></i>
+                        </button>
                     </div>
-                </div>
-            </header>
-
-            <!-- Main Content Area -->
-            <main class="p-6">
-                <!-- Alert Component -->
-                <?php if (isset($_SESSION['message'])): ?>
-                    <div class="bg-<?php echo $_SESSION['message_type'] ?? 'blue'; ?>-100 border-l-4 border-<?php echo $_SESSION['message_type'] ?? 'blue'; ?>-800 text-<?php echo $_SESSION['message_type'] ?? 'blue'; ?>-800 p-4 mb-6 rounded">
-                        <div class="flex items-start">
-                            <div class="flex-shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div class="ml-3">
-                                <p class="text-sm"><?php echo $_SESSION['message']; ?></p>
-                            </div>
+                    <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
+                        <div class="flex-shrink-0 flex items-center px-4">
+                            <span class="text-white text-lg font-semibold">Result Management</span>
                         </div>
-                    </div>
-                <?php
-                    unset($_SESSION['message']);
-                    unset($_SESSION['message_type']);
-                endif;
-                ?>
-
-                <!-- Tabs -->
-                <div class="mb-6">
-                    <div class="border-b border-gray-200">
-                        <nav class="-mb-px flex">
-                            <button onclick="showTab('upload')" id="tab-upload" class="tab-button active">
-                                Bulk Upload
-                            </button>
-                            <button onclick="showTab('manual')" id="tab-manual" class="tab-button">
-                                Manual Entry
-                            </button>
-                            <button onclick="showTab('manage')" id="tab-manage" class="tab-button">
-                                Manage Uploads
-                            </button>
+                        <nav class="mt-5 px-2 space-y-1">
+                            <!-- Mobile menu items -->
+                            <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                                <i class="fas fa-tachometer-alt mr-3"></i>
+                                Dashboard
+                            </a>
+                            <a href="manage_results.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-white bg-gray-700 rounded-md">
+                                <i class="fas fa-clipboard-list mr-3"></i>
+                                Manage Results
+                            </a>
+                            <!-- More mobile menu items -->
                         </nav>
                     </div>
                 </div>
+            </div>
 
-                <!-- Upload Tab Content -->
-                <div id="content-upload" class="tab-content active">
-                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                        <div class="p-6">
-                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Upload Results (CSV)</h2>
-                            <form action="process_upload.php" method="POST" enctype="multipart/form-data">
-                                <div class="mb-4">
-                                    <label for="file" class="block text-gray-700 mb-2">Select CSV File:</label>
-                                    <div class="flex items-center space-x-4">
-                                        <div class="flex-1">
-                                            <div class="relative border-2 border-dashed border-gray-300 rounded-lg p-6 transition-all duration-200 hover:border-blue-500">
-                                                <input type="file" id="file" name="file" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required accept=".csv">
-                                                <div class="text-center">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                                    </svg>
-                                                    <p class="mt-2 text-sm text-gray-600">Drag and drop your file here, or <span class="text-blue-600">browse</span></p>
-                                                    <p class="mt-1 text-xs text-gray-500">Supports CSV files only</p>
-                                                </div>
-                                            </div>
+            <!-- Main Content -->
+            <main class="flex-1 relative overflow-y-auto focus:outline-none">
+                <div class="py-6">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                        <h1 class="text-2xl font-semibold text-gray-900">Manage Results</h1>
+
+                        <!-- Notification Messages -->
+                        <?php if (isset($_SESSION['success_message'])): ?>
+                            <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 mt-4 rounded">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-check-circle text-green-500"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm text-green-700">
+                                            <?php echo $_SESSION['success_message'];
+                                            unset($_SESSION['success_message']); ?>
+                                        </p>
+                                    </div>
+                                    <div class="ml-auto pl-3">
+                                        <div class="-mx-1.5 -my-1.5">
+                                            <button class="inline-flex rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none" onclick="this.parentElement.parentElement.parentElement.remove()">
+                                                <span class="sr-only">Dismiss</span>
+                                                <i class="fas fa-times"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        <?php endif; ?>
 
-                                <div class="mb-4">
-                                    <label for="description" class="block text-gray-700 mb-2">Description (Optional):</label>
-                                    <input type="text" id="description" name="description" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., Midterm Results 2023">
-                                </div>
-
-                                <div class="mb-4">
-                                    <label class="block text-gray-700 mb-2">Options:</label>
-                                    <div class="flex items-center">
-                                        <input type="checkbox" id="publish" name="publish" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                        <label for="publish" class="ml-2 block text-sm text-gray-900">
-                                            Publish results immediately
-                                        </label>
+                        <?php if (isset($_SESSION['error_message'])): ?>
+                            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 mt-4 rounded">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-circle text-red-500"></i>
                                     </div>
-                                    <div class="flex items-center mt-2">
-                                        <input type="checkbox" id="overwrite" name="overwrite" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                        <label for="overwrite" class="ml-2 block text-sm text-gray-900">
-                                            Overwrite existing results
-                                        </label>
+                                    <div class="ml-3">
+                                        <p class="text-sm text-red-700">
+                                            <?php echo $_SESSION['error_message'];
+                                            unset($_SESSION['error_message']); ?>
+                                        </p>
+                                    </div>
+                                    <div class="ml-auto pl-3">
+                                        <div class="-mx-1.5 -my-1.5">
+                                            <button class="inline-flex rounded-md p-1.5 text-red-500 hover:bg-red-100 focus:outline-none" onclick="this.parentElement.parentElement.parentElement.remove()">
+                                                <span class="sr-only">Dismiss</span>
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
+                            </div>
+                        <?php endif; ?>
 
-                                <div class="flex justify-end">
-                                    <button type="submit" class="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg transition duration-200 flex items-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
-                                        </svg>
-                                        Upload Results
+
+                        <div class="mb-6 mt-6">
+                            <div class="border-b border-gray-300">
+                                <nav class="flex space-x-4" role="tablist">
+                                    <button onclick="showTab('upload')" id="tab-upload"
+                                        class="tab-button px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-300 
+                <?php echo $activeTab == 'upload' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 hover:border-blue-500'; ?>">
+                                        Bulk Upload
                                     </button>
+                                    <button onclick="showTab('manual')" id="tab-manual"
+                                        class="tab-button px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-300 
+                <?php echo $activeTab == 'manual' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 hover:border-blue-500'; ?>">
+                                        Manual Entry
+                                    </button>
+                                    <button onclick="showTab('batch')" id="tab-batch"
+                                        class="tab-button px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-300 
+                <?php echo $activeTab == 'batch' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 hover:border-blue-500'; ?>">
+                                        Batch Entry
+                                    </button>
+                                    <button onclick="showTab('manage')" id="tab-manage"
+                                        class="tab-button px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-300 
+                <?php echo $activeTab == 'manage' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 hover:border-blue-500'; ?>">
+                                        Manage Uploads
+                                    </button>
+                                </nav>
+                            </div>
+                        </div>
+
+
+                        <!-- Upload Tab Content -->
+                        <div id="content-upload" class="tab-content <?php echo $activeTab == 'upload' ? 'active' : ''; ?>">
+                            <div class="bg-white rounded-lg shadow-md overflow-hidden hover-scale">
+                                <div class="p-6">
+                                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Upload Results (CSV)</h2>
+                                    <form action="process_upload.php" method="POST" enctype="multipart/form-data">
+                                        <div class="mb-4">
+                                            <label for="file" class="block text-gray-700 mb-2">Select CSV File:</label>
+                                            <div class="flex items-center space-x-4">
+                                                <div class="flex-1">
+                                                    <div class="relative border-2 border-dashed border-gray-300 rounded-lg p-6 transition-all duration-200 hover:border-blue-500">
+                                                        <input type="file" id="file" name="file" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required accept=".csv">
+                                                        <div class="text-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                            </svg>
+                                                            <p class="mt-2 text-sm text-gray-600">Drag and drop your file here, or <span class="text-blue-600">browse</span></p>
+                                                            <p class="mt-1 text-xs text-gray-500">Supports CSV files only</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <label for="exam_id" class="block text-gray-700 mb-2">Select Exam:</label>
+                                            <select id="exam_id" name="exam_id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                                <option value="">-- Select Exam --</option>
+                                                <?php if ($exams && $exams->num_rows > 0): ?>
+                                                    <?php while ($row = $exams->fetch_assoc()): ?>
+                                                        <option value="<?php echo $row['exam_id']; ?>">
+                                                            <?php echo $row['exam_name'] . ' (' . ucfirst($row['exam_type']) . ')'; ?>
+                                                        </option>
+                                                    <?php endwhile; ?>
+                                                <?php endif; ?>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <label for="description" class="block text-gray-700 mb-2">Description (Optional):</label>
+                                            <input type="text" id="description" name="description" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., Midterm Results 2023">
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <label class="block text-gray-700 mb-2">Options:</label>
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="publish" name="publish" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                                <label for="publish" class="ml-2 block text-sm text-gray-900">
+                                                    Publish results immediately
+                                                </label>
+                                            </div>
+                                            <div class="flex items-center mt-2">
+                                                <input type="checkbox" id="overwrite" name="overwrite" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                                <label for="overwrite" class="ml-2 block text-sm text-gray-900">
+                                                    Overwrite existing results
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex justify-end">
+                                            <button type="submit" class="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg transition duration-200 flex items-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
+                                                </svg>
+                                                Upload Results
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                            </form>
+                            </div>
+                        </div>
+
+                        <!-- Manual Entry Tab Content -->
+                        <div id="content-manual" class="tab-content <?php echo $activeTab == 'manual' ? 'active' : ''; ?>">
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <!-- Student Search Section -->
+                                <div class="lg:col-span-1">
+                                    <div class="bg-white rounded-lg shadow-md overflow-hidden hover-scale">
+                                        <div class="p-6">
+                                            <h2 class="text-lg font-semibold text-gray-800 mb-4">Search Student</h2>
+                                            <form action="" method="GET" class="mb-4">
+                                                <input type="hidden" name="tab" value="manual">
+                                                <div class="flex">
+                                                    <input type="text" name="search" placeholder="Enter Student ID, Roll Number or Name" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500" value="<?php echo isset($_GET['search']) ? htmlspecialchars($_GET['search']) : ''; ?>">
+                                                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r-md">
+                                                        <i class="fas fa-search"></i>
+                                                    </button>
+                                                </div>
+                                            </form>
+                                            
+
+                                                <?php if (!empty($searchResults)): ?>
+                                                <div class="mt-4">
+                                                <h3 class="text-md font-medium text-gray-700 mb-2">Search Results</h3>
+                                                <div class="overflow-x-auto">
+                                                    <table class="min-w-full divide-y divide-gray-200">
+                                                        <thead class="bg-gray-50">
+                                                            <tr>
+                                                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                                                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody class="bg-white divide-y divide-gray-200">
+                                                            <?php foreach ($searchResults as $student): ?>
+                                                                <tr>
+                                                                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900"><?php echo $student['student_id']; ?></td>
+                                                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500"><?php echo $student['full_name']; ?></td>
+                                                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+                                                                        <?php
+                                                                        echo $student['class_name'] ?? 'N/A';
+                                                                        if (!empty($student['section'])) {
+                                                                            echo ' ' . $student['section'];
+                                                                        }
+                                                                        ?>
+                                                                    </td>
+                                                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+                                                                        <button type="button" class="select-student text-blue-600 hover:text-blue-900"
+                                                                            data-id="<?php echo $student['student_id']; ?>"
+                                                                            data-name="<?php echo $student['full_name']; ?>"
+                                                                            data-roll="<?php echo $student['roll_number']; ?>"
+                                                                            data-class="<?php echo ($student['class_name'] ?? '') . ' ' . ($student['section'] ?? ''); ?>">
+                                                                            Select
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            <?php endforeach; ?>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                        </div>
+                                    <?php elseif (isset($_GET['search'])): ?>
+                                        <div class="mt-4 text-center text-gray-500">No students found matching your search.</div>
+                                    <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Manual Entry Form -->
+                            <div class="lg:col-span-2">
+                                <div class="bg-white rounded-lg shadow-md overflow-hidden hover-scale">
+                                    <div class="p-6">
+                                        <h2 class="text-lg font-semibold text-gray-800 mb-4">Manual Result Entry</h2>
+                                        <form action="process_manual_entry.php" method="POST" id="resultForm">
+                                            <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                                                <!-- Student Information -->
+                                                <div class="sm:col-span-3">
+                                                    <label for="student_id" class="block text-sm font-medium text-gray-700">Student ID</label>
+                                                    <div class="mt-1">
+                                                        <input type="text" name="student_id" id="student_id" value="<?php echo isset($_GET['student_id']) ? $_GET['student_id'] : ''; ?>" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="Enter Student ID" required>
+                                                    </div>
+                                                </div>
+
+                                                <div class="sm:col-span-3">
+                                                    <label for="student_name" class="block text-sm font-medium text-gray-700">Student Name</label>
+                                                    <div class="mt-1">
+                                                        <input type="text" id="student_name" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50" readonly>
+                                                    </div>
+                                                </div>
+
+                                                <div class="sm:col-span-3">
+                                                    <label for="student_roll" class="block text-sm font-medium text-gray-700">Roll Number</label>
+                                                    <div class="mt-1">
+                                                        <input type="text" id="student_roll" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50" readonly>
+                                                    </div>
+                                                </div>
+
+                                                <div class="sm:col-span-3">
+                                                    <label for="student_class" class="block text-sm font-medium text-gray-700">Class</label>
+                                                    <div class="mt-1">
+                                                        <input type="text" id="student_class" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50" readonly>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Exam Selection -->
+                                                <div class="sm:col-span-6">
+                                                    <label for="exam_id" class="block text-sm font-medium text-gray-700">Select Exam</label>
+                                                    <select id="exam_id" name="exam_id" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                                        <option value="">-- Select Exam --</option>
+                                                        <?php
+                                                        // Reset exams result pointer
+                                                        if ($exams) $exams->data_seek(0);
+                                                        if ($exams && $exams->num_rows > 0):
+                                                        ?>
+                                                            <?php while ($row = $exams->fetch_assoc()): ?>
+                                                                <option value="<?php echo $row['exam_id']; ?>" data-class="<?php echo $row['class_id']; ?>">
+                                                                    <?php echo $row['exam_name'] . ' (' . ucfirst($row['exam_type']) . ')'; ?>
+                                                                </option>
+                                                            <?php endwhile; ?>
+                                                        <?php endif; ?>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <!-- Subject Marks Section -->
+                                            <div class="mt-6">
+                                                <h4 class="text-md font-medium text-gray-700 mb-3">Subject Marks</h4>
+
+                                                <div id="subjectsContainer">
+                                                    <div class="subject-row grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-12 mb-4 pb-4 border-b border-gray-200">
+                                                        <div class="sm:col-span-4">
+                                                            <label class="block text-sm font-medium text-gray-700">Subject</label>
+                                                            <select name="subject_id[]" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                                                <option value="">-- Select Subject --</option>
+                                                                <?php if ($subjects && $subjects->num_rows > 0): ?>
+                                                                    <?php
+                                                                    // Reset subjects result pointer
+                                                                    if ($subjects) $subjects->data_seek(0);
+                                                                    while ($row = $subjects->fetch_assoc()):
+                                                                    ?>
+                                                                        <option value="<?php echo $row['subject_id']; ?>">
+                                                                            <?php echo $row['subject_name']; ?>
+                                                                        </option>
+                                                                    <?php endwhile; ?>
+                                                                <?php endif; ?>
+                                                            </select>
+                                                        </div>
+                                                        <div class="sm:col-span-2">
+                                                            <label class="block text-sm font-medium text-gray-700">Theory Marks</label>
+                                                            <input type="number" name="theory_marks[]" min="0" max="100" step="0.01" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                                        </div>
+                                                        <div class="sm:col-span-2">
+                                                            <label class="block text-sm font-medium text-gray-700">Practical Marks</label>
+                                                            <input type="number" name="practical_marks[]" min="0" max="100" step="0.01" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                                        </div>
+                                                        <div class="sm:col-span-3">
+                                                            <label class="block text-sm font-medium text-gray-700">Remarks</label>
+                                                            <input type="text" name="remarks[]" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                                        </div>
+                                                        <div class="sm:col-span-1 flex items-end">
+                                                            <button type="button" class="remove-subject mt-1 text-red-600 hover:text-red-800">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-2">
+                                                    <button type="button" id="addSubject" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                        Add Subject
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Preview Section -->
+                                            <div class="mt-6 hidden" id="previewSection">
+                                                <h4 class="text-md font-medium text-gray-700 mb-3">Result Preview</h4>
+                                                <div class="bg-gray-50 p-4 rounded-md">
+                                                    <div class="overflow-x-auto">
+                                                        <table class="min-w-full divide-y divide-gray-200">
+                                                            <thead class="bg-gray-100">
+                                                                <tr>
+                                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Theory</th>
+                                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Practical</th>
+                                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody id="previewBody" class="bg-white divide-y divide-gray-200">
+                                                                <!-- Preview data will be inserted here -->
+                                                            </tbody>
+                                                            <tfoot class="bg-gray-50">
+                                                                <tr>
+                                                                    <td colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-500">Total:</td>
+                                                                    <td id="previewTotal" class="px-6 py-3 text-left text-sm font-medium text-gray-900">0</td>
+                                                                    <td class="px-6 py-3"></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-500">Percentage:</td>
+                                                                    <td id="previewPercentage" class="px-6 py-3 text-left text-sm font-medium text-gray-900">0%</td>
+                                                                    <td class="px-6 py-3"></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-500">Result:</td>
+                                                                    <td id="previewResult" class="px-6 py-3 text-left text-sm font-medium text-gray-900">-</td>
+                                                                    <td class="px-6 py-3"></td>
+                                                                </tr>
+                                                            </tfoot>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mt-6 flex justify-end space-x-3">
+                                                <button type="button" id="previewButton" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                    Preview
+                                                </button>
+                                                <button type="submit" name="save_result" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                                    </svg>
+                                                    Save Results
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Batch Entry Tab Content -->
+                    <div id="content-batch" class="tab-content <?php echo $activeTab == 'batch' ? 'active' : ''; ?>">
+                        <div class="bg-white rounded-lg shadow-md overflow-hidden hover-scale">
+                            <div class="p-6">
+                                <h2 class="text-lg font-semibold text-gray-800 mb-4">Batch Entry</h2>
+                                <p class="text-gray-600 mb-4">Use this form to enter results for multiple students for the same subject.</p>
+                                <form action="process_batch_entry.php" method="POST">
+                                    <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                                        <!-- Subject Selection -->
+                                        <div class="sm:col-span-3">
+                                            <label for="batch_subject_id" class="block text-sm font-medium text-gray-700">Subject</label>
+                                            <select id="batch_subject_id" name="subject_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md" required>
+                                                <option value="">-- Select Subject --</option>
+                                                <?php
+                                                // Reset subjects result pointer
+                                                if ($subjects) $subjects->data_seek(0);
+                                                if ($subjects && $subjects->num_rows > 0):
+                                                ?>
+                                                    <?php while ($row = $subjects->fetch_assoc()): ?>
+                                                        <option value="<?php echo $row['subject_id']; ?>"><?php echo htmlspecialchars($row['subject_name']); ?></option>
+                                                    <?php endwhile; ?>
+                                                <?php endif; ?>
+                                            </select>
+                                        </div>
 
-                </div>
+                                        <!-- Exam Selection -->
+                                        <div class="sm:col-span-3">
+                                            <label for="batch_exam_id" class="block text-sm font-medium text-gray-700">Exam</label>
+                                            <select id="batch_exam_id" name="exam_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md" required>
+                                                <option value="">-- Select Exam --</option>
+                                                <?php
+                                                // Reset exams result pointer
+                                                if ($exams) $exams->data_seek(0);
+                                                if ($exams && $exams->num_rows > 0):
+                                                ?>
+                                                    <?php while ($row = $exams->fetch_assoc()): ?>
+                                                        <option value="<?php echo $row['exam_id']; ?>"><?php echo htmlspecialchars($row['exam_name'] . ' (' . ucfirst($row['exam_type']) . ')'); ?></option>
+                                                    <?php endwhile; ?>
+                                                <?php endif; ?>
+                                            </select>
+                                        </div>
 
-                <!-- Manual Entry Tab Content -->
-                <div id="content-manual" class="tab-content hidden">
-                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                        <div class="p-6">
-                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Manual Result Entry</h2>
-                            <form action="process_manual_entry.php" method="POST">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <label for="student_id" class="block text-gray-700 mb-2">Student:</label>
-                                        <select id="student_id" name="student_id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                                            <option value="">-- Select Student --</option>
-                                            <?php if ($students && $students->num_rows > 0): ?>
-                                                <?php while ($row = $students->fetch_assoc()): ?>
-                                                    <option value="<?php echo $row['student_id']; ?>"><?php echo htmlspecialchars($row['full_name']) . ' (' . $row['student_id'] . ')'; ?></option>
-                                                <?php endwhile; ?>
-                                            <?php endif; ?>
-                                        </select>
+                                        <!-- Class Selection (Optional) -->
+                                        <div class="sm:col-span-3">
+                                            <label for="batch_class_id" class="block text-sm font-medium text-gray-700">Class (Optional)</label>
+                                            <select id="batch_class_id" name="class_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                                <option value="">-- All Classes --</option>
+                                                <?php
+                                                // Reset classes result pointer
+                                                if ($classes) $classes->data_seek(0);
+                                                if ($classes && $classes->num_rows > 0):
+                                                ?>
+                                                    <?php while ($row = $classes->fetch_assoc()): ?>
+                                                        <option value="<?php echo $row['class_id']; ?>"><?php echo htmlspecialchars($row['class_name'] . ' ' . $row['section']); ?></option>
+                                                    <?php endwhile; ?>
+                                                <?php endif; ?>
+                                            </select>
+                                            <p class="mt-1 text-xs text-gray-500">Filter students by class (optional)</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label for="subject_id" class="block text-gray-700 mb-2">Subject:</label>
-                                        <select id="subject_id" name="subject_id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                                            <option value="">-- Select Subject --</option>
-                                            <?php if ($subjects && $subjects->num_rows > 0): ?>
-                                                <?php while ($row = $subjects->fetch_assoc()): ?>
-                                                    <option value="<?php echo $row['subject_id']; ?>"><?php echo htmlspecialchars($row['subject_name']); ?></option>
-                                                <?php endwhile; ?>
-                                            <?php endif; ?>
-                                        </select>
-                                    </div>
-                                </div>
 
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                    <div>
-                                        <label for="theory_marks" class="block text-gray-700 mb-2">Theory Marks:</label>
-                                        <input type="number" id="theory_marks" name="theory_marks" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" required>
+                                    <div class="mt-6">
+                                        <h4 class="text-md font-medium text-gray-700 mb-3">Student Results</h4>
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full divide-y divide-gray-200">
+                                                <thead class="bg-gray-50">
+                                                    <tr>
+                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                            Student
+                                                        </th>
+                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                            Theory Marks
+                                                        </th>
+                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                            Practical Marks
+                                                        </th>
+                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                            Remarks
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="bg-white divide-y divide-gray-200" id="batch-students-container">
+                                                    <tr>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <select name="students[0][student_id]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                                                <option value="">-- Select Student --</option>
+                                                                <?php
+                                                                // Reset students result pointer
+                                                                if ($students) $students->data_seek(0);
+                                                                if ($students && $students->num_rows > 0):
+                                                                ?>
+                                                                    <?php while ($row = $students->fetch_assoc()): ?>
+                                                                        <option value="<?php echo $row['student_id']; ?>"><?php echo htmlspecialchars($row['full_name']) . ' (' . $row['student_id'] . ')'; ?></option>
+                                                                    <?php endwhile; ?>
+                                                                <?php endif; ?>
+                                                            </select>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <input type="number" name="students[0][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <input type="number" name="students[0][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <input type="text" name="students[0][remarks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                            
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" id="add-student-row" class="text-blue-600 hover:text-blue-800 flex items-center text-sm">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                                </svg>
+                                                Add Another Student
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label for="practical_marks" class="block text-gray-700 mb-2">Practical Marks (Optional):</label>
-                                        <input type="number" id="practical_marks" name="practical_marks" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100">
-                                    </div>
-                                    <div>
-                                        <label for="credit_hours" class="block text-gray-700 mb-2">Credit Hours:</label>
-                                        <input type="number" id="credit_hours" name="credit_hours" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="1" max="6" value="4" required>
-                                    </div>
-                                </div>
 
-                                <div class="flex justify-end">
-                                    <button type="submit" class="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg transition duration-200 flex items-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                        Save Result
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 bg-white rounded-lg shadow-md overflow-hidden">
-                        <div class="p-6">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4">Batch Entry</h3>
-                            <p class="text-gray-600 mb-4">Use this form to enter results for multiple students for the same subject.</p>
-                            <form action="process_batch_entry.php" method="POST">
-                                <div class="mb-4">
-                                    <label for="batch_subject_id" class="block text-gray-700 mb-2">Subject:</label>
-                                    <select id="batch_subject_id" name="subject_id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                                        <option value="">-- Select Subject --</option>
-                                        <?php
-                                        // Reset subjects result pointer
-                                        if ($subjects) $subjects->data_seek(0);
-                                        if ($subjects && $subjects->num_rows > 0):
-                                        ?>
-                                            <?php while ($row = $subjects->fetch_assoc()): ?>
-                                                <option value="<?php echo $row['subject_id']; ?>"><?php echo htmlspecialchars($row['subject_name']); ?></option>
-                                            <?php endwhile; ?>
-                                        <?php endif; ?>
-                                    </select>
-                                </div>
-
-                                <div class="mb-4">
-                                    <label for="credit_hours_batch" class="block text-gray-700 mb-2">Credit Hours:</label>
-                                    <input type="number" id="credit_hours_batch" name="credit_hours" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="1" max="6" value="4" required>
-                                </div>
-
-                                <div class="mb-4">
-                                    <label class="block text-gray-700 mb-2">Student Results:</label>
-                                    <div class="overflow-x-auto">
-                                        <table class="min-w-full divide-y divide-gray-200">
-                                            <thead class="bg-gray-50">
-                                                <tr>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Student
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Theory Marks
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Practical Marks
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="bg-white divide-y divide-gray-200" id="batch-students-container">
-                                                <tr>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <select name="students[0][student_id]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                                                            <option value="">-- Select Student --</option>
-                                                            <?php
-                                                            // Reset students result pointer
-                                                            if ($students) $students->data_seek(0);
-                                                            if ($students && $students->num_rows > 0):
-                                                            ?>
-                                                                <?php while ($row = $students->fetch_assoc()): ?>
-                                                                    <option value="<?php echo $row['student_id']; ?>"><?php echo htmlspecialchars($row['full_name']) . ' (' . $row['student_id'] . ')'; ?></option>
-                                                                <?php endwhile; ?>
-                                                            <?php endif; ?>
-                                                        </select>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <input type="number" name="students[0][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" required>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <input type="number" name="students[0][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100">
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div class="mt-2">
-                                        <button type="button" id="add-student-row" class="text-blue-600 hover:text-blue-800 flex items-center text-sm">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                    <div class="mt-6 flex justify-end">
+                                        <button type="submit" class="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg transition duration-200 flex items-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                             </svg>
-                                            Add Another Student
+                                            Save Batch Results
                                         </button>
                                     </div>
-                                </div>
-
-                                <div class="flex justify-end">
-                                    <button type="submit" class="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg transition duration-200 flex items-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                        Save Batch Results
-                                    </button>
-                                </div>
-                            </form>
+                                </form>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Manage Uploads Tab Content -->
-                <div id="content-manage" class="tab-content hidden">
-                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                        <div class="p-6">
-                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Manage Result Uploads</h2>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                File Name
-                                            </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Description
-                                            </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Date Uploaded
-                                            </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Students
-                                            </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Status
-                                            </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <?php if ($uploads && $uploads->num_rows > 0): ?>
-                                            <?php while ($row = $uploads->fetch_assoc()): ?>
+                    <!-- Manage Uploads Tab Content -->
+                    <div id="content-manage" class="tab-content <?php echo $activeTab == 'manage' ? 'active' : ''; ?>">
+                        <div class="bg-white rounded-lg shadow-md overflow-hidden hover-scale">
+                            <div class="p-6">
+                                <h2 class="text-lg font-semibold text-gray-800 mb-4">Manage Result Uploads</h2>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    File Name
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Description
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Exam
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Date Uploaded
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Students
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Status
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Actions
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            <?php if ($uploads && $uploads->num_rows > 0): ?>
+                                                <?php while ($row = $uploads->fetch_assoc()): ?>
+                                                    <tr>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <div class="flex items-center">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                </svg>
+                                                                <span class="text-sm text-gray-900"><?php echo htmlspecialchars($row['file_name']); ?></span>
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <?php echo htmlspecialchars($row['description'] ?? 'N/A'); ?>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <?php echo date('F d, Y', strtotime($row['upload_date'])); ?>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <?php echo number_format($row['student_count']); ?>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
+                                                                <?php echo htmlspecialchars($row['status']); ?>
+                                                            </span>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <a href="view_upload.php?id=<?php echo $row['id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+                                                            <?php if ($row['status'] != 'Published'): ?>
+                                                                <a href="publish_results.php?id=<?php echo $row['id']; ?>" class="text-green-600 hover:text-green-900 mr-3">Publish</a>
+                                                            <?php else: ?>
+                                                                <a href="unpublish_results.php?id=<?php echo $row['id']; ?>" class="text-yellow-600 hover:text-yellow-900 mr-3">Unpublish</a>
+                                                            <?php endif; ?>
+                                                            <a href="delete_upload.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900" onclick="return confirm('Are you sure you want to delete this upload? This will also delete all associated results.')">Delete</a>
+                                                        </td>
+                                                    </tr>
+                                                <?php endwhile; ?>
+                                            <?php else: ?>
                                                 <tr>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="flex items-center">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                            </svg>
-                                                            <span class="text-sm text-gray-900"><?php echo htmlspecialchars($row['file_name']); ?></span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo htmlspecialchars($row['description'] ?? 'N/A'); ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo date('F d, Y', strtotime($row['upload_date'])); ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo number_format($row['student_count']); ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
-                                                            <?php echo htmlspecialchars($row['status']); ?>
-                                                        </span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <a href="view_upload.php?id=<?php echo $row['id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
-                                                        <?php if ($row['status'] != 'Published'): ?>
-                                                            <a href="publish_results.php?id=<?php echo $row['id']; ?>" class="text-green-600 hover:text-green-900 mr-3">Publish</a>
-                                                        <?php else: ?>
-                                                            <a href="unpublish_results.php?id=<?php echo $row['id']; ?>" class="text-yellow-600 hover:text-yellow-900 mr-3">Unpublish</a>
-                                                        <?php endif; ?>
-                                                        <a href="delete_upload.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900" onclick="return confirm('Are you sure you want to delete this upload? This will also delete all associated results.')">Delete</a>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" colspan="7">
+                                                        No result uploads found.
                                                     </td>
                                                 </tr>
-                                            <?php endwhile; ?>
-                                        <?php else: ?>
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" colspan="6">
-                                                    No result uploads found.
-                                                </td>
-                                            </tr>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </main>
         </div>
+        </main>
+    </div>
     </div>
 
     <script>
@@ -412,15 +842,20 @@ $students = $conn->query($studentsQuery);
             const tabButtons = document.querySelectorAll('.tab-button');
 
             tabContents.forEach(content => {
-                content.classList.add('hidden');
+                content.classList.remove('active');
             });
 
             tabButtons.forEach(button => {
                 button.classList.remove('active');
             });
 
-            document.getElementById('content-' + tabId).classList.remove('hidden');
+            document.getElementById('content-' + tabId).classList.add('active');
             document.getElementById('tab-' + tabId).classList.add('active');
+
+            // Update URL with tab parameter
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', tabId);
+            window.history.replaceState({}, '', url);
         }
 
         // Add student row in batch entry
@@ -437,31 +872,227 @@ $students = $conn->query($studentsQuery);
             const updatedStudentSelectHTML = studentSelectHTML.replace(/students\[0\]/g, `students[${studentRowCount}]`);
 
             newRow.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap">
-                    ${updatedStudentSelectHTML}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="number" name="students[${studentRowCount}][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" required>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="number" name="students[${studentRowCount}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100">
-                </td>
-            `;
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        ${updatedStudentSelectHTML}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="number" name="students[${studentRowCount}][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="number" name="students[${studentRowCount}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="text" name="students[${studentRowCount}][remarks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </td>
+                `;
 
             container.appendChild(newRow);
             studentRowCount++;
         });
 
-        // Style active tab
-        document.addEventListener('DOMContentLoaded', function() {
-            const tabButtons = document.querySelectorAll('.tab-button');
+        // Add Subject Row
+        document.getElementById('addSubject').addEventListener('click', function() {
+            const container = document.getElementById('subjectsContainer');
+            const subjectRow = document.querySelector('.subject-row').cloneNode(true);
 
-            tabButtons.forEach(button => {
-                button.classList.add('px-4', 'py-2', 'text-sm', 'font-medium', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            // Clear input values
+            subjectRow.querySelectorAll('input').forEach(input => {
+                input.value = '';
+            });
 
-                if (button.classList.contains('active')) {
-                    button.classList.add('border-b-2', 'border-blue-500', 'text-blue-600');
+            // Reset select
+            subjectRow.querySelector('select').selectedIndex = 0;
+
+            // Add event listener to remove button
+            subjectRow.querySelector('.remove-subject').addEventListener('click', function() {
+                if (container.children.length > 1) {
+                    this.closest('.subject-row').remove();
                 }
+            });
+
+            container.appendChild(subjectRow);
+        });
+
+        // Initialize event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listener to initial remove button
+            document.querySelector('.remove-subject').addEventListener('click', function() {
+                const container = document.getElementById('subjectsContainer');
+                if (container.children.length > 1) {
+                    this.closest('.subject-row').remove();
+                }
+            });
+
+            // Student selection from search results
+            document.querySelectorAll('.select-student').forEach(button => {
+                button.addEventListener('click', function() {
+                    const studentId = this.getAttribute('data-id');
+                    const studentName = this.getAttribute('data-name');
+                    const studentRoll = this.getAttribute('data-roll');
+                    const studentClass = this.getAttribute('data-class');
+
+                    document.getElementById('student_id').value = studentId;
+                    document.getElementById('student_name').value = studentName;
+                    document.getElementById('student_roll').value = studentRoll;
+                    document.getElementById('student_class').value = studentClass;
+                });
+            });
+
+            // Preview Results
+            document.getElementById('previewButton').addEventListener('click',
+                function() {
+                    const previewSection = document.getElementById('previewSection');
+                    const previewBody = document.getElementById('previewBody');
+                    const previewTotal = document.getElementById('previewTotal');
+                    const previewPercentage = document.getElementById('previewPercentage');
+                    const previewResult = document.getElementById('previewResult');
+
+                    // Clear previous preview
+                    previewBody.innerHTML = '';
+
+                    // Get all subject rows
+                    const subjectRows = document.querySelectorAll('.subject-row');
+
+                    let totalMarks = 0;
+                    let totalSubjects = 0;
+                    let validSubjects = 0;
+
+                    // Process each subject
+                    subjectRows.forEach(row => {
+                        const subjectSelect = row.querySelector('select[name="subject_id[]"]');
+                        const theoryInput = row.querySelector('input[name="theory_marks[]"]');
+                        const practicalInput = row.querySelector('input[name="practical_marks[]"]');
+
+                        if (subjectSelect.value && (theoryInput.value || practicalInput.value)) {
+                            const subjectName = subjectSelect.options[subjectSelect.selectedIndex].text;
+                            const theory = parseFloat(theoryInput.value) || 0;
+                            const practical = parseFloat(practicalInput.value) || 0;
+                            const total = theory + practical;
+
+                            // Calculate grade
+                            const percentage = (total / 100) * 100; // Assuming total possible marks is 100
+                            let grade = '';
+
+                            if (percentage >= 90) {
+                                grade = 'A+';
+                            } else if (percentage >= 80) {
+                                grade = 'A';
+                            } else if (percentage >= 70) {
+                                grade = 'B+';
+                            } else if (percentage >= 60) {
+                                grade = 'B';
+                            } else if (percentage >= 50) {
+                                grade = 'C+';
+                            } else if (percentage >= 40) {
+                                grade = 'C';
+                            } else if (percentage >= 33) {
+                                grade = 'D';
+                            } else {
+                                grade = 'F';
+                            }
+
+                            // Create table row
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${subjectName}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${theory}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${practical}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${total}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${percentage >= 33 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                        ${grade}
+                                    </span>
+                                </td>
+                            `;
+
+                            previewBody.appendChild(tr);
+
+                            totalMarks += total;
+                            validSubjects++;
+                        }
+
+                        totalSubjects++;
+                    });
+
+                    // Update summary
+                    if (validSubjects > 0) {
+                        const percentage = (totalMarks / (validSubjects * 100)) * 100;
+                        previewTotal.textContent = totalMarks;
+                        previewPercentage.textContent = percentage.toFixed(2) + '%';
+                        previewResult.textContent = percentage >= 33 ? 'PASS' : 'FAIL';
+                        previewResult.className = percentage >= 33 ? 'px-6 py-3 text-left text-sm font-medium text-green-600' : 'px-6 py-3 text-left text-sm font-medium text-red-600';
+
+                        // Show preview section
+                        previewSection.classList.remove('hidden');
+                    } else {
+                        alert('Please enter marks for at least one subject.');
+                    }
+                });
+
+            // Filter students by class in batch entry
+            document.getElementById('batch_class_id').addEventListener('change', function() {
+                const classId = this.value;
+                if (!classId) return;
+
+                // Fetch students via AJAX
+                fetch(`get_students_by_class.php?class_id=${classId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const container = document.getElementById('batch-students-container');
+                        container.innerHTML = '';
+
+                        if (data.length === 0) {
+                            container.innerHTML = `
+                                    <tr>
+                                        <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                            No students found in this class.
+                                        </td>
+                                    </tr>
+                                `;
+                            return;
+                        }
+
+                        data.forEach((student, index) => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <select name="students[${index}][student_id]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                            <option value="${student.student_id}">${student.full_name} (${student.student_id})</option>
+                                        </select>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="number" name="students[${index}][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="number" name="students[${index}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="text" name="students[${index}][remarks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    </td>
+                                `;
+                            container.appendChild(row);
+                        });
+
+                        // Update student row count
+                        studentRowCount = data.length;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching students:', error);
+                        alert('Failed to load students. Please try again.');
+                    });
+            });
+
+            // Mobile sidebar toggle
+            document.getElementById('sidebar-toggle').addEventListener('click', function() {
+                document.getElementById('mobile-sidebar').classList.remove('-translate-x-full');
+            });
+
+            document.getElementById('close-sidebar').addEventListener('click', function() {
+                document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
+            });
+
+            document.getElementById('sidebar-backdrop').addEventListener('click', function() {
+                document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
             });
         });
     </script>

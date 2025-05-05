@@ -1,178 +1,135 @@
 <?php
-session_start();
+// Include necessary files
+require_once '../includes/config.php';
+require_once '../includes/db_connetc.php';
+// Remove the redundant session_start() since it's likely already started in config.php
 
-// Check if user is logged in and is an admin
+// Check if user is logged in and has admin privileges
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     $_SESSION['error'] = "You do not have permission to access this page.";
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 
-// Database connection
-$conn = new mysqli('localhost', 'root', '', 'result_management');
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+// Database connection is already established in db_connetc.php as $conn
 
-// Check if file was uploaded
-if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-    $_SESSION['message'] = "Error uploading file. Please try again.";
+// Check if form was submitted
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $_SESSION['message'] = "Invalid request.";
     $_SESSION['message_type'] = "red";
     header("Location: manage_results.php");
     exit();
 }
 
-// Check file type
-$fileType = pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION);
-if ($fileType != 'csv') {
-    $_SESSION['message'] = "Only CSV files are allowed.";
+// Get form data - using the original form field names
+$studentId = $_POST['student_id'];
+$subjectId = $_POST['subject_id'];
+$theoryMarks = $_POST['theory_marks'];
+$practicalMarks = isset($_POST['practical_marks']) && !empty($_POST['practical_marks']) ? $_POST['practical_marks'] : null;
+$creditHours = $_POST['credit_hours'];
+
+// Validate data
+if (empty($studentId) || empty($subjectId) || !is_numeric($theoryMarks) || !is_numeric($creditHours)) {
+    $_SESSION['message'] = "Please fill all required fields with valid data.";
     $_SESSION['message_type'] = "red";
     header("Location: manage_results.php");
     exit();
 }
 
-// Get other form data
-$description = isset($_POST['description']) ? $_POST['description'] : '';
-$publish = isset($_POST['publish']) ? true : false;
-$overwrite = isset($_POST['overwrite']) ? true : false;
-
-// Create upload record
-$fileName = $_FILES['file']['name'];
-$status = $publish ? 'Published' : 'Draft';
-
-$stmt = $conn->prepare("INSERT INTO ResultUploads (file_name, description, status, uploaded_by, upload_date) VALUES (?, ?, ?, ?, NOW())");
-$stmt->bind_param("sssi", $fileName, $description, $status, $_SESSION['user_id']);
+// Check if student exists
+$stmt = $conn->prepare("SELECT student_id FROM Students WHERE student_id = ?");
+$stmt->bind_param("s", $studentId);
 $stmt->execute();
-$uploadId = $conn->insert_id;
+$result = $stmt->get_result();
 
-// Process CSV file
-$file = fopen($_FILES['file']['tmp_name'], 'r');
-$headers = fgetcsv($file); // Get headers
-$studentCount = 0;
-$errorCount = 0;
-$errorMessages = [];
-
-// Validate headers
-$requiredHeaders = ['student_id', 'subject_id', 'theory_marks', 'practical_marks', 'credit_hours'];
-$missingHeaders = array_diff($requiredHeaders, array_map('strtolower', $headers));
-
-if (!empty($missingHeaders)) {
-    $_SESSION['message'] = "CSV file is missing required headers: " . implode(', ', $missingHeaders);
+if ($result->num_rows === 0) {
+    $_SESSION['message'] = "Student ID not found.";
     $_SESSION['message_type'] = "red";
     header("Location: manage_results.php");
     exit();
 }
 
-// Map header indices
-$headerMap = [];
-foreach ($requiredHeaders as $header) {
-    $index = array_search(strtolower($header), array_map('strtolower', $headers));
-    if ($index !== false) {
-        $headerMap[$header] = $index;
-    }
-}
+// Check if subject exists
+$stmt = $conn->prepare("SELECT subject_id FROM Subjects WHERE subject_id = ?");
+$stmt->bind_param("s", $subjectId);
+$stmt->execute();
+$result = $stmt->get_result();
 
-// Begin transaction
-$conn->begin_transaction();
-
-try {
-    // Process each row
-    while (($row = fgetcsv($file)) !== false) {
-        $studentId = $row[$headerMap['student_id']];
-        $subjectId = $row[$headerMap['subject_id']];
-        $theoryMarks = $row[$headerMap['theory_marks']];
-        $practicalMarks = $row[$headerMap['practical_marks']] ?? null;
-        $creditHours = $row[$headerMap['credit_hours']];
-        
-        // Validate data
-        if (empty($studentId) || empty($subjectId) || !is_numeric($theoryMarks) || !is_numeric($creditHours)) {
-            $errorCount++;
-            $errorMessages[] = "Row " . ($studentCount + 1) . ": Invalid data format.";
-            continue;
-        }
-        
-        // Check if student exists
-        $stmt = $conn->prepare("SELECT student_id FROM Students WHERE student_id = ?");
-        $stmt->bind_param("s", $studentId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows === 0) {
-            $errorCount++;
-            $errorMessages[] = "Row " . ($studentCount + 1) . ": Student ID $studentId not found.";
-            continue;
-        }
-        
-        // Check if subject exists
-        $stmt = $conn->prepare("SELECT subject_id FROM Subjects WHERE subject_id = ?");
-        $stmt->bind_param("s", $subjectId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows === 0) {
-            $errorCount++;
-            $errorMessages[] = "Row " . ($studentCount + 1) . ": Subject ID $subjectId not found.";
-            continue;
-        }
-        
-        // Calculate grade and GPA
-        $grade = calculateGrade($theoryMarks, $practicalMarks);
-        $gpa = calculateGPA($grade);
-        
-        // Check if result already exists
-        $stmt = $conn->prepare("SELECT result_id FROM Results WHERE student_id = ? AND subject_id = ?");
-        $stmt->bind_param("ss", $studentId, $subjectId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows > 0) {
-            if ($overwrite) {
-                // Update existing result
-                $stmt = $conn->prepare("UPDATE Results SET theory_marks = ?, practical_marks = ?, credit_hours = ?, grade = ?, gpa = ?, upload_id = ?, updated_at = NOW() WHERE student_id = ? AND subject_id = ?");
-                $stmt->bind_param("dddsdiis", $theoryMarks, $practicalMarks, $creditHours, $grade, $gpa, $uploadId, $studentId, $subjectId);
-                $stmt->execute();
-            } else {
-                $errorCount++;
-                $errorMessages[] = "Row " . ($studentCount + 1) . ": Result already exists for student $studentId and subject $subjectId.";
-                continue;
-            }
-        } else {
-            // Insert new result
-            $stmt = $conn->prepare("INSERT INTO Results (student_id, subject_id, theory_marks, practical_marks, credit_hours, grade, gpa, upload_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-            $stmt->bind_param("ssdddsdi", $studentId, $subjectId, $theoryMarks, $practicalMarks, $creditHours, $grade, $gpa, $uploadId);
-            $stmt->execute();
-        }
-        
-        $studentCount++;
-    }
-    
-    // Update upload record with student count
-    $stmt = $conn->prepare("UPDATE ResultUploads SET student_count = ? WHERE id = ?");
-    $stmt->bind_param("ii", $studentCount, $uploadId);
-    $stmt->execute();
-    
-    // Commit transaction
-    $conn->commit();
-    
-    // Set success message
-    if ($errorCount > 0) {
-        $_SESSION['message'] = "Upload completed with $errorCount errors. $studentCount results processed successfully.";
-        $_SESSION['message_type'] = "yellow";
-        $_SESSION['error_messages'] = $errorMessages;
-    } else {
-        $_SESSION['message'] = "Upload completed successfully. $studentCount results processed.";
-        $_SESSION['message_type'] = "green";
-    }
-    
-} catch (Exception $e) {
-    // Rollback transaction on error
-    $conn->rollback();
-    
-    $_SESSION['message'] = "Error processing file: " . $e->getMessage();
+if ($result->num_rows === 0) {
+    $_SESSION['message'] = "Subject ID not found.";
     $_SESSION['message_type'] = "red";
+    header("Location: manage_results.php");
+    exit();
 }
 
-fclose($file);
+// Calculate grade and GPA
+$grade = calculateGrade($theoryMarks, $practicalMarks);
+$gpa = calculateGPA($grade);
+
+// Check if result already exists
+$stmt = $conn->prepare("SELECT result_id FROM Results WHERE student_id = ? AND subject_id = ?");
+$stmt->bind_param("ss", $studentId, $subjectId);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($result->num_rows > 0) {
+    // Update existing result
+    $stmt = $conn->prepare("UPDATE Results SET theory_marks = ?, practical_marks = ?, credit_hours = ?, grade = ?, gpa = ?, updated_at = NOW() WHERE student_id = ? AND subject_id = ?");
+    $stmt->bind_param("dddsiss", $theoryMarks, $practicalMarks, $creditHours, $grade, $gpa, $studentId, $subjectId);
+    
+    if ($stmt->execute()) {
+        // Log the action
+        logAction($conn, $_SESSION['user_id'], "UPDATE_RESULT", "Updated result for student ID: $studentId, subject ID: $subjectId");
+        
+        $_SESSION['message'] = "Result updated successfully.";
+        $_SESSION['message_type'] = "green";
+    } else {
+        $_SESSION['message'] = "Error updating result: " . $conn->error;
+        $_SESSION['message_type'] = "red";
+    }
+} else {
+    // Create a manual upload record if needed
+    $uploadId = null;
+    
+    // First check if we have a manual entry upload for today
+    $checkUpload = $conn->query("SELECT id FROM ResultUploads WHERE file_name = 'Manual Entry' AND upload_date >= CURDATE() AND uploaded_by = {$_SESSION['user_id']} ORDER BY id DESC LIMIT 1");
+    
+    if ($checkUpload->num_rows > 0) {
+        $uploadId = $checkUpload->fetch_assoc()['id'];
+    } else {
+        // Create a new manual entry upload record
+        $stmt = $conn->prepare("INSERT INTO ResultUploads (file_name, description, status, uploaded_by, upload_date, is_manual_entry) VALUES ('Manual Entry', 'Manually entered results', 'Published', ?, NOW(), 1)");
+        $stmt->bind_param("i", $_SESSION['user_id']);
+        
+        if (!$stmt->execute()) {
+            $_SESSION['message'] = "Error creating upload record: " . $conn->error;
+            $_SESSION['message_type'] = "red";
+            header("Location: manage_results.php");
+            exit();
+        }
+        
+        $uploadId = $conn->insert_id;
+    }
+    
+    // Insert new result with the upload_id
+    $stmt = $conn->prepare("INSERT INTO Results (student_id, subject_id, theory_marks, practical_marks, credit_hours, grade, gpa, upload_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+    $stmt->bind_param("ssdddsdi", $studentId, $subjectId, $theoryMarks, $practicalMarks, $creditHours, $grade, $gpa, $uploadId);
+    
+    if ($stmt->execute()) {
+        // Update upload record with student count
+        $conn->query("UPDATE ResultUploads SET student_count = student_count + 1 WHERE id = $uploadId");
+        
+        // Log the action
+        logAction($conn, $_SESSION['user_id'], "ADD_RESULT", "Added new result for student ID: $studentId, subject ID: $subjectId");
+        
+        $_SESSION['message'] = "Result added successfully.";
+        $_SESSION['message_type'] = "green";
+    } else {
+        $_SESSION['message'] = "Error adding result: " . $conn->error . " (SQL State: " . $stmt->sqlstate . ")";
+        $_SESSION['message_type'] = "red";
+    }
+}
+
 header("Location: manage_results.php");
 exit();
 
@@ -212,5 +169,33 @@ function calculateGPA($grade) {
         default: return 0.0;
     }
 }
-?>
 
+// Function to log actions
+function logAction($conn, $user_id, $action, $details) {
+    try {
+        $stmt = $conn->prepare("INSERT INTO activity_logs (user_id, action, details, created_at) VALUES (?, ?, ?, NOW())");
+        $stmt->bind_param("iss", $user_id, $action, $details);
+        $stmt->execute();
+        $stmt->close();
+    } catch (Exception $e) {
+        // Create activity_logs table if it doesn't exist
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS `activity_logs` (
+              `log_id` int(11) NOT NULL AUTO_INCREMENT,
+              `user_id` int(11) NOT NULL,
+              `action` varchar(255) NOT NULL,
+              `details` text DEFAULT NULL,
+              `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+              PRIMARY KEY (`log_id`),
+              KEY `user_id` (`user_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+        
+        // Try again
+        $stmt = $conn->prepare("INSERT INTO activity_logs (user_id, action, details, created_at) VALUES (?, ?, ?, NOW())");
+        $stmt->bind_param("iss", $user_id, $action, $details);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+?>
