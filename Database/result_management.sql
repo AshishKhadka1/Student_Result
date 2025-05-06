@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 05, 2025 at 06:19 AM
+-- Generation Time: May 06, 2025 at 05:16 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -20,6 +20,81 @@ SET time_zone = "+00:00";
 --
 -- Database: `result_management`
 --
+
+DELIMITER $$
+--
+-- Procedures
+--
+CREATE DEFINER=`root`@`localhost` PROCEDURE `update_student_performance` (IN `p_student_id` VARCHAR(20), IN `p_exam_id` INT)   BEGIN
+  DECLARE v_avg_marks DECIMAL(5,2);
+  DECLARE v_gpa DECIMAL(3,2);
+  DECLARE v_total_subjects INT;
+  DECLARE v_subjects_passed INT;
+  DECLARE v_rank INT;
+  
+  -- Calculate average marks
+  SELECT 
+    AVG(theory_marks + practical_marks) INTO v_avg_marks
+  FROM 
+    results
+  WHERE 
+    student_id = p_student_id AND exam_id = p_exam_id;
+  
+  -- Calculate GPA (weighted average)
+  SELECT 
+    SUM(gpa * credit_hours) / SUM(credit_hours) INTO v_gpa
+  FROM 
+    results
+  WHERE 
+    student_id = p_student_id AND exam_id = p_exam_id;
+  
+  -- Count total subjects
+  SELECT 
+    COUNT(*) INTO v_total_subjects
+  FROM 
+    results
+  WHERE 
+    student_id = p_student_id AND exam_id = p_exam_id;
+  
+  -- Count passed subjects
+  SELECT 
+    COUNT(*) INTO v_subjects_passed
+  FROM 
+    results
+  WHERE 
+    student_id = p_student_id AND exam_id = p_exam_id AND grade <> 'F';
+  
+  -- Calculate rank (this is a simplified version)
+  SELECT 
+    COUNT(*) + 1 INTO v_rank
+  FROM 
+    (SELECT 
+      student_id, 
+      AVG(gpa) as avg_gpa
+     FROM 
+      results
+     WHERE 
+      exam_id = p_exam_id
+     GROUP BY 
+      student_id
+     HAVING 
+      AVG(gpa) > v_gpa) AS better_students;
+  
+  -- Insert or update performance record
+  INSERT INTO student_performance 
+    (student_id, exam_id, average_marks, gpa, total_subjects, subjects_passed, rank)
+  VALUES 
+    (p_student_id, p_exam_id, v_avg_marks, v_gpa, v_total_subjects, v_subjects_passed, v_rank)
+  ON DUPLICATE KEY UPDATE
+    average_marks = v_avg_marks,
+    gpa = v_gpa,
+    total_subjects = v_total_subjects,
+    subjects_passed = v_subjects_passed,
+    rank = v_rank,
+    updated_at = CURRENT_TIMESTAMP;
+END$$
+
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -211,7 +286,10 @@ INSERT INTO `loginlogs` (`log_id`, `user_id`, `ip_address`, `user_agent`, `login
 (3, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-03 16:53:30', NULL, NULL, 'success', NULL),
 (4, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-04 06:02:31', NULL, NULL, 'success', NULL),
 (5, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-05 07:43:59', NULL, NULL, 'success', NULL),
-(6, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-05 08:46:29', NULL, NULL, 'success', NULL);
+(6, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-05 08:46:29', NULL, NULL, 'success', NULL),
+(7, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-06 06:42:25', NULL, NULL, 'success', NULL),
+(8, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-06 06:44:26', NULL, NULL, 'success', NULL),
+(9, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-06 16:26:21', NULL, NULL, 'success', NULL);
 
 -- --------------------------------------------------------
 
@@ -246,6 +324,129 @@ INSERT INTO `notifications` (`notification_id`, `user_id`, `sender_id`, `title`,
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `resultdetails`
+--
+
+CREATE TABLE `resultdetails` (
+  `detail_id` int(11) NOT NULL,
+  `result_id` int(11) NOT NULL,
+  `subject_id` int(11) NOT NULL,
+  `marks_obtained` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `total_marks` decimal(10,2) NOT NULL DEFAULT 100.00,
+  `percentage` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `grade` varchar(5) DEFAULT NULL,
+  `is_pass` tinyint(1) NOT NULL DEFAULT 0,
+  `remarks` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `resultdetails`
+--
+
+INSERT INTO `resultdetails` (`detail_id`, `result_id`, `subject_id`, `marks_obtained`, `total_marks`, `percentage`, `grade`, `is_pass`, `remarks`) VALUES
+(1, 5, 101, 79.00, 100.00, 79.00, 'B+', 1, NULL),
+(2, 5, 102, 33.00, 100.00, 39.00, 'A', 1, NULL),
+(3, 5, 103, 60.00, 100.00, 87.00, 'B', 1, NULL),
+(4, 5, 104, 81.00, 100.00, 93.00, 'B', 1, NULL),
+(5, 5, 105, 33.00, 100.00, 31.00, 'B+', 1, NULL),
+(6, 5, 106, 38.00, 100.00, 96.00, 'C+', 0, NULL),
+(7, 5, 107, 54.00, 100.00, 30.00, 'B', 1, NULL),
+(8, 5, 108, 50.00, 100.00, 88.00, 'B', 1, NULL),
+(9, 5, 120, 36.00, 100.00, 36.00, 'B', 1, NULL),
+(10, 6, 101, 56.00, 100.00, 25.00, 'A', 1, NULL),
+(11, 6, 102, 55.00, 100.00, 47.00, 'A', 1, NULL),
+(12, 6, 103, 91.00, 100.00, 63.00, 'B+', 1, NULL),
+(13, 6, 104, 82.00, 100.00, 72.00, 'A+', 1, NULL),
+(14, 6, 105, 66.00, 100.00, 90.00, 'B', 1, NULL),
+(15, 6, 106, 67.00, 100.00, 21.00, 'B+', 1, NULL),
+(16, 6, 107, 71.00, 100.00, 95.00, 'D', 0, NULL),
+(17, 6, 108, 41.00, 100.00, 36.00, 'B', 1, NULL),
+(18, 6, 120, 41.00, 100.00, 80.00, 'A+', 1, NULL),
+(19, 9, 101, 66.00, 100.00, 56.00, 'C', 1, NULL),
+(20, 9, 102, 79.00, 100.00, 33.00, 'B+', 1, NULL),
+(21, 9, 103, 33.00, 100.00, 98.00, 'A', 1, NULL),
+(22, 9, 104, 39.00, 100.00, 23.00, 'D', 1, NULL),
+(23, 9, 105, 68.00, 100.00, 52.00, 'A', 1, NULL),
+(24, 9, 106, 30.00, 100.00, 80.00, 'A', 1, NULL),
+(25, 9, 107, 43.00, 100.00, 64.00, 'A+', 1, NULL),
+(26, 9, 108, 49.00, 100.00, 53.00, 'A+', 1, NULL),
+(27, 9, 120, 40.00, 100.00, 50.00, 'B', 1, NULL),
+(28, 10, 101, 46.00, 100.00, 91.00, 'C+', 0, NULL),
+(29, 10, 102, 63.00, 100.00, 54.00, 'C+', 1, NULL),
+(30, 10, 103, 55.00, 100.00, 30.00, 'C+', 1, NULL),
+(31, 10, 104, 41.00, 100.00, 87.00, 'B+', 0, NULL),
+(32, 10, 105, 46.00, 100.00, 39.00, 'B+', 1, NULL),
+(33, 10, 106, 58.00, 100.00, 96.00, 'A', 1, NULL),
+(34, 10, 107, 79.00, 100.00, 44.00, 'C', 1, NULL),
+(35, 10, 108, 79.00, 100.00, 94.00, 'B+', 1, NULL),
+(36, 10, 120, 64.00, 100.00, 92.00, 'B', 1, NULL),
+(37, 11, 101, 66.00, 100.00, 23.00, 'C+', 1, NULL),
+(38, 11, 102, 95.00, 100.00, 26.00, 'B+', 0, NULL),
+(39, 11, 103, 21.00, 100.00, 77.00, 'B', 1, NULL),
+(40, 11, 104, 22.00, 100.00, 23.00, 'B', 1, NULL),
+(41, 11, 105, 78.00, 100.00, 68.00, 'B', 1, NULL),
+(42, 11, 106, 63.00, 100.00, 85.00, 'A', 1, NULL),
+(43, 11, 107, 33.00, 100.00, 41.00, 'B', 1, NULL),
+(44, 11, 108, 45.00, 100.00, 76.00, 'A', 0, NULL),
+(45, 11, 120, 37.00, 100.00, 84.00, 'C+', 1, NULL),
+(46, 12, 101, 22.00, 100.00, 38.00, 'C+', 1, NULL),
+(47, 12, 102, 73.00, 100.00, 58.00, 'B', 1, NULL),
+(48, 12, 103, 87.00, 100.00, 91.00, 'A+', 1, NULL),
+(49, 12, 104, 98.00, 100.00, 24.00, 'B', 1, NULL),
+(50, 12, 105, 39.00, 100.00, 93.00, 'F', 1, NULL),
+(51, 12, 106, 97.00, 100.00, 66.00, 'B+', 1, NULL),
+(52, 12, 107, 80.00, 100.00, 77.00, 'B', 1, NULL),
+(53, 12, 108, 91.00, 100.00, 70.00, 'C+', 1, NULL),
+(54, 12, 120, 76.00, 100.00, 36.00, 'A+', 0, NULL),
+(55, 13, 101, 38.00, 100.00, 32.00, 'A', 1, NULL),
+(56, 13, 102, 75.00, 100.00, 68.00, 'A+', 0, NULL),
+(57, 13, 103, 59.00, 100.00, 35.00, 'A', 1, NULL),
+(58, 13, 104, 61.00, 100.00, 87.00, 'B+', 0, NULL),
+(59, 13, 105, 51.00, 100.00, 80.00, 'B+', 1, NULL),
+(60, 13, 106, 20.00, 100.00, 25.00, 'B', 1, NULL),
+(61, 13, 107, 23.00, 100.00, 60.00, 'B+', 1, NULL),
+(62, 13, 108, 42.00, 100.00, 49.00, 'B', 1, NULL),
+(63, 13, 120, 88.00, 100.00, 88.00, 'A', 1, NULL),
+(64, 14, 101, 45.00, 100.00, 29.00, 'B', 0, NULL),
+(65, 14, 102, 85.00, 100.00, 25.00, 'A+', 1, NULL),
+(66, 14, 103, 65.00, 100.00, 29.00, 'A+', 0, NULL),
+(67, 14, 104, 69.00, 100.00, 94.00, 'B+', 1, NULL),
+(68, 14, 105, 43.00, 100.00, 21.00, 'B', 1, NULL),
+(69, 14, 106, 88.00, 100.00, 71.00, 'C+', 1, NULL),
+(70, 14, 107, 78.00, 100.00, 44.00, 'A', 0, NULL),
+(71, 14, 108, 31.00, 100.00, 46.00, 'B+', 1, NULL),
+(72, 14, 120, 27.00, 100.00, 77.00, 'C+', 1, NULL),
+(73, 15, 101, 38.00, 100.00, 98.00, 'B+', 1, NULL),
+(74, 15, 102, 55.00, 100.00, 59.00, 'B', 1, NULL),
+(75, 15, 103, 86.00, 100.00, 45.00, 'B+', 1, NULL),
+(76, 15, 104, 86.00, 100.00, 44.00, 'B+', 1, NULL),
+(77, 15, 105, 32.00, 100.00, 62.00, 'B+', 0, NULL),
+(78, 15, 106, 41.00, 100.00, 32.00, 'A+', 1, NULL),
+(79, 15, 107, 40.00, 100.00, 71.00, 'B', 0, NULL),
+(80, 15, 108, 28.00, 100.00, 57.00, 'B', 0, NULL),
+(81, 15, 120, 72.00, 100.00, 31.00, 'B+', 1, NULL),
+(82, 16, 101, 45.00, 100.00, 20.00, 'B+', 1, NULL),
+(83, 16, 102, 33.00, 100.00, 20.00, 'B+', 1, NULL),
+(84, 16, 103, 41.00, 100.00, 86.00, 'C+', 1, NULL),
+(85, 16, 104, 85.00, 100.00, 72.00, 'B+', 1, NULL),
+(86, 16, 105, 46.00, 100.00, 77.00, 'B+', 1, NULL),
+(87, 16, 106, 49.00, 100.00, 71.00, 'C+', 1, NULL),
+(88, 16, 107, 80.00, 100.00, 44.00, 'B', 1, NULL),
+(89, 16, 108, 22.00, 100.00, 82.00, 'A', 1, NULL),
+(90, 16, 120, 60.00, 100.00, 55.00, 'B', 1, NULL),
+(91, 17, 101, 92.00, 100.00, 65.00, 'A', 1, NULL),
+(92, 17, 102, 78.00, 100.00, 22.00, 'A+', 1, NULL),
+(93, 17, 103, 89.00, 100.00, 24.00, 'B', 1, NULL),
+(94, 17, 104, 23.00, 100.00, 43.00, 'A', 1, NULL),
+(95, 17, 105, 53.00, 100.00, 86.00, 'A+', 0, NULL),
+(96, 17, 106, 53.00, 100.00, 20.00, 'A', 1, NULL),
+(97, 17, 107, 40.00, 100.00, 48.00, 'B', 1, NULL),
+(98, 17, 108, 41.00, 100.00, 54.00, 'C+', 1, NULL),
+(99, 17, 120, 78.00, 100.00, 60.00, 'A', 0, NULL);
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `results`
 --
 
@@ -268,27 +469,46 @@ CREATE TABLE `results` (
   `created_by` int(11) DEFAULT NULL COMMENT 'User ID who created the result',
   `updated_by` int(11) DEFAULT NULL COMMENT 'User ID who last updated the result',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_published` tinyint(1) NOT NULL DEFAULT 0,
+  `percentage` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `is_pass` tinyint(1) NOT NULL DEFAULT 0,
+  `total_marks` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `marks_obtained` decimal(10,2) NOT NULL DEFAULT 0.00
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `results`
 --
 
-INSERT INTO `results` (`result_id`, `student_id`, `subject_id`, `exam_id`, `theory_marks`, `practical_marks`, `credit_hours`, `grade`, `gpa`, `remarks`, `upload_id`, `batch_id`, `status`, `status_changed_at`, `status_changed_by`, `created_by`, `updated_by`, `created_at`, `updated_at`) VALUES
-(4, 'S001', '106', 2, 80.00, 90.00, 1.0, 'F', 0.00, NULL, NULL, NULL, 'pending', NULL, NULL, 1, 1, '2025-05-04 10:10:41', '2025-05-04 10:10:41'),
-(5, 'S001', '103', 2, 30.00, 35.00, 2.0, 'B', 3.00, NULL, NULL, NULL, 'pending', NULL, NULL, 1, 1, '2025-05-04 10:13:20', '2025-05-04 10:13:20'),
-(6, 'S001', '104', 2, 13.00, 59.00, 2.0, 'B+', 3.30, NULL, NULL, NULL, 'pending', NULL, NULL, 1, 1, '2025-05-04 14:32:14', '2025-05-04 14:32:14'),
-(9, 'S002', '106', 5, 36.00, 3.00, 1.0, 'D', 1.00, 'Aliqua Ex voluptate', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:57:15', '2025-05-05 02:57:15'),
-(10, 'S002', '105', 5, 49.00, 90.00, 1.0, 'A+', 4.00, 'Et fugit nulla omni', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:57:15', '2025-05-05 02:57:15'),
-(11, 'S002', '104', 5, 70.00, 36.00, 1.0, 'A+', 4.00, 'Doloremque quo neque', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:57:15', '2025-05-05 02:57:15'),
-(12, 'S002', '101', 5, 2.00, 0.00, 4.0, 'F', 0.00, '', 3, NULL, 'pending', NULL, NULL, NULL, 1, '2025-05-05 02:57:15', '2025-05-05 04:05:10'),
-(13, 'S002', '120', 5, 90.00, 13.00, 1.0, 'A+', 4.00, 'Mollit expedita labo', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:57:15', '2025-05-05 02:57:15'),
-(14, 'S001', '104', 5, 76.00, 89.00, 1.0, 'A+', 4.00, 'Doloremque deserunt ', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:59:23', '2025-05-05 02:59:23'),
-(15, 'S001', '106', 5, 6.00, 31.00, 1.0, 'D', 1.00, 'Voluptatem dolor pro', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:59:23', '2025-05-05 02:59:23'),
-(16, 'S001', '120', 5, 90.00, 82.00, 1.0, 'A+', 4.00, 'Sunt ullam omnis es', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:59:23', '2025-05-05 02:59:23'),
-(17, 'S001', '101', 5, 93.00, 78.00, 1.0, 'A+', 4.00, 'Tempora reprehenderi', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:59:23', '2025-05-05 02:59:23'),
-(18, 'S002', '107', 1, 0.00, 28.00, 1.0, 'F', 0.00, 'Sapiente sit ut dol', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 03:34:24', '2025-05-05 03:34:24');
+INSERT INTO `results` (`result_id`, `student_id`, `subject_id`, `exam_id`, `theory_marks`, `practical_marks`, `credit_hours`, `grade`, `gpa`, `remarks`, `upload_id`, `batch_id`, `status`, `status_changed_at`, `status_changed_by`, `created_by`, `updated_by`, `created_at`, `updated_at`, `is_published`, `percentage`, `is_pass`, `total_marks`, `marks_obtained`) VALUES
+(5, 'S001', '103', 2, 30.00, 35.00, 2.0, 'B', 3.00, NULL, NULL, NULL, 'pending', NULL, NULL, 1, 1, '2025-05-04 10:13:20', '2025-05-06 14:36:56', 0, 0.00, 0, 0.00, 0.00),
+(6, 'S001', '104', 2, 13.00, 59.00, 2.0, 'B+', 3.30, NULL, NULL, NULL, 'pending', NULL, NULL, 1, 1, '2025-05-04 14:32:14', '2025-05-04 14:32:14', 0, 0.00, 0, 0.00, 0.00),
+(9, 'S002', '106', 5, 36.00, 3.00, 1.0, 'D', 1.00, 'Aliqua Ex voluptate', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:57:15', '2025-05-05 02:57:15', 0, 0.00, 0, 0.00, 0.00),
+(10, 'S002', '105', 5, 49.00, 90.00, 1.0, 'A+', 4.00, 'Et fugit nulla omni', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:57:15', '2025-05-05 02:57:15', 0, 0.00, 0, 0.00, 0.00),
+(11, 'S002', '104', 5, 70.00, 36.00, 1.0, 'A+', 4.00, 'Doloremque quo neque', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:57:15', '2025-05-05 02:57:15', 0, 0.00, 0, 0.00, 0.00),
+(12, 'S002', '101', 5, 2.00, 0.00, 4.0, 'F', 0.00, '', 3, NULL, 'pending', NULL, NULL, NULL, 1, '2025-05-05 02:57:15', '2025-05-05 04:05:10', 0, 0.00, 0, 0.00, 0.00),
+(13, 'S002', '120', 5, 90.00, 13.00, 1.0, 'A+', 4.00, 'Mollit expedita labo', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:57:15', '2025-05-06 15:13:11', 0, 0.00, 0, 0.00, 0.00),
+(14, 'S001', '104', 5, 76.00, 89.00, 1.0, 'A+', 4.00, 'Doloremque deserunt ', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:59:23', '2025-05-05 02:59:23', 0, 0.00, 0, 0.00, 0.00),
+(15, 'S001', '106', 5, 6.00, 31.00, 1.0, 'D', 1.00, 'Voluptatem dolor pro', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:59:23', '2025-05-05 02:59:23', 0, 0.00, 0, 0.00, 0.00),
+(16, 'S001', '120', 5, 90.00, 82.00, 1.0, 'A+', 4.00, 'Sunt ullam omnis es', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:59:23', '2025-05-05 02:59:23', 0, 0.00, 0, 0.00, 0.00),
+(17, 'S001', '101', 5, 93.00, 78.00, 1.0, 'A+', 4.00, 'Tempora reprehenderi', 1, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-05 02:59:23', '2025-05-05 02:59:23', 0, 0.00, 0, 0.00, 0.00);
+
+--
+-- Triggers `results`
+--
+DELIMITER $$
+CREATE TRIGGER `after_result_insert` AFTER INSERT ON `results` FOR EACH ROW BEGIN
+  CALL update_student_performance(NEW.student_id, NEW.exam_id);
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `after_result_update` AFTER UPDATE ON `results` FOR EACH ROW BEGIN
+  CALL update_student_performance(NEW.student_id, NEW.exam_id);
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -515,10 +735,10 @@ CREATE TABLE `student_performance` (
 --
 
 INSERT INTO `student_performance` (`performance_id`, `student_id`, `exam_id`, `average_marks`, `gpa`, `total_subjects`, `subjects_passed`, `rank`, `remarks`, `created_at`, `updated_at`) VALUES
-(1, 'S002', 5, 77.80, 2.60, 5, 4, 2, NULL, '2025-05-05 02:57:15', '2025-05-05 04:05:10'),
+(1, 'S002', 5, 77.80, 1.63, 5, 4, 3, NULL, '2025-05-05 02:57:15', '2025-05-06 15:13:11'),
 (2, 'S001', 5, 136.25, 3.25, 4, 4, 1, NULL, '2025-05-05 02:59:23', '2025-05-05 04:05:10'),
 (3, 'S002', 1, 28.00, 0.00, 1, 0, NULL, NULL, '2025-05-05 03:34:24', '2025-05-05 03:34:24'),
-(4, 'S001', 2, 81.75, 1.58, 4, 2, 1, NULL, '2025-05-05 04:04:31', '2025-05-05 04:04:31'),
+(4, 'S001', 2, 68.50, 3.15, 2, 2, 1, NULL, '2025-05-05 04:04:31', '2025-05-06 14:36:56'),
 (5, 'S001', 4, 20.00, 0.00, 1, 0, 1, NULL, '2025-05-05 04:15:00', '2025-05-05 04:15:00');
 
 -- --------------------------------------------------------
@@ -755,6 +975,17 @@ ALTER TABLE `notifications`
   ADD KEY `idx_notifications_expires` (`expires_at`);
 
 --
+-- Indexes for table `resultdetails`
+--
+ALTER TABLE `resultdetails`
+  ADD PRIMARY KEY (`detail_id`),
+  ADD UNIQUE KEY `unique_result_subject` (`result_id`,`subject_id`),
+  ADD KEY `result_id` (`result_id`),
+  ADD KEY `subject_id` (`subject_id`),
+  ADD KEY `idx_resultdetails_result` (`result_id`),
+  ADD KEY `idx_resultdetails_subject` (`subject_id`);
+
+--
 -- Indexes for table `results`
 --
 ALTER TABLE `results`
@@ -770,7 +1001,10 @@ ALTER TABLE `results`
   ADD KEY `idx_results_grade` (`grade`),
   ADD KEY `idx_results_created_at` (`created_at`),
   ADD KEY `results_ibfk_7` (`status_changed_by`),
-  ADD KEY `idx_results_batch_id` (`batch_id`);
+  ADD KEY `idx_results_batch_id` (`batch_id`),
+  ADD KEY `idx_results_student` (`student_id`),
+  ADD KEY `idx_results_exam` (`exam_id`),
+  ADD KEY `idx_results_published` (`is_published`);
 
 --
 -- Indexes for table `resultuploads`
@@ -945,13 +1179,19 @@ ALTER TABLE `grading_system`
 -- AUTO_INCREMENT for table `loginlogs`
 --
 ALTER TABLE `loginlogs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
   MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `resultdetails`
+--
+ALTER TABLE `resultdetails`
+  MODIFY `detail_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=128;
 
 --
 -- AUTO_INCREMENT for table `results`
@@ -993,7 +1233,7 @@ ALTER TABLE `settings`
 -- AUTO_INCREMENT for table `student_performance`
 --
 ALTER TABLE `student_performance`
-  MODIFY `performance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `performance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `system_settings`

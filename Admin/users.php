@@ -206,43 +206,10 @@ $conn->close();
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
             <!-- Top Navigation -->
-            <div class="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
-                <button class="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:bg-gray-100 focus:text-gray-600 md:hidden" id="sidebar-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="flex-1 px-4 flex justify-between">
-                    <div class="flex-1 flex">
-                        <div class="w-full flex md:ml-0">
-                            <h1 class="text-2xl font-semibold text-gray-900 my-auto">Manage Users</h1>
-                        </div>
-                    </div>
-                    <div class="ml-4 flex items-center md:ml-6">
-                        <button class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <span class="sr-only">View notifications</span>
-                            <i class="fas fa-bell"></i>
-                        </button>
-
-                        <!-- Profile dropdown -->
-                        <div class="ml-3 relative">
-                            <div>
-                                <button type="button" class="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" id="user-menu-button">
-                                    <span class="sr-only">Open user menu</span>
-                                    <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-600">
-                                        <span class="text-sm font-medium leading-none text-white"><?php echo substr($_SESSION['full_name'], 0, 1); ?></span>
-                                    </span>
-                                </button>
-                            </div>
-
-                            <!-- Profile dropdown menu -->
-                            <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none" id="user-menu" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" tabindex="-1">
-                                <a href="profile.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Your Profile</a>
-                                <a href="settings.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Settings</a>
-                                <a href="logout.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Sign out</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <?php
+        // Include the file that processes form data
+        include 'topBar.php';
+        ?>
 
             <!-- Main Content -->
             <main class="flex-1 relative overflow-y-auto focus:outline-none">

@@ -265,18 +265,10 @@ $conn->close();
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
             <!-- Top Navigation -->
-            <div class="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
-                <button class="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:bg-gray-100 focus:text-gray-600 md:hidden" id="sidebar-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="flex-1 px-4 flex justify-between">
-                    <div class="flex-1 flex">
-                        <div class="w-full flex md:ml-0">
-                            <h1 class="text-2xl font-semibold text-gray-900 my-auto">Manage Subjects</h1>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <?php
+        // Include the file that processes form data
+        include 'topBar.php';
+        ?>
 
             <!-- Main Content -->
             <main class="flex-1 relative overflow-y-auto focus:outline-none">

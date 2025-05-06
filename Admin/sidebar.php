@@ -8,7 +8,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <div class="flex items-center justify-center h-16 bg-gray-800 shadow">
             <span class="text-lg font-bold">Result Management</span>
         </div>
-        <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto text-sm font-medium">
+        <!-- <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto text-sm font-medium"> -->
             <a href="admin_dashboard.php" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 <?= ($current_page == 'admin_dashboard.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-tachometer-alt"></i> Dashboard
             </a>
@@ -30,9 +30,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="grade_sheet.php" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 <?= ($current_page == 'grade_sheet.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-file-alt"></i> Grade Sheet
             </a>
-            <a href="result_sheet_template.php" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 <?= ($current_page == 'result_sheet_template.php') ? 'bg-gray-700' : '' ?>">
+            <!-- <a href="result_sheet_template.php" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 <?= ($current_page == 'result_sheet_template.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-file-invoice"></i> Result Sheet
-            </a>
+            </a> -->
             <a href="students_result.php" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 <?= ($current_page == 'students_result.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-user-graduate"></i> Student Result
             </a>
