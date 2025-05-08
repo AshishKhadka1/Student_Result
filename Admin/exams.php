@@ -18,7 +18,7 @@ $user_name = $_SESSION['full_name'] ?? 'Admin';
 $classes = [];
 try {
     $sql = "SELECT class_id, class_name, section, academic_year 
-            FROM Classes 
+            FROM classes 
             ORDER BY academic_year DESC, class_name, section";
     $result = $conn->query($sql);
     while ($row = $result->fetch_assoc()) {
@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $total_marks = 100;
             $passing_marks = 40;
 
-            $stmt = $conn->prepare("INSERT INTO Exams (exam_name, exam_type, class_id, academic_year, exam_date, description, status, total_marks, passing_marks, results_published, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())");
+            $stmt = $conn->prepare("INSERT INTO exams (exam_name, exam_type, class_id, academic_year, exam_date, description, status, total_marks, passing_marks, results_published, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())");
             $stmt->bind_param("ssissssii", $exam_name, $exam_type_db, $class_id, $academic_year, $exam_date, $description, $status, $total_marks, $passing_marks);
 
             if ($stmt->execute()) {
@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $valid_types = ['midterm', 'final', 'quiz', 'assignment', 'project', 'other'];
             $exam_type_db = in_array(strtolower($exam_type), $valid_types) ? strtolower($exam_type) : 'other';
 
-            $stmt = $conn->prepare("UPDATE Exams SET exam_name = ?, exam_type = ?, class_id = ?, academic_year = ?, exam_date = ?, description = ?, status = ?, updated_at = NOW() WHERE exam_id = ?");
+            $stmt = $conn->prepare("UPDATE exams SET exam_name = ?, exam_type = ?, class_id = ?, academic_year = ?, exam_date = ?, description = ?, status = ?, updated_at = NOW() WHERE exam_id = ?");
             $stmt->bind_param("ssissssi", $exam_name, $exam_type_db, $class_id, $academic_year, $exam_date, $description, $status, $exam_id);
 
             if ($stmt->execute()) {
@@ -132,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $exam_id = $_POST['exam_id'];
 
             // Check if there are results associated with this exam
-            $stmt = $conn->prepare("SELECT COUNT(*) as count FROM Results WHERE exam_id = ?");
+            $stmt = $conn->prepare("SELECT COUNT(*) as count FROM results WHERE exam_id = ?");
             $stmt->bind_param("i", $exam_id);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($row['count'] > 0) {
                 $_SESSION['error'] = "Cannot delete exam because there are results associated with it.";
             } else {
-                $stmt = $conn->prepare("DELETE FROM Exams WHERE exam_id = ?");
+                $stmt = $conn->prepare("DELETE FROM exams WHERE exam_id = ?");
                 $stmt->bind_param("i", $exam_id);
 
                 if ($stmt->execute()) {
@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $conn->query("ALTER TABLE `exams` ADD COLUMN `results_published` TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_active`");
             }
 
-            $stmt = $conn->prepare("UPDATE Exams SET results_published = 1, updated_at = NOW() WHERE exam_id = ?");
+            $stmt = $conn->prepare("UPDATE exams SET results_published = 1, updated_at = NOW() WHERE exam_id = ?");
             $stmt->bind_param("i", $exam_id);
 
             if ($stmt->execute()) {
@@ -197,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $conn->query("ALTER TABLE `exams` ADD COLUMN `results_published` TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_active`");
             }
 
-            $stmt = $conn->prepare("UPDATE Exams SET results_published = 0, updated_at = NOW() WHERE exam_id = ?");
+            $stmt = $conn->prepare("UPDATE exams SET results_published = 0, updated_at = NOW() WHERE exam_id = ?");
             $stmt->bind_param("i", $exam_id);
 
             if ($stmt->execute()) {
@@ -233,8 +233,8 @@ try {
     }
 
     $query = "SELECT e.*, c.class_name, c.section 
-              FROM Exams e 
-              LEFT JOIN Classes c ON e.class_id = c.class_id 
+              FROM exams e 
+              LEFT JOIN classes c ON e.class_id = c.class_id 
               WHERE 1=1";
     $params = [];
     $types = "";
@@ -290,7 +290,7 @@ try {
 // Get unique academic years for filter
 $academic_years = [];
 try {
-    $sql = "SELECT DISTINCT academic_year FROM Exams ORDER BY academic_year DESC";
+    $sql = "SELECT DISTINCT academic_year FROM exams ORDER BY academic_year DESC";
     $result = $conn->query($sql);
     while ($row = $result->fetch_assoc()) {
         $academic_years[] = $row['academic_year'];
@@ -302,7 +302,7 @@ try {
 // Get unique exam types for filter
 $exam_types = [];
 try {
-    $sql = "SELECT DISTINCT exam_type FROM Exams ORDER BY exam_type";
+    $sql = "SELECT DISTINCT exam_type FROM exams ORDER BY exam_type";
     $result = $conn->query($sql);
     while ($row = $result->fetch_assoc()) {
         $exam_types[] = $row['exam_type'];

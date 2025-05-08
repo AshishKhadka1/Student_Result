@@ -5,6 +5,12 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit();
 }
 
+// Database connection
+$conn = new mysqli('localhost', 'root', '', 'result_management');
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
 // Check if result_id is provided
 if (!isset($_GET['result_id']) || empty($_GET['result_id'])) {
     $_SESSION['error'] = "Result ID is required.";
@@ -14,10 +20,214 @@ if (!isset($_GET['result_id']) || empty($_GET['result_id'])) {
 
 $result_id = intval($_GET['result_id']);
 
-// Database connection
-$conn = new mysqli('localhost', 'root', '', 'result_management');
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+// Process actions
+if (isset($_POST['action'])) {
+    if ($_POST['action'] == 'publish') {
+        $stmt = $conn->prepare("UPDATE Results SET is_published = 1 WHERE result_id = ?");
+        $stmt->bind_param("i", $result_id);
+        $stmt->execute();
+        $stmt->close();
+        $_SESSION['success'] = "Result published successfully.";
+        header("Location: view_student_result.php?result_id=" . $result_id);
+        exit();
+    } 
+    elseif ($_POST['action'] == 'unpublish') {
+        $stmt = $conn->prepare("UPDATE Results SET is_published = 0 WHERE result_id = ?");
+        $stmt->bind_param("i", $result_id);
+        $stmt->execute();
+        $stmt->close();
+        $_SESSION['success'] = "Result unpublished successfully.";
+        header("Location: view_student_result.php?result_id=" . $result_id);
+        exit();
+    }
+    elseif ($_POST['action'] == 'delete') {
+        // First delete related records from ResultDetails
+        $stmt = $conn->prepare("DELETE FROM ResultDetails WHERE result_id = ?");
+        $stmt->bind_param("i", $result_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Then delete the result
+        $stmt = $conn->prepare("DELETE FROM Results WHERE result_id = ?");
+        $stmt->bind_param("i", $result_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        $_SESSION['success'] = "Result deleted successfully.";
+        header("Location: result.php");
+        exit();
+    }
+    elseif ($_POST['action'] == 'update_subject_marks' && isset($_POST['detail_id'])) {
+        $detail_id = intval($_POST['detail_id']);
+        $marks_obtained = floatval($_POST['marks_obtained']);
+        $total_marks = floatval($_POST['total_marks']);
+        
+        // Calculate percentage
+        $percentage = ($marks_obtained / $total_marks) * 100;
+        
+        // Determine grade
+        $grade = '';
+        $is_pass = 0;
+        
+        if ($percentage >= 90) {
+            $grade = 'A+';
+            $is_pass = 1;
+        } elseif ($percentage >= 80) {
+            $grade = 'A';
+            $is_pass = 1;
+        } elseif ($percentage >= 70) {
+            $grade = 'B+';
+            $is_pass = 1;
+        } elseif ($percentage >= 60) {
+            $grade = 'B';
+            $is_pass = 1;
+        } elseif ($percentage >= 50) {
+            $grade = 'C+';
+            $is_pass = 1;
+        } elseif ($percentage >= 40) {
+            $grade = 'C';
+            $is_pass = 1;
+        } elseif ($percentage >= 33) {
+            $grade = 'D';
+            $is_pass = 1;
+        } else {
+            $grade = 'F';
+            $is_pass = 0;
+        }
+        
+        // Update the subject result
+        $stmt = $conn->prepare("UPDATE ResultDetails SET marks_obtained = ?, total_marks = ?, percentage = ?, grade = ?, is_pass = ? WHERE detail_id = ?");
+        $stmt->bind_param("dddsii", $marks_obtained, $total_marks, $percentage, $grade, $is_pass, $detail_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Now update the overall result
+        $query = "SELECT SUM(marks_obtained) as total_obtained, SUM(total_marks) as total_marks, 
+                         MIN(is_pass) as all_pass
+                  FROM ResultDetails 
+                  WHERE result_id = ?";
+        
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $result_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        
+        $total_obtained = $row['total_obtained'];
+        $total_marks = $row['total_marks'];
+        $all_pass = $row['all_pass'];
+        
+        $overall_percentage = ($total_obtained / $total_marks) * 100;
+        
+        // Determine overall grade
+        $overall_grade = '';
+        if ($overall_percentage >= 90) {
+            $overall_grade = 'A+';
+        } elseif ($overall_percentage >= 80) {
+            $overall_grade = 'A';
+        } elseif ($overall_percentage >= 70) {
+            $overall_grade = 'B+';
+        } elseif ($overall_percentage >= 60) {
+            $overall_grade = 'B';
+        } elseif ($overall_percentage >= 50) {
+            $overall_grade = 'C+';
+        } elseif ($overall_percentage >= 40) {
+            $overall_grade = 'C';
+        } elseif ($overall_percentage >= 33) {
+            $overall_grade = 'D';
+        } else {
+            $overall_grade = 'F';
+        }
+        
+        // Update the main result
+        $query = "UPDATE Results 
+                  SET total_marks = ?, marks_obtained = ?, percentage = ?, grade = ?, is_pass = ?
+                  WHERE result_id = ?";
+        
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("dddsii", $total_marks, $total_obtained, $overall_percentage, $overall_grade, $all_pass, $result_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        $_SESSION['success'] = "Subject marks updated successfully.";
+        header("Location: view_student_result.php?result_id=" . $result_id);
+        exit();
+    }
+    elseif ($_POST['action'] == 'delete_subject' && isset($_POST['detail_id'])) {
+        $detail_id = intval($_POST['detail_id']);
+        
+        // Get the subject info before deleting (for the success message)
+        $stmt = $conn->prepare("SELECT s.subject_name FROM ResultDetails rd 
+                               JOIN Subjects s ON rd.subject_id = s.subject_id 
+                               WHERE rd.detail_id = ?");
+        $stmt->bind_param("i", $detail_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $subject_info = $result->fetch_assoc();
+        $stmt->close();
+        
+        // Delete the subject result
+        $stmt = $conn->prepare("DELETE FROM ResultDetails WHERE detail_id = ?");
+        $stmt->bind_param("i", $detail_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Now update the overall result
+        $query = "SELECT SUM(marks_obtained) as total_obtained, SUM(total_marks) as total_marks, 
+                         MIN(is_pass) as all_pass
+                  FROM ResultDetails 
+                  WHERE result_id = ?";
+        
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $result_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($row['total_obtained'] !== null) {
+            $total_obtained = $row['total_obtained'];
+            $total_marks = $row['total_marks'];
+            $all_pass = $row['all_pass'];
+            
+            $overall_percentage = ($total_obtained / $total_marks) * 100;
+            
+            // Determine overall grade
+            $overall_grade = '';
+            if ($overall_percentage >= 90) {
+                $overall_grade = 'A+';
+            } elseif ($overall_percentage >= 80) {
+                $overall_grade = 'A';
+            } elseif ($overall_percentage >= 70) {
+                $overall_grade = 'B+';
+            } elseif ($overall_percentage >= 60) {
+                $overall_grade = 'B';
+            } elseif ($overall_percentage >= 50) {
+                $overall_grade = 'C+';
+            } elseif ($overall_percentage >= 40) {
+                $overall_grade = 'C';
+            } elseif ($overall_percentage >= 33) {
+                $overall_grade = 'D';
+            } else {
+                $overall_grade = 'F';
+            }
+            
+            // Update the main result
+            $query = "UPDATE Results 
+                      SET total_marks = ?, marks_obtained = ?, percentage = ?, grade = ?, is_pass = ?
+                      WHERE result_id = ?";
+            
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param("dddsii", $total_marks, $total_obtained, $overall_percentage, $overall_grade, $all_pass, $result_id);
+            $stmt->execute();
+            $stmt->close();
+        }
+        
+        $_SESSION['success'] = "Subject '" . $subject_info['subject_name'] . "' has been deleted successfully.";
+        header("Location: view_student_result.php?result_id=" . $result_id);
+        exit();
+    }
 }
 
 // Get result information
@@ -213,125 +423,6 @@ try {
     exit();
 }
 
-// Process actions
-if (isset($_POST['action'])) {
-    if ($_POST['action'] == 'publish') {
-        $stmt = $conn->prepare("UPDATE Results SET is_published = 1 WHERE result_id = ?");
-        $stmt->bind_param("i", $result_id);
-        $stmt->execute();
-        $stmt->close();
-        $_SESSION['success'] = "Result published successfully.";
-        header("Location: view_student_result.php?result_id=" . $result_id);
-        exit();
-    } 
-    elseif ($_POST['action'] == 'unpublish') {
-        $stmt = $conn->prepare("UPDATE Results SET is_published = 0 WHERE result_id = ?");
-        $stmt->bind_param("i", $result_id);
-        $stmt->execute();
-        $stmt->close();
-        $_SESSION['success'] = "Result unpublished successfully.";
-        header("Location: view_student_result.php?result_id=" . $result_id);
-        exit();
-    }
-    elseif ($_POST['action'] == 'update_subject_marks' && isset($_POST['detail_id'])) {
-        $detail_id = intval($_POST['detail_id']);
-        $marks_obtained = floatval($_POST['marks_obtained']);
-        $total_marks = floatval($_POST['total_marks']);
-        
-        // Calculate percentage
-        $percentage = ($marks_obtained / $total_marks) * 100;
-        
-        // Determine grade
-        $grade = '';
-        $is_pass = 0;
-        
-        if ($percentage >= 90) {
-            $grade = 'A+';
-            $is_pass = 1;
-        } elseif ($percentage >= 80) {
-            $grade = 'A';
-            $is_pass = 1;
-        } elseif ($percentage >= 70) {
-            $grade = 'B+';
-            $is_pass = 1;
-        } elseif ($percentage >= 60) {
-            $grade = 'B';
-            $is_pass = 1;
-        } elseif ($percentage >= 50) {
-            $grade = 'C+';
-            $is_pass = 1;
-        } elseif ($percentage >= 40) {
-            $grade = 'C';
-            $is_pass = 1;
-        } elseif ($percentage >= 33) {
-            $grade = 'D';
-            $is_pass = 1;
-        } else {
-            $grade = 'F';
-            $is_pass = 0;
-        }
-        
-        // Update the subject result
-        $stmt = $conn->prepare("UPDATE ResultDetails SET marks_obtained = ?, total_marks = ?, percentage = ?, grade = ?, is_pass = ? WHERE detail_id = ?");
-        $stmt->bind_param("dddsii", $marks_obtained, $total_marks, $percentage, $grade, $is_pass, $detail_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Now update the overall result
-        $query = "SELECT SUM(marks_obtained) as total_obtained, SUM(total_marks) as total_marks, 
-                         MIN(is_pass) as all_pass
-                  FROM ResultDetails 
-                  WHERE result_id = ?";
-        
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("i", $result_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $stmt->close();
-        
-        $total_obtained = $row['total_obtained'];
-        $total_marks = $row['total_marks'];
-        $all_pass = $row['all_pass'];
-        
-        $overall_percentage = ($total_obtained / $total_marks) * 100;
-        
-        // Determine overall grade
-        $overall_grade = '';
-        if ($overall_percentage >= 90) {
-            $overall_grade = 'A+';
-        } elseif ($overall_percentage >= 80) {
-            $overall_grade = 'A';
-        } elseif ($overall_percentage >= 70) {
-            $overall_grade = 'B+';
-        } elseif ($overall_percentage >= 60) {
-            $overall_grade = 'B';
-        } elseif ($overall_percentage >= 50) {
-            $overall_grade = 'C+';
-        } elseif ($overall_percentage >= 40) {
-            $overall_grade = 'C';
-        } elseif ($overall_percentage >= 33) {
-            $overall_grade = 'D';
-        } else {
-            $overall_grade = 'F';
-        }
-        
-        // Update the main result
-        $query = "UPDATE Results 
-                  SET total_marks = ?, marks_obtained = ?, percentage = ?, grade = ?, is_pass = ?
-                  WHERE result_id = ?";
-        
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("dddsii", $total_marks, $total_obtained, $overall_percentage, $overall_grade, $all_pass, $result_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        $_SESSION['success'] = "Subject marks updated successfully.";
-        header("Location: view_student_result.php?result_id=" . $result_id);
-        exit();
-    }
-}
-
 $conn->close();
 ?>
 
@@ -439,7 +530,7 @@ $conn->close();
             color: black;
             text-decoration: none;
         }
-
+        
         /* Dark mode for modal */
         .dark-mode .modal-content {
             background-color: #2d3748;
@@ -604,6 +695,13 @@ $conn->close();
                                 </form>
                                 <?php endif; ?>
                                 
+                                <form method="POST" onsubmit="return confirm('Are you sure you want to delete this result? This action cannot be undone.');">
+                                    <input type="hidden" name="action" value="delete">
+                                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                        <i class="fas fa-trash mr-2"></i> Delete
+                                    </button>
+                                </form>
+                                
                                 <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                     <i class="fas fa-print mr-2"></i> Print
                                 </button>
@@ -628,60 +726,65 @@ $conn->close();
                                 <span class="font-semibold">Unpublished Result</span>
                             </div>
                             <?php endif; ?>
-                            
-                            <!-- Student Information -->
-                            <div class="p-6 border-b border-gray-200">
-                                <h2 class="text-xl font-semibold text-gray-900 mb-4">Student Information</h2>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <p class="text-sm text-gray-500">Name</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo htmlspecialchars($result_data['full_name']); ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Roll Number</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo htmlspecialchars($result_data['roll_number']); ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Class</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo htmlspecialchars($result_data['class_name'] . ' ' . $result_data['section']); ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Academic Year</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo htmlspecialchars($result_data['academic_year']); ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Email</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo htmlspecialchars($result_data['email'] ?? 'N/A'); ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Phone</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo htmlspecialchars($result_data['phone'] ?? 'N/A'); ?></p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Exam Information -->
-                            <div class="p-6 border-b border-gray-200">
-                                <h2 class="text-xl font-semibold text-gray-900 mb-4">Exam Information</h2>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <p class="text-sm text-gray-500">Exam Name</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo htmlspecialchars($result_data['exam_name']); ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Exam Type</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo htmlspecialchars($result_data['exam_type']); ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Exam Date</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo date('d M Y', strtotime($result_data['exam_date'])); ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm text-gray-500">Result Date</p>
-                                        <p class="text-lg font-medium text-gray-900"><?php echo date('d M Y', strtotime($result_data['created_at'])); ?></p>
-                                    </div>
-                                </div>
-                            </div>
+
+
+
+    <!-- Student Information Card -->
+    <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+        <h2 class="text-2xl font-bold text-indigo-600 mb-4 border-b pb-2">🎓 Student Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <p class="text-sm text-gray-500">Full Name</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['full_name']); ?></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Roll Number</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['roll_number']); ?></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Class</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['class_name'] . ' ' . $result_data['section']); ?></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Academic Year</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['academic_year']); ?></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Email</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['email'] ?? 'N/A'); ?></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Phone</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['phone'] ?? 'N/A'); ?></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exam Information Card -->
+    <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+        <h2 class="text-2xl font-bold text-indigo-600 mb-4 border-b pb-2">📝 Exam Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <p class="text-sm text-gray-500">Exam Name</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['exam_name']); ?></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Exam Type</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['exam_type']); ?></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Exam Date</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo date('d M Y', strtotime($result_data['exam_date'])); ?></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Result Date</p>
+                <p class="text-lg font-semibold text-gray-900"><?php echo date('d M Y', strtotime($result_data['created_at'])); ?></p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
                             
                             <!-- Subject-wise Results -->
                             <div class="p-6 border-b border-gray-200">
@@ -750,9 +853,19 @@ $conn->close();
                                                         <?php endif; ?>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium no-print">
-                                                        <button type="button" onclick="openEditSubjectMarksModal(<?php echo $subject['detail_id']; ?>, '<?php echo $subject['subject_name']; ?>', <?php echo $subject['marks_obtained']; ?>, <?php echo $subject['total_marks']; ?>)" class="text-blue-600 hover:text-blue-900">
-                                                            <i class="fas fa-edit"></i> Edit
-                                                        </button>
+                                                        <div class="flex space-x-3">
+                                                            <button type="button" onclick="openEditSubjectMarksModal(<?php echo $subject['detail_id']; ?>, '<?php echo $subject['subject_name']; ?>', <?php echo $subject['marks_obtained']; ?>, <?php echo $subject['total_marks']; ?>)" class="text-blue-600 hover:text-blue-900 transition-colors duration-200">
+                                                                <i class="fas fa-edit"></i> Edit
+                                                            </button>
+                                                            
+                                                            <form method="POST" class="inline" onsubmit="return confirmDeleteSubject('<?php echo htmlspecialchars($subject['subject_name']); ?>');">
+                                                                <input type="hidden" name="action" value="delete_subject">
+                                                                <input type="hidden" name="detail_id" value="<?php echo $subject['detail_id']; ?>">
+                                                                <button type="submit" class="text-red-600 hover:text-red-900 transition-colors duration-200">
+                                                                    <i class="fas fa-trash"></i> Delete
+                                                                </button>
+                                                            </form>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                                 <?php endforeach; ?>
@@ -907,6 +1020,21 @@ $conn->close();
                 });
             }
         });
+
+        function confirmDeleteSubject(subjectName) {
+            return Swal.fire({
+                title: 'Delete Subject Result',
+                html: `Are you sure you want to delete the result for <strong>${subjectName}</strong>?<br><br>This action cannot be undone.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                return result.isConfirmed;
+            });
+        }
     </script>
 </body>
 </html>

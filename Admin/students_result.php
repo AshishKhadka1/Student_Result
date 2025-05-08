@@ -686,9 +686,7 @@ $conn->close();
                                         <button onclick="openTab('progress')" class="tab-button w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
                                             <i class="fas fa-chart-line mr-2"></i> Progress Tracking
                                         </button>
-                                        <button onclick="openTab('download')" class="tab-button w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                                            <i class="fas fa-download mr-2"></i> Download Options
-                                        </button>
+                                      
                                     </nav>
                                 </div>
 
@@ -907,52 +905,6 @@ $conn->close();
                                         </div>
                                     <?php endif; ?>
                                 </div>
-
-                                <!-- Download Options Tab -->
-                                <div id="download" class="tab-content p-6">
-                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Download Result Sheets</h3>
-                                    
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div class="bg-blue-50 p-6 rounded-lg">
-                                            <h4 class="text-md font-medium text-blue-800 mb-3">Current Result Sheet</h4>
-                                            <p class="text-gray-600 mb-4">Download your latest result sheet in PDF format.</p>
-                                            <button onclick="generatePDF('current')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded flex items-center justify-center">
-                                                <i class="fas fa-file-pdf mr-2"></i>
-                                                Download Result PDF
-                                            </button>
-                                        </div>
-                                        
-                                        <div class="bg-green-50 p-6 rounded-lg">
-                                            <h4 class="text-md font-medium text-green-800 mb-3">Progress Report</h4>
-                                            <p class="text-gray-600 mb-4">Download a comprehensive progress report with charts and analysis.</p>
-                                            <button onclick="generatePDF('progress')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded flex items-center justify-center">
-                                                <i class="fas fa-chart-line mr-2"></i>
-                                                Download Progress PDF
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mt-6 bg-gray-50 p-6 rounded-lg">
-                                        <h4 class="text-md font-medium text-gray-800 mb-3">Official Format</h4>
-                                        <p class="text-gray-600 mb-4">Download your result in the official examination board format.</p>
-                                        <button onclick="generatePDF('official')" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-2 px-4 rounded flex items-center justify-center">
-                                            <i class="fas fa-file-alt mr-2"></i>
-                                            Download Official Format PDF
-                                        </button>
-                                    </div>
-                                    
-                                    <div class="mt-6 p-4 bg-yellow-50 rounded-lg">
-                                        <div class="flex items-start">
-                                            <i class="fas fa-info-circle text-yellow-500 mt-0.5 mr-2"></i>
-                                            <div>
-                                                <p class="text-sm text-yellow-700">
-                                                    <span class="font-medium">Note:</span> These PDF documents are for personal use only. For official purposes, please request a certified copy from the administration office.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         <?php endif; ?>
                     </div>
                 </div>

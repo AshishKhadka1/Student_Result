@@ -1,4 +1,45 @@
 <?php
+// At the beginning of your result.php file, add this code to check and create the missing columns if needed
+// This ensures the columns exist before any queries try to access them
+
+// Check if the phone and address columns exist in the Users table
+$conn = new mysqli('localhost', 'root', '', 'result_management');
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Check for phone column
+$phoneColumnExists = false;
+$columnsResult = $conn->query("SHOW COLUMNS FROM Users LIKE 'phone'");
+if ($columnsResult->num_rows > 0) {
+    $phoneColumnExists = true;
+}
+
+// Check for address column
+$addressColumnExists = false;
+$columnsResult = $conn->query("SHOW COLUMNS FROM Users LIKE 'address'");
+if ($columnsResult->num_rows > 0) {
+    $addressColumnExists = true;
+}
+
+// Add missing columns if they don't exist
+if (!$phoneColumnExists) {
+    $alterTableSQL = "ALTER TABLE Users ADD COLUMN `phone` VARCHAR(20) DEFAULT NULL";
+    $conn->query($alterTableSQL);
+}
+
+if (!$addressColumnExists) {
+    $alterTableSQL = "ALTER TABLE Users ADD COLUMN `address` VARCHAR(255) DEFAULT NULL";
+    $conn->query($alterTableSQL);
+}
+
+$conn->close();
+
+// Continue with the rest of your result.php code
+// The existing code that references u.phone and u.address will now work correctly
+?>
+
+<?php
 session_start();
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: ../login.php");
@@ -123,10 +164,19 @@ if (isset($_POST['action'])) {
     }
     elseif ($_POST['action'] == 'delete' && isset($_POST['result_id'])) {
         $result_id = intval($_POST['result_id']);
+        
+        // First delete related records from ResultDetails
+        $stmt = $conn->prepare("DELETE FROM ResultDetails WHERE result_id = ?");
+        $stmt->bind_param("i", $result_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Then delete the result
         $stmt = $conn->prepare("DELETE FROM Results WHERE result_id = ?");
         $stmt->bind_param("i", $result_id);
         $stmt->execute();
         $stmt->close();
+        
         $_SESSION['success'] = "Result deleted successfully.";
         header("Location: result.php");
         exit();
@@ -596,6 +646,29 @@ $conn->close();
                         </div>
                         <?php endif; ?>
 
+                        <?php if(isset($_SESSION['info'])): ?>
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-info-circle text-blue-500"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-blue-700">
+                                        <?php echo $_SESSION['info']; unset($_SESSION['info']); ?>
+                                    </p>
+                                </div>
+                                <div class="ml-auto pl-3">
+                                    <div class="-mx-1.5 -my-1.5">
+                                        <button class="inline-flex rounded-md p-1.5 text-blue-500 hover:bg-blue-100 focus:outline-none" onclick="this.parentElement.parentElement.parentElement.remove()">
+                                            <span class="sr-only">Dismiss</span>
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <!-- Dashboard Stats -->
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                             <div class="bg-white rounded-lg shadow-md p-6 hover-scale">
@@ -787,9 +860,6 @@ $conn->close();
                                                                     <i class="fas fa-eye"></i>
                                                                 </a>
                                                                 
-                                                                <button type="button" onclick="openEditMarksModal(<?php echo $exam['result_id']; ?>, <?php echo $exam['marks_obtained']; ?>, <?php echo $exam['total_marks']; ?>)" class="text-blue-600 hover:text-blue-900" title="Edit Marks">
-                                                                    <i class="fas fa-edit"></i>
-                                                                </button>
                                                                 
                                                                 <?php if ($exam['is_published']): ?>
                                                                 <form method="POST" class="inline">

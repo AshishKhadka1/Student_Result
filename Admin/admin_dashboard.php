@@ -668,9 +668,7 @@ $conn->close();
                                     </p>
                                 </div>
                                 <div class="mt-4 md:mt-0 flex space-x-3">
-                                    <a href="reports.php" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white">
-                                        View Reports
-                                    </a>
+
                                     <a href="add_result.php" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400">
                                         Add New Result
                                     </a>
@@ -706,9 +704,7 @@ $conn->close();
                                     <i class="fas fa-calendar-plus text-2xl mb-2"></i>
                                     <p class="text-sm">Add Exam</p>
                                 </a>
-                                <a href="reports.php" class="bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
-                                    <i class="fas fa-chart-bar text-2xl mb-2"></i>
-                                    <p class="text-sm">Reports</p>
+
                                 </a>
                                 <a href="settings.php" class="bg-gray-600 hover:bg-gray-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
                                     <i class="fas fa-cog text-2xl mb-2"></i>
@@ -832,37 +828,7 @@ $conn->close();
                             </div>
                         </div>
 
-                        <!-- Charts and Tables -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <!-- Performance Chart -->
-                            <div class="bg-white shadow rounded-lg p-4 hover-scale card-hover">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h2 class="text-lg font-medium text-gray-900">Subject Performance</h2>
-                                    <div class="flex space-x-2">
-                                        <button class="text-sm text-gray-500 hover:text-gray-700 chart-filter active" data-period="week">Week</button>
-                                        <button class="text-sm text-gray-500 hover:text-gray-700 chart-filter" data-period="month">Month</button>
-                                        <button class="text-sm text-gray-500 hover:text-gray-700 chart-filter" data-period="year">Year</button>
-                                    </div>
-                                </div>
-                                <div class="h-64">
-                                    <canvas id="performanceChart"></canvas>
-                                </div>
-                            </div>
 
-                            <!-- Class GPA Chart -->
-                            <div class="bg-white shadow rounded-lg p-4 hover-scale card-hover">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h2 class="text-lg font-medium text-gray-900">Class-wise GPA</h2>
-                                    <div class="flex space-x-2">
-                                        <button class="text-sm text-gray-500 hover:text-gray-700 gpa-filter active" data-period="current">Current</button>
-                                        <button class="text-sm text-gray-500 hover:text-gray-700 gpa-filter" data-period="previous">Previous</button>
-                                    </div>
-                                </div>
-                                <div class="h-64">
-                                    <canvas id="gpaChart"></canvas>
-                                </div>
-                            </div>
-                        </div>
 
                         <!-- Class Toppers and Academic Progress -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -1095,50 +1061,6 @@ $conn->close();
                             </div>
                         </div>
 
-                        <!-- System Health -->
-                        <div class="bg-white shadow rounded-lg overflow-hidden mb-6 hover-scale card-hover">
-                            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                <h3 class="text-lg font-medium text-gray-900">System Health</h3>
-                                <p class="mt-1 text-sm text-gray-500">System status and metrics</p>
-                            </div>
-                            <div class="px-4 py-5 sm:p-6">
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div class="bg-gray-50 p-4 rounded-lg">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                                                <i class="fas fa-database text-white text-xl"></i>
-                                            </div>
-                                            <div class="ml-5">
-                                                <p class="text-sm font-medium text-gray-500">Database Size</p>
-                                                <p class="text-lg font-semibold text-gray-900"><?php echo $system_health['database_size']; ?> MB</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="bg-gray-50 p-4 rounded-lg">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
-                                                <i class="fas fa-save text-white text-xl"></i>
-                                            </div>
-                                            <div class="ml-5">
-                                                <p class="text-sm font-medium text-gray-500">Last Backup</p>
-                                                <p class="text-lg font-semibold text-gray-900"><?php echo date('M d, Y H:i', strtotime($system_health['last_backup'])); ?></p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="bg-gray-50 p-4 rounded-lg">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 bg-yellow-500 rounded-md p-3">
-                                                <i class="fas fa-tasks text-white text-xl"></i>
-                                            </div>
-                                            <div class="ml-5">
-                                                <p class="text-sm font-medium text-gray-500">Pending Tasks</p>
-                                                <p class="text-lg font-semibold text-gray-900"><?php echo $system_health['pending_tasks']; ?></p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </main>

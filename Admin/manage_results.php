@@ -118,14 +118,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
         }
 
         /* Hover effects */
-        .hover-scale {
-            transition: all 0.3s ease;
-        }
 
-        .hover-scale:hover {
-            transform: scale(1.02);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
 
         /* Tab styles */
         .tab-button {
@@ -274,23 +267,23 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                             <div class="border-b border-gray-300">
                                 <nav class="flex space-x-4" role="tablist">
                                     <button onclick="showTab('upload')" id="tab-upload"
-                                        class="tab-button px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-300 
-                <?php echo $activeTab == 'upload' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 hover:border-blue-500'; ?>">
+                                        class="tab-button px-4 py-2 text-sm font-medium  transition-colors 
+                <?php echo $activeTab == 'upload' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 '; ?>">
                                         Bulk Upload
                                     </button>
                                     <button onclick="showTab('manual')" id="tab-manual"
-                                        class="tab-button px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-300 
-                <?php echo $activeTab == 'manual' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 hover:border-blue-500'; ?>">
+                                        class="tab-button px-4 py-2 text-sm font-medium  transition-colors 
+                <?php echo $activeTab == 'manual' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 '; ?>">
                                         Manual Entry
                                     </button>
                                     <button onclick="showTab('batch')" id="tab-batch"
-                                        class="tab-button px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-300 
-                <?php echo $activeTab == 'batch' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 hover:border-blue-500'; ?>">
+                                        class="tab-button px-4 py-2 text-sm font-medium  transition-colors  
+                <?php echo $activeTab == 'batch' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 '; ?>">
                                         Batch Entry
                                     </button>
                                     <button onclick="showTab('manage')" id="tab-manage"
-                                        class="tab-button px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-300 
-                <?php echo $activeTab == 'manage' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 hover:border-blue-500'; ?>">
+                                        class="tab-button px-4 py-2 text-sm font-medium  transition-colors 
+                <?php echo $activeTab == 'manage' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-500 '; ?>">
                                         Manage Uploads
                                     </button>
                                 </nav>
