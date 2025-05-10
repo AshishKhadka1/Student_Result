@@ -711,7 +711,9 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                         </td>
                                                     </tr>
                                                 </tbody>
+                                                
                                             </table>
+                                           
                                             
                                         </div>
                                         <div class="mt-2">

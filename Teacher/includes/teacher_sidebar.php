@@ -1,73 +1,82 @@
-<!-- Sidebar -->
-<nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
+<?php
+// Start session if not already started
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'teacher') {
+    header("Location: ../login.php");
+    exit();
+}
+
+// Get the current page filename
+$current_page = basename($_SERVER['PHP_SELF']);
+?>
+
+<nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
     <div class="position-sticky pt-3">
         <div class="text-center mb-4">
-            <img src="<?php echo !empty($_SESSION['profile_image']) ? htmlspecialchars($_SESSION['profile_image']) : 'assets/images/default-teacher.png'; ?>" 
-                 alt="Teacher Profile" class="img-fluid rounded-circle mb-2" style="width: 80px; height: 80px; object-fit: cover;">
-            <h6 class="text-white"><?php echo htmlspecialchars($_SESSION['full_name']); ?></h6>
-            <span class="badge bg-success">Teacher</span>
+            <img src="../img/logo.png" alt="School Logo" class="img-fluid rounded-circle mb-3" style="width: 80px; height: 80px; object-fit: cover;">
+            <h5>Result Management</h5>
+            <p class="text-muted">Teacher Portal</p>
         </div>
         
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a class="nav-link text-white <?php echo basename($_SERVER['PHP_SELF']) == 'teacher_dashboard.php' ? 'active bg-primary' : ''; ?>" href="teacher_dashboard.php">
-                    <i class="bi bi-speedometer2 me-2"></i>
+                <a class="nav-link <?php echo ($current_page == 'teacher_dashboard.php') ? 'active' : ''; ?>" href="teacher_dashboard.php">
+                    <i class="fas fa-tachometer-alt me-2"></i>
                     Dashboard
                 </a>
             </li>
+            
             <li class="nav-item">
-                <a class="nav-link text-white <?php echo basename($_SERVER['PHP_SELF']) == 'assigned_classes.php' ? 'active bg-primary' : ''; ?>" href="assigned_classes.php">
-                    <i class="bi bi-mortarboard me-2"></i>
-                    Assigned Classes
+                <a class="nav-link <?php echo ($current_page == 'manage_results.php') ? 'active' : ''; ?>" href="manage_results.php">
+                    <i class="fas fa-graduation-cap me-2"></i>
+                    Manage Results
                 </a>
             </li>
+            
             <li class="nav-item">
-                <a class="nav-link text-white <?php echo basename($_SERVER['PHP_SELF']) == 'assigned_subjects.php' ? 'active bg-primary' : ''; ?>" href="assigned_subjects.php">
-                    <i class="bi bi-book me-2"></i>
-                    Assigned Subjects
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white <?php echo basename($_SERVER['PHP_SELF']) == 'edit_marks.php' ? 'active bg-primary' : ''; ?>" href="edit_marks.php">
-                    <i class="bi bi-pencil-square me-2"></i>
+                <a class="nav-link <?php echo ($current_page == 'edit_marks.php') ? 'active' : ''; ?>" href="edit_marks.php">
+                    <i class="fas fa-edit me-2"></i>
                     Edit Marks
                 </a>
             </li>
+            
             <li class="nav-item">
-                <a class="nav-link text-white <?php echo basename($_SERVER['PHP_SELF']) == 'class_performance.php' ? 'active bg-primary' : ''; ?>" href="class_performance.php">
-                    <i class="bi bi-bar-chart me-2"></i>
+                <a class="nav-link <?php echo ($current_page == 'class_performance.php') ? 'active' : ''; ?>" href="class_performance.php">
+                    <i class="fas fa-chart-bar me-2"></i>
                     Class Performance
                 </a>
             </li>
+            
             <li class="nav-item">
-                <a class="nav-link text-white <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active bg-primary' : ''; ?>" href="reports.php">
-                    <i class="bi bi-file-earmark-text me-2"></i>
-                    Reports
+                <a class="nav-link <?php echo ($current_page == 'student_details.php') ? 'active' : ''; ?>" href="student_details.php">
+                    <i class="fas fa-user-graduate me-2"></i>
+                    Student Details
+                </a>
+            </li>
+            
+            <li class="nav-item">
+                <a class="nav-link <?php echo ($current_page == 'profile.php') ? 'active' : ''; ?>" href="profile.php">
+                    <i class="fas fa-user-cog me-2"></i>
+                    My Profile
                 </a>
             </li>
         </ul>
         
-        <hr class="text-white-50">
+        <hr class="my-3">
         
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a class="nav-link text-white <?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active bg-primary' : ''; ?>" href="profile.php">
-                    <i class="bi bi-person-circle me-2"></i>
-                    My Profile
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white <?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active bg-primary' : ''; ?>" href="settings.php">
-                    <i class="bi bi-gear me-2"></i>
-                    Settings
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="../includes/logout.php">
-                    <i class="bi bi-box-arrow-right me-2"></i>
+                <a class="nav-link" href="../includes/logout.php">
+                    <i class="fas fa-sign-out-alt me-2"></i>
                     Logout
                 </a>
             </li>
         </ul>
     </div>
 </nav>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+

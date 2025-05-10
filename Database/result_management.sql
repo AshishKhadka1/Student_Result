@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 07, 2025 at 04:46 PM
+-- Generation Time: May 09, 2025 at 03:16 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- PHP Version: 8.0.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -150,7 +150,9 @@ INSERT INTO `activity_logs` (`log_id`, `user_id`, `action`, `details`, `ip_addre
 (9, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 1', NULL, '2025-05-05 03:34:24'),
 (10, 1, 'DELETE_EXAM', 'Deleted exam ID: 4', '::1', '2025-05-07 02:58:31'),
 (11, 1, 'PUBLISH_RESULTS', 'Published results for exam ID: 2', '::1', '2025-05-07 02:58:38'),
-(12, 1, 'UNPUBLISH_RESULTS', 'Unpublished results for exam ID: 2', '::1', '2025-05-07 02:58:53');
+(12, 1, 'UNPUBLISH_RESULTS', 'Unpublished results for exam ID: 2', '::1', '2025-05-07 02:58:53'),
+(13, 1, 'PUBLISH_RESULTS', 'Published results for exam ID: 2', '::1', '2025-05-08 02:02:55'),
+(14, 1, 'UNPUBLISH_RESULTS', 'Unpublished results for exam ID: 2', '::1', '2025-05-08 02:47:14');
 
 -- --------------------------------------------------------
 
@@ -193,8 +195,7 @@ CREATE TABLE `classes` (
 
 INSERT INTO `classes` (`class_id`, `class_name`, `class_numeric`, `class_teacher_id`, `section`, `academic_year`, `description`, `is_active`, `created_at`, `updated_at`) VALUES
 (3, 'Class 11', 11, NULL, 'A', '2023-2024', NULL, 1, '2025-04-03 13:58:45', '2025-05-03 11:16:39'),
-(5, 'Class 12', 12, NULL, 'A', '2023-2024', NULL, 1, '2025-04-03 13:58:45', '2025-05-03 11:16:39'),
-(6, 'Class 12', 12, NULL, 'B', '2023-2024', NULL, 1, '2025-04-03 13:58:45', '2025-05-03 11:16:39');
+(5, 'Class 12', 12, NULL, 'A', '2023-2024', NULL, 1, '2025-04-03 13:58:45', '2025-05-03 11:16:39');
 
 -- --------------------------------------------------------
 
@@ -227,8 +228,8 @@ CREATE TABLE `exams` (
 
 INSERT INTO `exams` (`exam_id`, `exam_name`, `exam_type`, `class_id`, `start_date`, `end_date`, `total_marks`, `passing_marks`, `academic_year`, `description`, `status`, `exam_date`, `is_active`, `created_at`, `updated_at`, `results_published`) VALUES
 (1, 'Midterm Exam', 'midterm', NULL, '2023-10-01', '2023-10-10', 100, 40, '2023-2024', 'Midterm examination for Class 10', 'upcoming', NULL, 1, '2025-03-28 04:26:17', '2025-04-03 13:58:45', 0),
-(2, 'First Terminal', '', NULL, NULL, NULL, 0, 0, '2025', '', 'upcoming', '2025-09-01', 1, '2025-05-03 14:17:10', '2025-05-07 02:58:53', 0),
-(5, 'Third terminal', '', 6, NULL, NULL, 0, 0, '2020', '', '', '2020-02-02', 1, '2025-05-03 14:44:49', '2025-05-03 14:44:49', 0);
+(2, 'First Terminal', '', NULL, NULL, NULL, 0, 0, '2025', '', 'upcoming', '2025-09-01', 1, '2025-05-03 14:17:10', '2025-05-08 02:47:14', 0),
+(5, 'Third terminal', '', NULL, NULL, NULL, 0, 0, '2020', '', '', '2020-02-02', 1, '2025-05-03 14:44:49', '2025-05-03 14:44:49', 0);
 
 -- --------------------------------------------------------
 
@@ -292,7 +293,10 @@ INSERT INTO `loginlogs` (`log_id`, `user_id`, `ip_address`, `user_agent`, `login
 (8, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-06 06:44:26', NULL, NULL, 'success', NULL),
 (9, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-06 16:26:21', NULL, NULL, 'success', NULL),
 (10, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-07 06:41:46', NULL, NULL, 'success', NULL),
-(11, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-07 08:56:05', NULL, NULL, 'success', NULL);
+(11, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-07 08:56:05', NULL, NULL, 'success', NULL),
+(12, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-08 07:46:19', NULL, NULL, 'success', NULL),
+(13, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-08 09:55:03', NULL, NULL, 'success', NULL),
+(14, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-09 06:53:06', NULL, NULL, 'success', NULL);
 
 -- --------------------------------------------------------
 
@@ -635,7 +639,6 @@ CREATE TABLE `sections` (
 INSERT INTO `sections` (`section_id`, `class_id`, `section_name`, `capacity`, `teacher_id`, `is_active`, `created_at`, `updated_at`) VALUES
 (3, 3, 'A', NULL, NULL, 1, '2025-05-03 11:16:39', '2025-05-03 11:16:39'),
 (5, 5, 'A', NULL, NULL, 1, '2025-05-03 11:16:39', '2025-05-03 11:16:39'),
-(6, 6, 'B', NULL, NULL, 1, '2025-05-03 11:16:39', '2025-05-03 11:16:39'),
 (8, 5, 'Sacha Heath', 46, 2, 1, '2025-05-03 11:41:38', '2025-05-03 11:41:38'),
 (11, 3, 'r', 74, 2, 1, '2025-05-03 11:43:00', '2025-05-03 11:43:00');
 
@@ -698,16 +701,17 @@ CREATE TABLE `students` (
   `parent_email` varchar(100) DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `section_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `students`
 --
 
-INSERT INTO `students` (`student_id`, `user_id`, `roll_number`, `registration_number`, `class_id`, `batch_year`, `date_of_birth`, `gender`, `address`, `phone`, `parent_name`, `parent_phone`, `parent_email`, `is_active`, `created_at`, `updated_at`) VALUES
-('S001', 1, '8', '78787878', 5, '2023', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, '2025-05-02 14:53:02', '2025-05-02 14:53:02'),
-('S002', 7, '1', '123', 3, '2023', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, '2025-05-05 02:03:12', '2025-05-05 02:03:12');
+INSERT INTO `students` (`student_id`, `user_id`, `roll_number`, `registration_number`, `class_id`, `batch_year`, `date_of_birth`, `gender`, `address`, `phone`, `parent_name`, `parent_phone`, `parent_email`, `is_active`, `created_at`, `updated_at`, `section_id`) VALUES
+('S001', 1, '8', '78787878', 5, '2023', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, '2025-05-02 14:53:02', '2025-05-02 14:53:02', NULL),
+('S002', 7, '1', '123', 3, '2023', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, '2025-05-05 02:03:12', '2025-05-08 02:06:13', 11);
 
 -- --------------------------------------------------------
 
@@ -1149,7 +1153,7 @@ ALTER TABLE `academic_years`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `batch_operations`
@@ -1179,7 +1183,7 @@ ALTER TABLE `grading_system`
 -- AUTO_INCREMENT for table `loginlogs`
 --
 ALTER TABLE `loginlogs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `notifications`
