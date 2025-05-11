@@ -682,6 +682,9 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                             Remarks
                                                         </th>
+                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                            Action
+                                                        </th>
                                                     </tr>
                                                 </thead>
                                                 <tbody class="bg-white divide-y divide-gray-200" id="batch-students-container">
@@ -708,6 +711,13 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                         </td>
                                                         <td class="px-6 py-4 whitespace-nowrap">
                                                             <input type="text" name="students[0][remarks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <button type="button" class="delete-student-row text-red-600 hover:text-red-800">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 </tbody>
@@ -867,19 +877,26 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             const updatedStudentSelectHTML = studentSelectHTML.replace(/students\[0\]/g, `students[${studentRowCount}]`);
 
             newRow.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        ${updatedStudentSelectHTML}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <input type="number" name="students[${studentRowCount}][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <input type="number" name="students[${studentRowCount}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <input type="text" name="students[${studentRowCount}][remarks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </td>
-                `;
+    <td class="px-6 py-4 whitespace-nowrap">
+        ${updatedStudentSelectHTML}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <input type="number" name="students[${studentRowCount}][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <input type="number" name="students[${studentRowCount}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <input type="text" name="students[${studentRowCount}][remarks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <button type="button" class="delete-student-row text-red-600 hover:text-red-800">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+        </button>
+    </td>
+`;
 
             container.appendChild(newRow);
             studentRowCount++;
@@ -1050,21 +1067,28 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                         data.forEach((student, index) => {
                             const row = document.createElement('tr');
                             row.innerHTML = `
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <select name="students[${index}][student_id]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                                            <option value="${student.student_id}">${student.full_name} (${student.student_id})</option>
-                                        </select>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <input type="number" name="students[${index}][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <input type="number" name="students[${index}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <input type="text" name="students[${index}][remarks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    </td>
-                                `;
+    <td class="px-6 py-4 whitespace-nowrap">
+        <select name="students[${index}][student_id]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            <option value="${student.student_id}">${student.full_name} (${student.student_id})</option>
+        </select>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <input type="number" name="students[${index}][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <input type="number" name="students[${index}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <input type="text" name="students[${index}][remarks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <button type="button" class="delete-student-row text-red-600 hover:text-red-800">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+        </button>
+    </td>
+`;
                             container.appendChild(row);
                         });
 
@@ -1088,6 +1112,21 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 
             document.getElementById('sidebar-backdrop').addEventListener('click', function() {
                 document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
+            });
+
+            // Add event delegation for delete student row buttons
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.delete-student-row')) {
+                    const row = e.target.closest('tr');
+                    const container = document.getElementById('batch-students-container');
+                    
+                    // Only delete if there's more than one row
+                    if (container.querySelectorAll('tr').length > 1) {
+                        row.remove();
+                    } else {
+                        alert('You must have at least one student row.');
+                    }
+                }
             });
         });
     </script>

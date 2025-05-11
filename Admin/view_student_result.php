@@ -284,25 +284,44 @@ try {
     
     // If no subject results found, check if we need to generate sample data
     if (empty($subject_results)) {
-        // Get subjects for this class
+        // First try to get subjects from ClassSubjects table
         $query = "SELECT s.subject_id, s.subject_name, s.subject_code
                   FROM Subjects s
                   JOIN ClassSubjects cs ON s.subject_id = cs.subject_id
-                  JOIN Students st ON cs.class_id = st.class_id
-                  WHERE st.student_id = ?
+                  WHERE cs.class_id = ?
                   LIMIT 5";
         
         $stmt = $conn->prepare($query);
-        $stmt->bind_param("i", $result_data['student_id']);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        $subjects = [];
-        while ($row = $result->fetch_assoc()) {
-            $subjects[] = $row;
+        if ($stmt === false) {
+            // If prepare fails, log the error
+            $_SESSION['error'] = "Database error: " . $conn->error;
+            // We'll continue and try a different approach
+        } else {
+            $stmt->bind_param("i", $result_data['class_id']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            $subjects = [];
+            while ($row = $result->fetch_assoc()) {
+                $subjects[] = $row;
+            }
+            
+            $stmt->close();
         }
         
-        $stmt->close();
+        // If the above query fails or returns no results, try a simpler query to get any subjects
+        if (empty($subjects)) {
+            $query = "SELECT subject_id, subject_name, subject_code 
+                      FROM Subjects 
+                      LIMIT 5";
+            
+            $result = $conn->query($query);
+            if ($result && $result->num_rows > 0) {
+                while ($row = $result->fetch_assoc()) {
+                    $subjects[] = $row;
+                }
+            }
+        }
         
         // If we have subjects, generate sample result details
         if (!empty($subjects)) {
@@ -352,6 +371,7 @@ try {
                 
                 // Add to our array for display
                 $subject_results[] = [
+                    'detail_id' => $conn->insert_id,
                     'subject_id' => $subject['subject_id'],
                     'subject_name' => $subject['subject_name'],
                     'subject_code' => $subject['subject_code'],
@@ -366,13 +386,13 @@ try {
             // Update the main result with calculated totals
             $total_obtained = 0;
             $total_marks = 0;
-            $all_pass = true;
+            $all_pass = 1;
             
             foreach ($subject_results as $sr) {
                 $total_obtained += $sr['marks_obtained'];
                 $total_marks += $sr['total_marks'];
                 if ($sr['is_pass'] == 0) {
-                    $all_pass = false;
+                    $all_pass = 0;
                 }
             }
             

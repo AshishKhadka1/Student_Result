@@ -192,71 +192,81 @@ if (isset($_GET['student_id']) && isset($_GET['exam_id'])) {
     $filter_class = isset($_GET['class_id']) ? $_GET['class_id'] : '';
     $filter_year = isset($_GET['academic_year']) ? $_GET['academic_year'] : '';
     $filter_exam_type = isset($_GET['exam_type']) ? $_GET['exam_type'] : '';
-    
-    // Build the query with filters
-    $exam_query = "SELECT e.exam_id, e.exam_name, e.exam_type, e.academic_year 
-                  FROM exams e 
-                  WHERE e.is_active = 1";
-    
-    $params = [];
-    $param_types = "";
-    
-    if (!empty($filter_class)) {
-        // Check if the exams table has a class_id column
-        $column_check = $conn->query("SHOW COLUMNS FROM exams LIKE 'class_id'");
-        if ($column_check && $column_check->num_rows > 0) {
-            $exam_query .= " AND e.class_id = ?";
-            $params[] = $filter_class;
-            $param_types .= "i";
-        } else {
-            // If no class_id in exams table, we need to join with results and students
-            $exam_query = "SELECT DISTINCT e.exam_id, e.exam_name, e.exam_type, e.academic_year 
-                          FROM exams e 
-                          JOIN results r ON e.exam_id = r.exam_id
-                          JOIN students s ON r.student_id = s.student_id
-                          WHERE e.is_active = 1 AND s.class_id = ?";
-            $params[] = $filter_class;
-            $param_types .= "i";
-        }
-    }
-    
-    if (!empty($filter_year)) {
-        $exam_query .= " AND e.academic_year = ?";
-        $params[] = $filter_year;
-        $param_types .= "s";
-    }
-    
-    // Check if exam_type column exists
-    $column_check = $conn->query("SHOW COLUMNS FROM exams LIKE 'exam_type'");
-    if ($column_check && $column_check->num_rows > 0 && !empty($filter_exam_type)) {
-        $exam_query .= " AND e.exam_type = ?";
-        $params[] = $filter_exam_type;
-        $param_types .= "s";
-    }
-    
-    $exam_query .= " ORDER BY e.created_at DESC";
-    
-    if (!empty($params)) {
-        $stmt = $conn->prepare($exam_query);
-        if ($stmt) {
-            $stmt->bind_param($param_types, ...$params);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
-            while ($row = $result->fetch_assoc()) {
-                $exams[] = $row;
+    $search_submitted = isset($_GET['search_submitted']) && $_GET['search_submitted'] == '1';
+
+    // Only apply filters if search was submitted
+    if ($search_submitted) {
+        // Build the query with filters
+        $exam_query = "SELECT e.exam_id, e.exam_name, e.exam_type, e.academic_year 
+                      FROM exams e 
+                      WHERE e.is_active = 1";
+
+        $params = [];
+        $param_types = "";
+
+        if (!empty($filter_class)) {
+            // Check if the exams table has a class_id column
+            $column_check = $conn->query("SHOW COLUMNS FROM exams LIKE 'class_id'");
+            if ($column_check && $column_check->num_rows > 0) {
+                $exam_query .= " AND e.class_id = ?";
+                $params[] = $filter_class;
+                $param_types .= "i";
+            } else {
+                // If no class_id in exams table, we need to join with results and students
+                $exam_query = "SELECT DISTINCT e.exam_id, e.exam_name, e.exam_type, e.academic_year 
+                              FROM exams e 
+                              JOIN results r ON e.exam_id = r.exam_id
+                              JOIN students s ON r.student_id = s.student_id
+                              WHERE e.is_active = 1 AND s.class_id = ?";
+                $params[] = $filter_class;
+                $param_types .= "i";
             }
-            $stmt->close();
+        }
+
+        if (!empty($filter_year)) {
+            $exam_query .= " AND e.academic_year = ?";
+            $params[] = $filter_year;
+            $param_types .= "s";
+        }
+
+        // Check if exam_type column exists
+        $column_check = $conn->query("SHOW COLUMNS FROM exams LIKE 'exam_type'");
+        if ($column_check && $column_check->num_rows > 0 && !empty($filter_exam_type)) {
+            $exam_query .= " AND e.exam_type = ?";
+            $params[] = $filter_exam_type;
+            $param_types .= "s";
+        }
+
+        $exam_query .= " ORDER BY e.created_at DESC";
+        
+        if (!empty($params)) {
+            $stmt = $conn->prepare($exam_query);
+            if ($stmt) {
+                $stmt->bind_param($param_types, ...$params);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                while ($row = $result->fetch_assoc()) {
+                    $exams[] = $row;
+                }
+                $stmt->close();
+            } else {
+                // Fallback to simple query if prepare fails
+                $result = $conn->query("SELECT exam_id, exam_name, exam_type, academic_year FROM exams WHERE is_active = 1 ORDER BY created_at DESC");
+                while ($row = $result->fetch_assoc()) {
+                    $exams[] = $row;
+                }
+            }
         } else {
-            // Fallback to simple query if prepare fails
-            $result = $conn->query("SELECT exam_id, exam_name, exam_type, academic_year FROM exams WHERE is_active = 1 ORDER BY created_at DESC");
+            // No filters, get all exams
+            $result = $conn->query($exam_query);
             while ($row = $result->fetch_assoc()) {
                 $exams[] = $row;
             }
         }
     } else {
-        // No filters, get all exams
-        $result = $conn->query($exam_query);
+        // If search not submitted, just get recent exams for the dropdown
+        $result = $conn->query("SELECT exam_id, exam_name, exam_type, academic_year FROM exams WHERE is_active = 1 ORDER BY created_at DESC LIMIT 20");
         while ($row = $result->fetch_assoc()) {
             $exams[] = $row;
         }
@@ -671,6 +681,64 @@ $conn->close();
         .filter-tag i:hover {
             color: #e53e3e;
         }
+
+        /* Search button styles */
+        .search-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .search-button:hover {
+            background-color: #2980b9;
+        }
+        
+        .search-button i {
+            margin-right: 8px;
+        }
+        
+        .exam-type-container {
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 12px;
+            background-color: #f8fafc;
+        }
+        
+        .exam-type-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        
+        .exam-type-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+        }
+        
+        .exam-type-option {
+            display: flex;
+            align-items: center;
+        }
+        
+        .exam-type-option input {
+            margin-right: 6px;
+        }
+        
+        .exam-type-option label {
+            font-size: 14px;
+            color: #4a5568;
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -736,6 +804,7 @@ $conn->close();
                                         <i class="fas fa-filter"></i> Filter Grade Sheets
                                     </div>
                                     <form action="" method="GET" id="filter-form">
+                                        <input type="hidden" name="search_submitted" value="1">
                                         <div class="filter-grid">
                                             <div class="filter-item">
                                                 <label for="class_id" class="filter-label">Class:</label>
@@ -760,42 +829,35 @@ $conn->close();
                                                     <?php endforeach; ?>
                                                 </select>
                                             </div>
-                                            
-                                            <div class="filter-item">
-                                                <label for="exam_type" class="filter-label">Exam Type:</label>
-                                                <select name="exam_type" id="exam_type" class="filter-select">
-                                                    <option value="">All Types</option>
-                                                    <?php foreach ($exam_types as $type): ?>
-                                                        <option value="<?php echo $type; ?>" <?php echo (isset($_GET['exam_type']) && $_GET['exam_type'] == $type) ? 'selected' : ''; ?>>
-                                                            <?php echo $type; ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                            
-                                            <div class="filter-item">
-                                                <label for="exam_id" class="filter-label">Exam:</label>
-                                                <select name="exam_id" id="exam_id" class="filter-select">
-                                                    <option value="">-- Select Exam --</option>
-                                                    <?php foreach ($exams as $exam): ?>
-                                                        <option value="<?php echo $exam['exam_id']; ?>" <?php echo (isset($_GET['exam_id']) && $_GET['exam_id'] == $exam['exam_id']) ? 'selected' : ''; ?>>
-                                                            <?php echo $exam['exam_name'] . ' (' . $exam['academic_year'] . ')'; ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
+                                        </div>
+                                        
+                                        <!-- Enhanced Exam Type Selection -->
+                                        <div class="exam-type-container mt-4">
+                                            <div class="exam-type-title">Exam Type:</div>
+                                            <div class="exam-type-grid">
+                                                <div class="exam-type-option">
+                                                    <input type="radio" id="exam_type_all" name="exam_type" value="" <?php echo (!isset($_GET['exam_type']) || empty($_GET['exam_type'])) ? 'checked' : ''; ?>>
+                                                    <label for="exam_type_all">All Types</label>
+                                                </div>
+                                                <?php foreach ($exam_types as $index => $type): ?>
+                                                    <div class="exam-type-option">
+                                                        <input type="radio" id="exam_type_<?php echo $index; ?>" name="exam_type" value="<?php echo $type; ?>" <?php echo (isset($_GET['exam_type']) && $_GET['exam_type'] == $type) ? 'checked' : ''; ?>>
+                                                        <label for="exam_type_<?php echo $index; ?>"><?php echo $type; ?></label>
+                                                    </div>
+                                                <?php endforeach; ?>
                                             </div>
                                         </div>
                                         
-                                        <div class="filter-actions">
-                                            <button type="submit" class="filter-button">
-                                                <i class="fas fa-search mr-2"></i> Apply Filters
-                                            </button>
+                                        <div class="filter-actions mt-6">
                                             <button type="button" id="reset-filters" class="filter-button filter-reset">
                                                 <i class="fas fa-undo mr-2"></i> Reset
                                             </button>
+                                            <button type="submit" class="search-button ml-3">
+                                                <i class="fas fa-search"></i> Search Grade Sheets
+                                            </button>
                                         </div>
                                         
-                                        <?php if (isset($_GET['class_id']) || isset($_GET['academic_year']) || isset($_GET['exam_type'])): ?>
+                                        <?php if ($search_submitted && (isset($_GET['class_id']) || isset($_GET['academic_year']) || isset($_GET['exam_type']))): ?>
                                             <div class="active-filters">
                                                 <div class="text-sm text-gray-600 mr-2">Active filters:</div>
                                                 <?php if (isset($_GET['class_id']) && !empty($_GET['class_id'])): 
@@ -830,6 +892,56 @@ $conn->close();
                                         <?php endif; ?>
                                     </form>
                                 </div>
+
+                                <?php if ($search_submitted): ?>
+                                    <?php if (!empty($exams)): ?>
+                                        <div class="mt-6">
+                                            <h3 class="text-lg font-medium text-gray-900 mb-3">Select Exam:</h3>
+                                            <div class="bg-white overflow-hidden shadow rounded-lg divide-y divide-gray-200">
+                                                <div class="px-4 py-5 sm:px-6">
+                                                    <h3 class="text-md font-medium text-gray-900">Found <?php echo count($exams); ?> exam(s) matching your criteria</h3>
+                                                </div>
+                                                <div class="px-4 py-5 sm:p-6">
+                                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                                        <?php foreach ($exams as $exam): ?>
+                                                            <div class="bg-gray-50 overflow-hidden shadow-sm rounded-md hover:bg-blue-50 transition-colors">
+                                                                <a href="?search_submitted=1&exam_id=<?php echo $exam['exam_id']; ?>&class_id=<?php echo isset($_GET['class_id']) ? $_GET['class_id'] : ''; ?>&academic_year=<?php echo isset($_GET['academic_year']) ? $_GET['academic_year'] : ''; ?>&exam_type=<?php echo isset($_GET['exam_type']) ? $_GET['exam_type'] : ''; ?>" class="block p-4">
+                                                                    <div class="flex items-center">
+                                                                        <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                                                                            <i class="fas fa-file-alt text-white"></i>
+                                                                        </div>
+                                                                        <div class="ml-4">
+                                                                            <div class="text-sm font-medium text-gray-900"><?php echo $exam['exam_name']; ?></div>
+                                                                            <div class="text-sm text-gray-500"><?php echo $exam['academic_year']; ?></div>
+                                                                            <?php if (!empty($exam['exam_type'])): ?>
+                                                                                <div class="text-xs text-gray-500 mt-1">
+                                                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                                                        <?php echo $exam['exam_type']; ?>
+                                                                                    </span>
+                                                                                </div>
+                                                                            <?php endif; ?>
+                                                                        </div>
+                                                                    </div>
+                                                                </a>
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mt-6">
+                                            <div class="flex">
+                                                <div class="flex-shrink-0">
+                                                    <i class="fas fa-exclamation-triangle text-yellow-500"></i>
+                                                </div>
+                                                <div class="ml-3">
+                                                    <p class="text-sm text-yellow-700">No exams found matching the selected filters.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endif; ?>
 
                                 <?php if (isset($_GET['exam_id']) && !empty($students)): ?>
                                     <div class="mt-6">
@@ -872,30 +984,6 @@ $conn->close();
                                             </div>
                                         </div>
                                     </div>
-                                <?php elseif (!empty($_GET['class_id']) || !empty($_GET['academic_year']) || !empty($_GET['exam_type'])): ?>
-                                    <?php if (empty($exams)): ?>
-                                        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mt-6">
-                                            <div class="flex">
-                                                <div class="flex-shrink-0">
-                                                    <i class="fas fa-exclamation-triangle text-yellow-500"></i>
-                                                </div>
-                                                <div class="ml-3">
-                                                    <p class="text-sm text-yellow-700">No exams found matching the selected filters.</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mt-6">
-                                            <div class="flex">
-                                                <div class="flex-shrink-0">
-                                                    <i class="fas fa-info-circle text-blue-500"></i>
-                                                </div>
-                                                <div class="ml-3">
-                                                    <p class="text-sm text-blue-700">Please select an exam from the dropdown to view student grade sheets.</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         <?php else: ?>
@@ -945,6 +1033,12 @@ $conn->close();
                                         <span class="info-label">Academic Year:</span>
                                         <span><?php echo $student['academic_year']; ?></span>
                                     </div>
+                                    <?php if (!empty($student['exam_type'])): ?>
+                                    <div class="info-item">
+                                        <span class="info-label">Exam Type:</span>
+                                        <span><?php echo $student['exam_type']; ?></span>
+                                    </div>
+                                    <?php endif; ?>
                                 </div>
 
                                 <table class="grade-sheet-table">
@@ -1090,33 +1184,6 @@ $conn->close();
             window.location.href = 'grade_sheet.php';
         });
         
-        // Class filter change
-        document.getElementById('class_id').addEventListener('change', function() {
-            // If we're changing class, we should reset exam selection
-            document.getElementById('exam_id').value = '';
-            
-            // If we want to auto-submit on change, uncomment the line below
-            // document.getElementById('filter-form').submit();
-        });
-        
-        // Academic year filter change
-        document.getElementById('academic_year').addEventListener('change', function() {
-            // If we're changing year, we should reset exam selection
-            document.getElementById('exam_id').value = '';
-            
-            // If we want to auto-submit on change, uncomment the line below
-            // document.getElementById('filter-form').submit();
-        });
-        
-        // Exam type filter change
-        document.getElementById('exam_type').addEventListener('change', function() {
-            // If we're changing exam type, we should reset exam selection
-            document.getElementById('exam_id').value = '';
-            
-            // If we want to auto-submit on change, uncomment the line below
-            // document.getElementById('filter-form').submit();
-        });
-        
         // Remove a specific filter
         function removeFilter(filterName) {
             // Create a new URL object
@@ -1128,6 +1195,11 @@ $conn->close();
             // If we're removing a filter that affects exams, also reset exam_id
             if (filterName === 'class_id' || filterName === 'academic_year' || filterName === 'exam_type') {
                 url.searchParams.delete('exam_id');
+            }
+            
+            // Keep the search_submitted parameter
+            if (!url.searchParams.has('search_submitted')) {
+                url.searchParams.set('search_submitted', '1');
             }
             
             // Redirect to the new URL

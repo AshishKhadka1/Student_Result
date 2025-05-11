@@ -11,6 +11,27 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+// Ensure exam_type field supports the terminal types
+try {
+    // Check if the exam_type column is properly set up
+    $checkTypeQuery = "SHOW COLUMNS FROM exams LIKE 'exam_type'";
+    $typeResult = $conn->query($checkTypeQuery);
+    if ($typeResult && $typeResult->num_rows > 0) {
+        $typeInfo = $typeResult->fetch_assoc();
+        // If it's an enum type, check if it includes our terminal types
+        if (strpos($typeInfo['Type'], 'enum') === 0) {
+            // If it doesn't contain 'First Terminal', we need to modify it
+            if (strpos($typeInfo['Type'], 'First Terminal') === false) {
+                $alterQuery = "ALTER TABLE exams MODIFY COLUMN exam_type ENUM('midterm','final','quiz','assignment','project','other','First Terminal','Second Terminal','Third Terminal','Final Terminal') NOT NULL";
+                $conn->query($alterQuery);
+            }
+        }
+    }
+} catch (Exception $e) {
+    // Silently handle any errors
+    error_log("Error updating exam_type column: " . $e->getMessage());
+}
+
 $user_id = $_SESSION['user_id'];
 $user_name = $_SESSION['full_name'] ?? 'Admin';
 
@@ -73,8 +94,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $status = $_POST['status'];
 
             // Check if the exam_type is valid for the database enum
-            $valid_types = ['midterm', 'final', 'quiz', 'assignment', 'project', 'other'];
-            $exam_type_db = in_array(strtolower($exam_type), $valid_types) ? strtolower($exam_type) : 'other';
+            $valid_types = ['First Terminal', 'Second Terminal', 'Third Terminal', 'Final Terminal'];
+            // Don't convert to lowercase anymore since the terminal types use uppercase first letters
+            $exam_type_db = in_array($exam_type, $valid_types) ? $exam_type : 'other';
 
             // Set default values for required fields in the database
             $total_marks = 100;
@@ -108,8 +130,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $status = $_POST['status'];
 
             // Check if the exam_type is valid for the database enum
-            $valid_types = ['midterm', 'final', 'quiz', 'assignment', 'project', 'other'];
-            $exam_type_db = in_array(strtolower($exam_type), $valid_types) ? strtolower($exam_type) : 'other';
+            $valid_types = ['First Terminal', 'Second Terminal', 'Third Terminal', 'Final Terminal'];
+            // Don't convert to lowercase anymore since the terminal types use uppercase first letters
+            $exam_type_db = in_array($exam_type, $valid_types) ? $exam_type : 'other';
 
             $stmt = $conn->prepare("UPDATE exams SET exam_name = ?, exam_type = ?, class_id = ?, academic_year = ?, exam_date = ?, description = ?, status = ?, updated_at = NOW() WHERE exam_id = ?");
             $stmt->bind_param("ssissssi", $exam_name, $exam_type_db, $class_id, $academic_year, $exam_date, $description, $status, $exam_id);
@@ -523,11 +546,10 @@ $conn->close();
                                     <label for="filter_type" class="block text-sm font-medium text-gray-700 mb-1">Exam Type</label>
                                     <select id="filter_type" name="filter_type" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                                         <option value="">All Types</option>
-                                        <?php foreach ($exam_types as $type): ?>
-                                            <option value="<?php echo htmlspecialchars($type); ?>" <?php echo ($filter_type == $type) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($type); ?>
-                                            </option>
-                                        <?php endforeach; ?>
+                                        <option value="First Terminal" <?php echo ($filter_type == 'First Terminal') ? 'selected' : ''; ?>>First Terminal</option>
+                                        <option value="Second Terminal" <?php echo ($filter_type == 'Second Terminal') ? 'selected' : ''; ?>>Second Terminal</option>
+                                        <option value="Third Terminal" <?php echo ($filter_type == 'Third Terminal') ? 'selected' : ''; ?>>Third Terminal</option>
+                                        <option value="Final Terminal" <?php echo ($filter_type == 'Final Terminal') ? 'selected' : ''; ?>>Final Terminal</option>
                                     </select>
                                 </div>
 
@@ -692,12 +714,10 @@ $conn->close();
                         <label for="exam_type" class="block text-sm font-medium text-gray-700 mb-1">Exam Type</label>
                         <select id="exam_type" name="exam_type" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                             <option value="">Select Type</option>
-                            <option value="midterm">Midterm</option>
-                            <option value="final">Final</option>
-                            <option value="quiz">Quiz</option>
-                            <option value="assignment">Assignment</option>
-                            <option value="project">Project</option>
-                            <option value="other">Other</option>
+                            <option value="First Terminal">First Terminal</option>
+                            <option value="Second Terminal">Second Terminal</option>
+                            <option value="Third Terminal">Third Terminal</option>
+                            <option value="Final Terminal">Final Terminal</option>
                         </select>
                     </div>
 
@@ -773,12 +793,10 @@ $conn->close();
                         <label for="edit_exam_type" class="block text-sm font-medium text-gray-700 mb-1">Exam Type</label>
                         <select id="edit_exam_type" name="exam_type" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                             <option value="">Select Type</option>
-                            <option value="midterm">Midterm</option>
-                            <option value="final">Final</option>
-                            <option value="quiz">Quiz</option>
-                            <option value="assignment">Assignment</option>
-                            <option value="project">Project</option>
-                            <option value="other">Other</option>
+                            <option value="First Terminal">First Terminal</option>
+                            <option value="Second Terminal">Second Terminal</option>
+                            <option value="Third Terminal">Third Terminal</option>
+                            <option value="Final Terminal">Final Terminal</option>
                         </select>
                     </div>
 
