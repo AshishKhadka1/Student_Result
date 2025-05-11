@@ -123,18 +123,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $academic_year = $_POST['academic_year'];
         
         // Check if assignment already exists
-        $stmt = $conn->prepare("SELECT id FROM teachersubjects WHERE teacher_id = ? AND subject_id = ? AND academic_year = ?");
-        $stmt->bind_param("iss", $teacher_id, $subject_id, $academic_year);
+        $stmt = $conn->prepare("SELECT * FROM teachersubjects WHERE teacher_id = ? AND subject_id = ?");
+        if (!$stmt) {
+            $_SESSION['error'] = "Database error: " . $conn->error;
+            header("Location: subject.php");
+            exit();
+        }
+        $stmt->bind_param("is", $teacher_id, $subject_id);
         $stmt->execute();
         $result = $stmt->get_result();
         
         if ($result->num_rows > 0) {
             // Update existing assignment
-            $_SESSION['error'] = "This teacher is already assigned to this subject for the selected academic year.";
+            $_SESSION['error'] = "This teacher is already assigned to this subject.";
         } else {
             // Insert new assignment
-            $stmt = $conn->prepare("INSERT INTO teachersubjects (teacher_id, subject_id, academic_year) VALUES (?, ?, ?)");
-            $stmt->bind_param("iss", $teacher_id, $subject_id, $academic_year);
+            $stmt = $conn->prepare("INSERT INTO teachersubjects (teacher_id, subject_id, class_id) VALUES (?, ?, 3)");
+            if (!$stmt) {
+                $_SESSION['error'] = "Database error: " . $conn->error;
+                header("Location: subject.php");
+                exit();
+            }
+            $stmt->bind_param("is", $teacher_id, $subject_id);
             
             if ($stmt->execute()) {
                 $_SESSION['success'] = "Teacher assigned to subject successfully!";
