@@ -62,7 +62,7 @@ while ($row = $dept_result->fetch_assoc()) {
 $conn->close();
 ?>
 
-<form id="editTeacherForm" onsubmit="return saveTeacherEdit('editTeacherForm')">
+<form id="editTeacherForm" onsubmit="return saveTeacherEdit()">
     <input type="hidden" name="teacher_id" value="<?php echo $teacher_id; ?>">
     <input type="hidden" name="user_id" value="<?php echo $teacher['user_id']; ?>">
     

@@ -38,30 +38,40 @@ if (isset($_GET['delete']) && !empty($_GET['delete'])) {
         $stmt->bind_param("s", $student_id);
         $stmt->execute();
         $result = $stmt->get_result();
-        $user_id = $result->fetch_assoc()['user_id'];
-        $stmt->close();
-        
-        // Delete student record
-        $stmt = $conn->prepare("DELETE FROM students WHERE student_id = ?");
-        $stmt->bind_param("s", $student_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Delete user account
-        $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Commit transaction
-        $conn->commit();
-        
-        $success_message = "Student deleted successfully.";
+        $row = $result->fetch_assoc();
+        if ($row) {
+            $user_id = $row['user_id'];
+            $stmt->close();
+            
+            // Delete student record
+            $stmt = $conn->prepare("DELETE FROM students WHERE student_id = ?");
+            $stmt->bind_param("s", $student_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            // Delete user account
+            $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            // Commit transaction
+            $conn->commit();
+            
+            $success_message = "Student deleted successfully.";
+        } else {
+            // Student not found
+            $conn->rollback();
+            $error_message = "Error: Student not found.";
+        }
     } catch (Exception $e) {
         // Rollback transaction on error
         $conn->rollback();
         $error_message = "Error deleting student: " . $e->getMessage();
     }
+} else if (isset($_GET['added']) && $_GET['added'] == 'true') {
+    // Show success message when student is added successfully
+    $success_message = "Student added successfully.";
 }
 
 // Handle search and filters
@@ -728,6 +738,28 @@ $conn->close();
                                 <option value="pending">Pending</option>
                             </select>
                         </div>
+                        
+                        <!-- Parent/Guardian Information -->
+                        <div class="md:col-span-2 mt-4">
+                            <h4 class="text-lg font-medium text-gray-900 mb-2">Parent/Guardian Information</h4>
+                        </div>
+                        
+                        <div>
+                            <label for="parent_name" class="block text-sm font-medium text-gray-700">Parent/Guardian Name</label>
+                            <input type="text" name="parent_name" id="parent_name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        
+                        <div>
+                            <label for="parent_phone" class="block text-sm font-medium text-gray-700">Parent/Guardian Phone</label>
+                            <input type="text" name="parent_phone" id="parent_phone" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        
+                        <div>
+                            <label for="parent_email" class="block text-sm font-medium text-gray-700">Parent/Guardian Email</label>
+                            <input type="email" name="parent_email" id="parent_email" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        
+                        
                     </div>
                     
                     <div class="flex justify-end space-x-3 mt-6">
@@ -965,7 +997,7 @@ $conn->close();
                         confirmButtonColor: '#3085d6'
                     }).then(() => {
                         closeAddStudentModal();
-                        window.location.reload();
+                        window.location.href = 'students.php?added=true';
                     });
                 } else {
                     Swal.fire({

@@ -2,7 +2,7 @@
 // Enable error logging to a file
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
-error_log("Starting teacher edit process");
+error_log("Starting teacher save process");
 
 // Start output buffering to prevent any unwanted output
 ob_start();
@@ -69,10 +69,10 @@ try {
     error_log("Database connection successful");
 
     // Get form data
-    $teacher_id = getPostValue('teacher_id');
-    $user_id = getPostValue('user_id');
     $full_name = getPostValue('full_name');
     $email = getPostValue('email');
+    $password = getPostValue('password');
+    $confirm_password = getPostValue('confirm_password');
     $phone = getPostValue('phone');
     $employee_id = getPostValue('employee_id');
     $department = getPostValue('department') === 'other' ? getPostValue('other_department') : getPostValue('department');
@@ -85,8 +85,6 @@ try {
     $address = getPostValue('address');
 
     error_log("Form data received: " . json_encode([
-        'teacher_id' => $teacher_id,
-        'user_id' => $user_id,
         'full_name' => $full_name,
         'email' => $email,
         'employee_id' => $employee_id,
@@ -95,62 +93,121 @@ try {
     ]));
 
     // Validate required fields
-    if (empty($teacher_id) || empty($user_id) || empty($full_name) || empty($email) || empty($employee_id) || empty($department)) {
+    if (empty($full_name) || empty($email) || empty($password) || empty($employee_id) || empty($department)) {
         error_log("Missing required fields");
         throw new Exception('Please fill all required fields');
     }
+
+    // Validate password match
+    if ($password !== $confirm_password) {
+        error_log("Passwords do not match");
+        throw new Exception('Passwords do not match');
+    }
+
+    // Check if email already exists
+    error_log("Checking if email exists: $email");
+    $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
+    if (!$stmt) {
+        error_log("Prepare statement failed: " . $conn->error);
+        throw new Exception('Database error: ' . $conn->error);
+    }
+    
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        error_log("Email already exists: $email");
+        throw new Exception('Email already exists');
+    }
+    $stmt->close();
+
+    // Check if employee ID already exists
+    error_log("Checking if employee ID exists: $employee_id");
+    $stmt = $conn->prepare("SELECT teacher_id FROM teachers WHERE employee_id = ?");
+    if (!$stmt) {
+        error_log("Prepare statement failed: " . $conn->error);
+        throw new Exception('Database error: ' . $conn->error);
+    }
+    
+    $stmt->bind_param("s", $employee_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        error_log("Employee ID already exists: $employee_id");
+        throw new Exception('Employee ID already exists');
+    }
+    $stmt->close();
 
     // Begin transaction
     error_log("Beginning transaction");
     $conn->begin_transaction();
 
-    // Check if email already exists for another user
-    error_log("Checking if email exists for another user: $email");
-    $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
-    if (!$stmt) {
-        error_log("Prepare statement failed: " . $conn->error);
-        throw new Exception('Database error: ' . $conn->error);
+    // Hash password
+    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    
+    // Check if username column exists in users table
+    error_log("Checking for username column");
+    $column_check = $conn->query("SHOW COLUMNS FROM users LIKE 'username'");
+    $username_exists = $column_check && $column_check->num_rows > 0;
+    error_log("Username column exists: " . ($username_exists ? 'yes' : 'no'));
+    
+    // Generate a username from email if needed
+    $username = '';
+    if ($username_exists) {
+        // Generate username from email (part before @)
+        $username = strtolower(explode('@', $email)[0]);
+        
+        // Check if username already exists and append numbers if needed
+        $base_username = $username;
+        $counter = 1;
+        
+        while (true) {
+            $check_stmt = $conn->prepare("SELECT user_id FROM users WHERE username = ?");
+            $check_stmt->bind_param("s", $username);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if ($check_result->num_rows === 0) {
+                // Username is available
+                $check_stmt->close();
+                break;
+            }
+            
+            // Username exists, try with a number appended
+            $username = $base_username . $counter;
+            $counter++;
+            $check_stmt->close();
+        }
+        
+        error_log("Generated username: $username");
     }
     
-    $stmt->bind_param("si", $email, $user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        error_log("Email already exists for another user: $email");
-        throw new Exception('Email already exists for another user');
-    }
-    $stmt->close();
-
-    // Check if employee ID already exists for another teacher
-    error_log("Checking if employee ID exists for another teacher: $employee_id");
-    $stmt = $conn->prepare("SELECT teacher_id FROM teachers WHERE employee_id = ? AND teacher_id != ?");
-    if (!$stmt) {
-        error_log("Prepare statement failed: " . $conn->error);
-        throw new Exception('Database error: ' . $conn->error);
-    }
-    
-    $stmt->bind_param("si", $employee_id, $teacher_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        error_log("Employee ID already exists for another teacher: $employee_id");
-        throw new Exception('Employee ID already exists for another teacher');
-    }
-    $stmt->close();
-
-    // Update user information
-    error_log("Updating user information");
-    $stmt = $conn->prepare("UPDATE users SET full_name = ?, email = ?, status = ?, phone = ? WHERE user_id = ?");
-    if (!$stmt) {
-        error_log("Prepare statement failed: " . $conn->error);
-        throw new Exception('Database error: ' . $conn->error);
+    // Insert user
+    error_log("Inserting user record");
+    if ($username_exists) {
+        $stmt = $conn->prepare("INSERT INTO users (full_name, email, username, password, role, status, phone, created_at) VALUES (?, ?, ?, ?, 'teacher', ?, ?, NOW())");
+        if (!$stmt) {
+            error_log("Prepare statement failed: " . $conn->error);
+            throw new Exception('Database error: ' . $conn->error);
+        }
+        
+        $stmt->bind_param("ssssss", $full_name, $email, $username, $hashed_password, $status, $phone);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO users (full_name, email, password, role, status, phone, created_at) VALUES (?, ?, ?, 'teacher', ?, ?, NOW())");
+        if (!$stmt) {
+            error_log("Prepare statement failed: " . $conn->error);
+            throw new Exception('Database error: ' . $conn->error);
+        }
+        
+        $stmt->bind_param("sssss", $full_name, $email, $hashed_password, $status, $phone);
     }
     
-    $stmt->bind_param("ssssi", $full_name, $email, $status, $phone, $user_id);
     if (!$stmt->execute()) {
         error_log("Execute failed: " . $stmt->error);
-        throw new Exception('Error updating user: ' . $stmt->error);
+        throw new Exception('Error inserting user: ' . $stmt->error);
     }
+    $user_id = $conn->insert_id;
+    error_log("User inserted with ID: $user_id");
     $stmt->close();
     
     // Check if gender column exists in teachers table
@@ -166,9 +223,9 @@ try {
     error_log("DOB column exists: " . ($dob_exists ? 'yes' : 'no'));
     
     // Prepare SQL based on existing columns
-    error_log("Preparing teacher update statement");
+    error_log("Preparing teacher insert statement");
     if ($gender_exists && $dob_exists) {
-        $query = "UPDATE teachers SET employee_id = ?, department = ?, qualification = ?, joining_date = ?, experience = ?, address = ?, gender = ?, date_of_birth = ? WHERE teacher_id = ?";
+        $query = "INSERT INTO teachers (user_id, employee_id, department, qualification, joining_date, experience, address, gender, date_of_birth, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
         error_log("Using query with gender and DOB: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -176,9 +233,9 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("ssssisssi", $employee_id, $department, $qualification, $joining_date, $experience, $address, $gender, $date_of_birth, $teacher_id);
+        $stmt->bind_param("isssissss", $user_id, $employee_id, $department, $qualification, $joining_date, $experience, $address, $gender, $date_of_birth);
     } elseif ($gender_exists) {
-        $query = "UPDATE teachers SET employee_id = ?, department = ?, qualification = ?, joining_date = ?, experience = ?, address = ?, gender = ? WHERE teacher_id = ?";
+        $query = "INSERT INTO teachers (user_id, employee_id, department, qualification, joining_date, experience, address, gender, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
         error_log("Using query with gender: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -186,9 +243,9 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("ssssissi", $employee_id, $department, $qualification, $joining_date, $experience, $address, $gender, $teacher_id);
+        $stmt->bind_param("isssiss", $user_id, $employee_id, $department, $qualification, $joining_date, $experience, $address, $gender);
     } elseif ($dob_exists) {
-        $query = "UPDATE teachers SET employee_id = ?, department = ?, qualification = ?, joining_date = ?, experience = ?, address = ?, date_of_birth = ? WHERE teacher_id = ?";
+        $query = "INSERT INTO teachers (user_id, employee_id, department, qualification, joining_date, experience, address, date_of_birth, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
         error_log("Using query with DOB: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -196,9 +253,9 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("ssssissi", $employee_id, $department, $qualification, $joining_date, $experience, $address, $date_of_birth, $teacher_id);
+        $stmt->bind_param("isssisss", $user_id, $employee_id, $department, $qualification, $joining_date, $experience, $address, $date_of_birth);
     } else {
-        $query = "UPDATE teachers SET employee_id = ?, department = ?, qualification = ?, joining_date = ?, experience = ?, address = ? WHERE teacher_id = ?";
+        $query = "INSERT INTO teachers (user_id, employee_id, department, qualification, joining_date, experience, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
         error_log("Using basic query: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -206,19 +263,21 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("ssssisi", $employee_id, $department, $qualification, $joining_date, $experience, $address, $teacher_id);
+        $stmt->bind_param("isssiss", $user_id, $employee_id, $department, $qualification, $joining_date, $experience, $address);
     }
     
     if (!$stmt->execute()) {
         error_log("Execute failed: " . $stmt->error);
-        throw new Exception('Error updating teacher: ' . $stmt->error);
+        throw new Exception('Error inserting teacher: ' . $stmt->error);
     }
+    $teacher_id = $conn->insert_id;
+    error_log("Teacher inserted with ID: $teacher_id");
     $stmt->close();
     
     // Log the activity
     error_log("Logging activity");
-    $activity_type = 'teacher_update';
-    $description = "Updated teacher: $full_name";
+    $activity_type = 'teacher_create';
+    $description = "Added new teacher: $full_name";
     $admin_id = $_SESSION['user_id'];
     $current_time = date('Y-m-d H:i:s');
     
@@ -246,11 +305,11 @@ try {
     // Clean any output that might have been generated
     ob_end_clean();
     
-    error_log("Teacher updated successfully: $teacher_id");
+    error_log("Teacher added successfully with ID: $teacher_id");
     header('Content-Type: application/json');
-    echo json_encode(['success' => true, 'message' => 'Teacher updated successfully', 'teacher_id' => $teacher_id]);
+    echo json_encode(['success' => true, 'message' => 'Teacher added successfully', 'teacher_id' => $teacher_id]);
 } catch (Exception $e) {
-    error_log("Error in save_teacher_edit.php: " . $e->getMessage());
+    error_log("Error in save_new_teacher.php: " . $e->getMessage());
     // Rollback transaction on error if connection exists
     if (isset($conn) && $conn instanceof mysqli) {
         error_log("Rolling back transaction");
@@ -261,7 +320,7 @@ try {
     ob_end_clean();
     
     header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Error updating teacher: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Error adding teacher: ' . $e->getMessage()]);
 }
 
 // Close connection if it exists

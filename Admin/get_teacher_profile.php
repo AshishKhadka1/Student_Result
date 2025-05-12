@@ -5,16 +5,21 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit();
 }
 
-// Check if teacher ID is provided
-if (!isset($_GET['id']) || empty($_GET['id'])) {
+// Check if teacher ID is provided (check both 'id' and 'teacher_id' parameters)
+$teacher_id = null;
+if (isset($_GET['id']) && !empty($_GET['id'])) {
+    $teacher_id = $_GET['id'];
+} elseif (isset($_GET['teacher_id']) && !empty($_GET['teacher_id'])) {
+    $teacher_id = $_GET['teacher_id'];
+}
+
+if ($teacher_id === null) {
     echo '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
             <p class="font-bold">Error</p>
             <p>Teacher ID is required.</p>
           </div>';
     exit();
 }
-
-$teacher_id = $_GET['id'];
 
 // Database connection
 $conn = new mysqli('localhost', 'root', '', 'result_management');

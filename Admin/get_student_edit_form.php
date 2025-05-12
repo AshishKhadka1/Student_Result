@@ -20,9 +20,10 @@ if ($conn->connect_error) {
     exit();
 }
 
-// Get student data with user information
+// Get student data with user information - UPDATED QUERY to include all fields
 $stmt = $conn->prepare("
-    SELECT s.*, u.full_name, u.email, u.username, u.status, u.created_at as account_created, 
+    SELECT s.*, u.full_name, u.email, u.username, u.status, u.phone as user_phone, 
+           u.created_at as account_created, u.address as user_address,
            c.class_name, c.section
     FROM students s
     JOIN users u ON s.user_id = u.user_id
@@ -78,7 +79,7 @@ $conn->close();
         
         <div>
             <label for="phone" class="block text-sm font-medium text-gray-700">Phone</label>
-            <input type="text" name="phone" id="phone" value="<?php echo htmlspecialchars($student['phone'] ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            <input type="text" name="phone" id="phone" value="<?php echo htmlspecialchars($student['phone'] ?? $student['user_phone'] ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         </div>
         
         <div>
@@ -97,7 +98,27 @@ $conn->close();
         
         <div class="md:col-span-2">
             <label for="address" class="block text-sm font-medium text-gray-700">Address</label>
-            <textarea name="address" id="address" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"><?php echo htmlspecialchars($student['address'] ?? ''); ?></textarea>
+            <textarea name="address" id="address" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"><?php echo htmlspecialchars($student['address'] ?? $student['user_address'] ?? ''); ?></textarea>
+        </div>
+        
+        <!-- Parent Information (New Section) -->
+        <div class="md:col-span-2 mt-4">
+            <h4 class="text-lg font-medium text-gray-900 mb-2">Parent/Guardian Information</h4>
+        </div>
+        
+        <div>
+            <label for="parent_name" class="block text-sm font-medium text-gray-700">Parent Name</label>
+            <input type="text" name="parent_name" id="parent_name" value="<?php echo htmlspecialchars($student['parent_name'] ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+        </div>
+        
+        <div>
+            <label for="parent_phone" class="block text-sm font-medium text-gray-700">Parent Phone</label>
+            <input type="text" name="parent_phone" id="parent_phone" value="<?php echo htmlspecialchars($student['parent_phone'] ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+        </div>
+        
+        <div>
+            <label for="parent_email" class="block text-sm font-medium text-gray-700">Parent Email</label>
+            <input type="email" name="parent_email" id="parent_email" value="<?php echo htmlspecialchars($student['parent_email'] ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         </div>
         
         <!-- Academic Information -->
@@ -108,6 +129,11 @@ $conn->close();
         <div>
             <label for="roll_number" class="block text-sm font-medium text-gray-700">Roll Number</label>
             <input type="text" name="roll_number" id="roll_number" value="<?php echo htmlspecialchars($student['roll_number']); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+        </div>
+        
+        <div>
+            <label for="registration_number" class="block text-sm font-medium text-gray-700">Registration Number</label>
+            <input type="text" name="registration_number" id="registration_number" value="<?php echo htmlspecialchars($student['registration_number'] ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         </div>
         
         <div>

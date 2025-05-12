@@ -1130,6 +1130,9 @@ $conn->close();
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+    Upload Status
+</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
@@ -1152,7 +1155,7 @@ $conn->close();
                                                         <div class="text-sm text-gray-900"><?php echo htmlspecialchars($student['class_name'] . ' ' . $student['section']); ?></div>
                                                         <div class="text-sm text-gray-500"><?php echo htmlspecialchars($student['academic_year']); ?></div>
                                                     </td>
-                                                    <td colspan="6" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No exam results found</td>
+                                                    <td colspan="7" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No exam results found</td>
                                                 </tr>
                                                 <?php else: ?>
                                                     <?php foreach ($student['exams'] as $exam): ?>
@@ -1207,6 +1210,15 @@ $conn->close();
                                                             </span>
                                                             <?php endif; ?>
                                                         </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+    <?php if (!empty($row['upload_status'])): ?>
+        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['upload_status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['upload_status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
+            <?php echo htmlspecialchars($row['upload_status']); ?>
+        </span>
+    <?php else: ?>
+        <span class="text-gray-400">Not from upload</span>
+    <?php endif; ?>
+</td>
                                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                             <div class="flex space-x-2">
                                                                 <a href="view_student_result.php?result_id=<?php echo $exam['result_id']; ?>" class="text-indigo-600 hover:text-indigo-900" title="View Result">

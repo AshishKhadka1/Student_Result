@@ -19,36 +19,47 @@ if (isset($_GET['delete']) && !empty($_GET['delete'])) {
     $conn->begin_transaction();
     
     try {
-        // Delete teacher's subject assignments first
-        $stmt = $conn->prepare("DELETE FROM teachersubjects WHERE teacher_id = ?");
-        $stmt->bind_param("i", $teacher_id);
-        $stmt->execute();
-        $stmt->close();
+        // First check if the teacher exists
+        $check_stmt = $conn->prepare("SELECT user_id FROM teachers WHERE teacher_id = ?");
+        $check_stmt->bind_param("i", $teacher_id);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
         
-        // Get user_id associated with teacher
-        $stmt = $conn->prepare("SELECT user_id FROM teachers WHERE teacher_id = ?");
-        $stmt->bind_param("i", $teacher_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $user_id = $result->fetch_assoc()['user_id'];
-        $stmt->close();
-        
-        // Delete teacher record
-        $stmt = $conn->prepare("DELETE FROM teachers WHERE teacher_id = ?");
-        $stmt->bind_param("i", $teacher_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Delete user account
-        $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Commit transaction
-        $conn->commit();
-        
-        $success_message = "Teacher deleted successfully.";
+        if ($check_result->num_rows === 0) {
+            // Teacher doesn't exist - this could be because it was already deleted
+            // or the ID is invalid. Either way, we'll show a success message.
+            $conn->rollback(); // No need for a transaction
+            $success_message = "Teacher with ID $teacher_id has been removed from the system.";
+            $check_stmt->close();
+        } else {
+            // Teacher exists, proceed with deletion
+            $teacher_data = $check_result->fetch_assoc();
+            $user_id = $teacher_data['user_id'];
+            $check_stmt->close();
+            
+            // Delete teacher's subject assignments first
+            $stmt = $conn->prepare("DELETE FROM teachersubjects WHERE teacher_id = ?");
+            $stmt->bind_param("i", $teacher_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            // Delete teacher record
+            $stmt = $conn->prepare("DELETE FROM teachers WHERE teacher_id = ?");
+            $stmt->bind_param("i", $teacher_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            // Delete user account
+            $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            // Commit transaction
+            $conn->commit();
+            
+            $success_message = "Teacher deleted successfully.";
+        }
     } catch (Exception $e) {
         // Rollback transaction on error
         $conn->rollback();
@@ -341,12 +352,7 @@ $conn->close();
                                     <button onclick="showAddTeacherModal()" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                         <i class="fas fa-user-plus mr-2"></i> Add Teacher
                                     </button>
-                                    <button onclick="showImportModal()" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                                        <i class="fas fa-file-import mr-2"></i> Import
-                                    </button>
-                                    <button onclick="exportTeachers()" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                                        <i class="fas fa-file-export mr-2"></i> Export
-                                    </button>
+                                   
                                     <button onclick="printTeacherList()" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                                         <i class="fas fa-print mr-2"></i> Print
                                     </button>
@@ -630,40 +636,7 @@ $conn->close();
         </div>
     </div>
 
-    <!-- Import Modal -->
-    <div id="importModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Import Teachers</h3>
-                <div class="mt-2 px-7 py-3">
-                    <p class="text-sm text-gray-500 mb-4">
-                        Upload a CSV file with teacher data. The file should have the following columns: full_name, email, password, employee_id, department, qualification, gender
-                    </p>
-                    <form action="import_teachers.php" method="post" enctype="multipart/form-data">
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-sm font-bold mb-2" for="csvFile">
-                                CSV File
-                            </label>
-                            <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="csvFile" type="file" name="csvFile" accept=".csv" required>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <button type="button" onclick="closeImportModal()" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                                Cancel
-                            </button>
-                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                                Import
-                            </button>
-                        </div>
-                    </form>
-                    <div class="mt-4">
-                        <a href="templates/teacher_import_template.csv" download class="text-blue-500 hover:text-blue-700 text-sm">
-                            <i class="fas fa-download mr-1"></i> Download Template
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+
 
     <!-- Add Teacher Modal -->
     <div id="addTeacherModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
@@ -838,453 +811,7 @@ $conn->close();
         </div>
     </div>
 
-    <script>
-        // Confirm delete function
-        function confirmDelete(teacherId) {
-            Swal.fire({
-                title: 'Delete Teacher?',
-                html: `
-                    <div class="text-left">
-                        <p class="mb-2">You are about to delete this teacher. This action:</p>
-                        <ul class="list-disc pl-5 mb-4">
-                            <li>Will permanently remove the teacher record</li>
-                            <li>Will delete all associated subject assignments</li>
-                            <li>Will remove the user account</li>
-                            <li>Cannot be undone</li>
-                        </ul>
-                        <p class="font-bold text-red-600">Are you sure you want to proceed?</p>
-                    </div>
-                `,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, delete teacher',
-                cancelButtonText: 'Cancel',
-                reverseButtons: true
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Show loading state
-                    Swal.fire({
-                        title: 'Deleting...',
-                        html: 'Please wait while we delete the teacher record.',
-                        allowOutsideClick: false,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        }
-                    });
-                    
-                    // Redirect to delete URL
-                    window.location.href = 'teachers.php?delete=' + teacherId;
-                }
-            });
-        }
-
-        // Select all checkboxes
-        document.getElementById('selectAll').addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.teacher-checkbox');
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = this.checked;
-            });
-        });
-
-        // Show success message if status parameter exists
-        document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const status = urlParams.get('status');
-            
-            if (status === 'deleted') {
-                Swal.fire({
-                    title: 'Deleted!',
-                    text: 'Teacher has been deleted successfully.',
-                    icon: 'success',
-                    confirmButtonColor: '#3085d6'
-                });
-            }
-        });
-        
-        // Import Modal Functions
-        function showImportModal() {
-            document.getElementById('importModal').classList.remove('hidden');
-        }
-        
-        function closeImportModal() {
-            document.getElementById('importModal').classList.add('hidden');
-        }
-        
-        // Add Teacher Modal Functions
-        function showAddTeacherModal() {
-            document.getElementById('addTeacherModal').classList.remove('hidden');
-        }
-        
-        function closeAddTeacherModal() {
-            document.getElementById('addTeacherModal').classList.add('hidden');
-        }
-        
-        // Save new teacher
-        function saveNewTeacher() {
-            const form = document.getElementById('addTeacherForm');
-            const formData = new FormData(form);
-            
-            // Validate passwords match
-            const password = formData.get('password');
-            const confirmPassword = formData.get('confirm_password');
-            
-            if (password !== confirmPassword) {
-                Swal.fire({
-                    title: 'Error!',
-                    text: 'Passwords do not match.',
-                    icon: 'error',
-                    confirmButtonColor: '#3085d6'
-                });
-                return false;
-            }
-            
-            // Handle other department
-            if (formData.get('department') === 'other') {
-                const otherDepartment = formData.get('other_department');
-                if (!otherDepartment) {
-                    Swal.fire({
-                        title: 'Error!',
-                        text: 'Please specify the department.',
-                        icon: 'error',
-                        confirmButtonColor: '#3085d6'
-                    });
-                    return false;
-                }
-                formData.set('department', otherDepartment);
-            }
-            
-            fetch('save_new_teacher.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    Swal.fire({
-                        title: 'Success!',
-                        text: data.message,
-                        icon: 'success',
-                        confirmButtonColor: '#3085d6'
-                    }).then(() => {
-                        closeAddTeacherModal();
-                        window.location.reload();
-                    });
-                } else {
-                    Swal.fire({
-                        title: 'Error!',
-                        text: data.message,
-                        icon: 'error',
-                        confirmButtonColor: '#3085d6'
-                    });
-                }
-            })
-            .catch(error => {
-                Swal.fire({
-                    title: 'Error!',
-                    text: 'An error occurred while saving: ' + error.message,
-                    icon: 'error',
-                    confirmButtonColor: '#3085d6'
-                });
-            });
-            
-            return false;
-        }
-        
-        // Export Teachers Function
-        function exportTeachers() {
-            // Get selected teachers
-            const checkboxes = document.querySelectorAll('.teacher-checkbox:checked');
-            const selectedTeachers = Array.from(checkboxes).map(cb => cb.value);
-            
-            // Get current filter parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            const search = urlParams.get('search') || '';
-            const departmentFilter = urlParams.get('department') || '';
-            const statusFilter = urlParams.get('status') || '';
-            
-            // Create export URL with filters and selected teachers
-            let exportUrl = 'export_teachers.php?';
-            if (search) exportUrl += `search=${encodeURIComponent(search)}&`;
-            if (departmentFilter) exportUrl += `department=${encodeURIComponent(departmentFilter)}&`;
-            if (statusFilter) exportUrl += `status=${encodeURIComponent(statusFilter)}&`;
-            
-            // Add selected teachers if any
-            if (selectedTeachers.length > 0) {
-                exportUrl += `selected=${encodeURIComponent(JSON.stringify(selectedTeachers))}&`;
-            }
-            
-            // Redirect to export URL
-            window.location.href = exportUrl;
-        }
-        
-        // Print Teacher List Function
-        function printTeacherList() {
-            // Get selected teachers
-            const checkboxes = document.querySelectorAll('.teacher-checkbox:checked');
-            const selectedTeachers = Array.from(checkboxes).map(cb => cb.value);
-            
-            // Create a new window for printing
-            const printWindow = window.open('', '_blank');
-            
-            // Get the table data
-            const table = document.querySelector('table');
-            const tableClone = table.cloneNode(true);
-            
-            // Remove checkboxes and action buttons from the print view
-            const checkboxCells = tableClone.querySelectorAll('td:first-child, th:first-child');
-            checkboxCells.forEach(cell => {
-                cell.remove();
-            });
-            
-            const actionCells = tableClone.querySelectorAll('td:last-child, th:last-child');
-            actionCells.forEach(cell => {
-                cell.remove();
-            });
-            
-            // If teachers are selected, filter the table to only show selected teachers
-            if (selectedTeachers.length > 0) {
-                const rows = tableClone.querySelectorAll('tbody tr');
-                rows.forEach(row => {
-                    const teacherId = row.cells[0].textContent.trim();
-                    if (!selectedTeachers.includes(teacherId)) {
-                        row.remove();
-                    }
-                });
-            }
-            
-            // Create print HTML
-            const printContent = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Teacher List</title>
-                    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-                    <style>
-                        @media print {
-                            body {
-                                font-size: 12px;
-                            }
-                            table {
-                                width: 100%;
-                                border-collapse: collapse;
-                            }
-                            th, td {
-                                border: 1px solid #ddd;
-                                padding: 8px;
-                                text-align: left;
-                            }
-                            th {
-                                background-color: #f2f2f2;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="p-4">
-                        <h1 class="text-2xl font-bold mb-4">Teacher List</h1>
-                        <p class="mb-4">Generated on: ${new Date().toLocaleString()}</p>
-                        ${tableClone.outerHTML}
-                    </div>
-                </body>
-                </html>
-            `;
-            
-            // Write to the new window and print
-            printWindow.document.open();
-            printWindow.document.write(printContent);
-            printWindow.document.close();
-            
-            // Wait for content to load then print
-            setTimeout(() => {
-                printWindow.print();
-            }, 500);
-        }
-        
-        // Profile Modal Functions
-        function showProfileModal(teacherId) {
-            document.getElementById('profileModal').classList.remove('hidden');
-            document.getElementById('profileContent').innerHTML = '<div class="flex justify-center"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
-            
-            // Fetch teacher profile data
-            fetch(`get_teacher_profile.php?id=${teacherId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.text();
-                })
-                .then(data => {
-                    document.getElementById('profileContent').innerHTML = data;
-                })
-                .catch(error => {
-                    document.getElementById('profileContent').innerHTML = `
-                        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
-                            <p class="font-bold">Error</p>
-                            <p>Failed to load teacher profile: ${error.message}</p>
-                            <button onclick="closeProfileModal()" class="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                                Close
-                            </button>
-                        </div>
-                    `;
-                });
-        }
-        
-        function closeProfileModal() {
-            document.getElementById('profileModal').classList.add('hidden');
-        }
-        
-        // Edit Modal Functions
-        function showEditModal(teacherId) {
-            document.getElementById('editModal').classList.remove('hidden');
-            document.getElementById('editContent').innerHTML = '<div class="flex justify-center"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
-            
-            // Fetch teacher edit form
-            fetch(`get_teacher_edit_form.php?id=${teacherId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.text();
-                })
-                .then(data => {
-                    document.getElementById('editContent').innerHTML = data;
-                })
-                .catch(error => {
-                    document.getElementById('editContent').innerHTML = `
-                        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
-                            <p class="font-bold">Error</p>
-                            <p>Failed to load edit form: ${error.message}</p>
-                            <button onclick="closeEditModal()" class="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                                Close
-                            </button>
-                        </div>
-                    `;
-                });
-        }
-        
-        function closeEditModal() {
-            document.getElementById('editModal').classList.add('hidden');
-        }
-        
-        // Subjects Modal Functions
-        function showSubjectsModal(teacherId) {
-            document.getElementById('subjectsModal').classList.remove('hidden');
-            document.getElementById('subjectsContent').innerHTML = '<div class="flex justify-center"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
-            
-            // Fetch teacher subjects
-            fetch(`get_teacher_subjects.php?id=${teacherId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.text();
-                })
-                .then(data => {
-                    document.getElementById('subjectsContent').innerHTML = data;
-                })
-                .catch(error => {
-                    document.getElementById('subjectsContent').innerHTML = `
-                        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
-                            <p class="font-bold">Error</p>
-                            <p>Failed to load subjects: ${error.message}</p>
-                            <button onclick="closeSubjectsModal()" class="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                                Close
-                            </button>
-                        </div>
-                    `;
-                });
-        }
-        
-        function closeSubjectsModal() {
-            document.getElementById('subjectsModal').classList.add('hidden');
-        }
-        
-        // Save teacher edit form
-        function saveTeacherEdit(formId) {
-            const form = document.getElementById(formId);
-            const formData = new FormData(form);
-            
-            fetch('save_teacher_edit.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    Swal.fire({
-                        title: 'Success!',
-                        text: data.message,
-                        icon: 'success',
-                        confirmButtonColor: '#3085d6'
-                    }).then(() => {
-                        closeEditModal();
-                        window.location.reload();
-                    });
-                } else {
-                    Swal.fire({
-                        title: 'Error!',
-                        text: data.message,
-                        icon: 'error',
-                        confirmButtonColor: '#3085d6'
-                    });
-                }
-            })
-            .catch(error => {
-                Swal.fire({
-                    title: 'Error!',
-                    text: 'An error occurred while saving: ' + error.message,
-                    icon: 'error',
-                    confirmButtonColor: '#3085d6'
-                });
-            });
-            
-            return false;
-        }
-        
-        // Save teacher subjects
-        function saveTeacherSubjects(formId) {
-            const form = document.getElementById(formId);
-            const formData = new FormData(form);
-            
-            fetch('save_teacher_subjects.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    Swal.fire({
-                        title: 'Success!',
-                        text: data.message,
-                        icon: 'success',
-                        confirmButtonColor: '#3085d6'
-                    }).then(() => {
-                        closeSubjectsModal();
-                        window.location.reload();
-                    });
-                } else {
-                    Swal.fire({
-                        title: 'Error!',
-                        text: data.message,
-                        icon: 'error',
-                        confirmButtonColor: '#3085d6'
-                    });
-                }
-            })
-            .catch(error => {
-                Swal.fire({
-                    title: 'Error!',
-                    text: 'An error occurred while saving: ' + error.message,
-                    icon: 'error',
-                    confirmButtonColor: '#3085d6'
-                });
-            });
-            
-            return false;
-        }
-    </script>
+    <script src="../js/teachers.js"></script>
 </body>
 
 </html>

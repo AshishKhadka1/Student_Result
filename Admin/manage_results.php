@@ -817,7 +817,8 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                             <?php else: ?>
                                                                 <a href="unpublish_results.php?id=<?php echo $row['id']; ?>" class="text-yellow-600 hover:text-yellow-900 mr-3">Unpublish</a>
                                                             <?php endif; ?>
-                                                            <a href="delete_upload.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900" onclick="return confirm('Are you sure you want to delete this upload? This will also delete all associated results.')">Delete</a>
+                                                            <a href="delete_upload.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900 mr-3" onclick="return confirm('Are you sure you want to delete this upload? This will also delete all associated results.')">Delete</a>
+                                                            <a href="students_result.php?upload_id=<?php echo $row['id']; ?>" class="text-indigo-600 hover:text-indigo-900">Student Results</a>
                                                         </td>
                                                     </tr>
                                                 <?php endwhile; ?>

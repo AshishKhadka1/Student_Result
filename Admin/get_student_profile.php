@@ -20,9 +20,10 @@ if ($conn->connect_error) {
     exit();
 }
 
-// Get student data with user information
+// Get student data with user information - UPDATED QUERY to include all fields
 $stmt = $conn->prepare("
-    SELECT s.*, u.full_name, u.email, u.username, u.status, u.created_at as account_created, 
+    SELECT s.*, u.full_name, u.email, u.username, u.status, u.phone as user_phone, 
+           u.created_at as account_created, u.address as user_address,
            c.class_name, c.section, c.academic_year
     FROM students s
     JOIN users u ON s.user_id = u.user_id
@@ -126,6 +127,10 @@ $conn->close();
                         <span class="font-medium"><?php echo htmlspecialchars($student['roll_number']); ?></span>
                     </div>
                     <div class="flex justify-between py-2 border-b border-gray-200">
+                        <span class="text-gray-500">Registration:</span>
+                        <span class="font-medium"><?php echo htmlspecialchars($student['registration_number'] ?? 'N/A'); ?></span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-200">
                         <span class="text-gray-500">Class:</span>
                         <span class="font-medium">
                             <?php 
@@ -174,11 +179,42 @@ $conn->close();
                     </div>
                     <div>
                         <p class="text-sm text-gray-500">Phone</p>
-                        <p class="font-medium"><?php echo !empty($student['phone']) ? htmlspecialchars($student['phone']) : 'Not specified'; ?></p>
+                        <p class="font-medium">
+                            <?php 
+                            // Use student's phone if available, otherwise use user's phone
+                            $phone = !empty($student['phone']) ? $student['phone'] : (!empty($student['user_phone']) ? $student['user_phone'] : 'Not specified');
+                            echo htmlspecialchars($phone);
+                            ?>
+                        </p>
                     </div>
                     <div>
                         <p class="text-sm text-gray-500">Address</p>
-                        <p class="font-medium"><?php echo !empty($student['address']) ? htmlspecialchars($student['address']) : 'Not specified'; ?></p>
+                        <p class="font-medium">
+                            <?php 
+                            // Use student's address if available, otherwise use user's address
+                            $address = !empty($student['address']) ? $student['address'] : (!empty($student['user_address']) ? $student['user_address'] : 'Not specified');
+                            echo htmlspecialchars($address);
+                            ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Parent Information (New Section) -->
+            <div class="mb-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Parent/Guardian Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-500">Parent Name</p>
+                        <p class="font-medium"><?php echo !empty($student['parent_name']) ? htmlspecialchars($student['parent_name']) : 'Not specified'; ?></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Parent Phone</p>
+                        <p class="font-medium"><?php echo !empty($student['parent_phone']) ? htmlspecialchars($student['parent_phone']) : 'Not specified'; ?></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Parent Email</p>
+                        <p class="font-medium"><?php echo !empty($student['parent_email']) ? htmlspecialchars($student['parent_email']) : 'Not specified'; ?></p>
                     </div>
                 </div>
             </div>

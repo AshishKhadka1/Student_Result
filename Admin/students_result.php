@@ -14,6 +14,32 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+// Check if we're filtering by upload
+$upload_filter = false;
+$upload_data = null;
+
+if (isset($_GET['upload_id']) && !empty($_GET['upload_id'])) {
+    $upload_id = intval($_GET['upload_id']);
+    $upload_filter = true;
+    
+    // Get upload information
+    $stmt = $conn->prepare("SELECT ru.*, e.exam_name, c.class_name, c.section 
+                           FROM result_uploads ru
+                           LEFT JOIN exams e ON ru.exam_id = e.exam_id
+                           LEFT JOIN classes c ON ru.class_id = c.class_id
+                           WHERE ru.id = ?");
+    $stmt->bind_param("i", $upload_id);
+    $stmt->execute();
+    $upload_data = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    
+    if (!$upload_data) {
+        $_SESSION['error_message'] = "Upload not found.";
+        header("Location: manage_results.php");
+        exit();
+    }
+}
+
 // Initialize variables
 $student = [];
 $subjects = [];
@@ -82,14 +108,13 @@ if (isset($_GET['student_id'])) {
     }
     
     // Get results for all exams for this student
-    $stmt = $conn->prepare("
-        SELECT r.*, e.exam_name, e.exam_type, e.academic_year, s.subject_name
+    $query = "SELECT r.*, e.exam_name, e.exam_type, e.academic_year, s.subject_name
         FROM results r
         JOIN exams e ON r.exam_id = e.exam_id
         JOIN subjects s ON r.subject_id = s.subject_id
-        WHERE r.student_id = ?
-        ORDER BY e.created_at DESC, s.subject_id
-    ");
+        WHERE r.student_id = ?";
+
+    $stmt = $conn->prepare($query);
     $stmt->bind_param("s", $student_id);
     $stmt->execute();
     $results_data = $stmt->get_result();
@@ -285,6 +310,28 @@ $settings = [];
 $settings_result = $conn->query("SELECT setting_key, setting_value FROM settings");
 while ($row = $settings_result->fetch_assoc()) {
     $settings[$row['setting_key']] = $row['setting_value'];
+}
+
+// Add a heading to show we're filtering by upload
+if ($upload_filter) {
+    echo '<div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-500"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                        Showing results for upload: <strong>' . htmlspecialchars($upload_data['description'] ?: $upload_data['file_name']) . '</strong>
+                        <br>Exam: ' . htmlspecialchars($upload_data['exam_name']) . '
+                        <br>Class: ' . htmlspecialchars($upload_data['class_name'] . ' ' . $upload_data['section']) . '
+                        <br>Status: <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-' . 
+                        ($upload_data['status'] == 'Published' ? 'green' : 'yellow') . '-100 text-' . 
+                        ($upload_data['status'] == 'Published' ? 'green' : 'yellow') . '-800">' . 
+                        htmlspecialchars($upload_data['status']) . '</span>
+                    </p>
+                </div>
+            </div>
+        </div>';
 }
 
 $conn->close();
@@ -630,6 +677,8 @@ $conn->close();
                                     </table>
                                 </div>
                             </div>
+
+
                         <?php else: ?>
                             <!-- Student Result View -->
                             <div class="mb-4 flex justify-between">
