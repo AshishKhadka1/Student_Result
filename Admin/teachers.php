@@ -69,7 +69,7 @@ if (isset($_GET['delete']) && !empty($_GET['delete'])) {
 
 // Handle search and filters
 $search = isset($_GET['search']) ? $_GET['search'] : '';
-$department_filter = isset($_GET['department']) ? $_GET['department'] : '';
+// Department filter removed
 $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 
 // Base query
@@ -84,9 +84,7 @@ if (!empty($search)) {
     $query .= " AND (u.full_name LIKE ? OR t.employee_id LIKE ? OR u.email LIKE ? OR t.department LIKE ?)";
 }
 
-if (!empty($department_filter)) {
-    $query .= " AND t.department = ?";
-}
+// Department filter condition removed
 
 if (!empty($status_filter)) {
     $query .= " AND u.status = ?";
@@ -99,18 +97,10 @@ $query .= " ORDER BY t.created_at DESC";
 $stmt = $conn->prepare($query);
 
 // Bind parameters
-if (!empty($search) && !empty($department_filter) && !empty($status_filter)) {
-    $stmt->bind_param("sssss", $search, $search, $search, $search, $department_filter, $status_filter);
-} elseif (!empty($search) && !empty($department_filter)) {
-    $stmt->bind_param("sssss", $search, $search, $search, $search, $department_filter);
-} elseif (!empty($search) && !empty($status_filter)) {
+if (!empty($search) && !empty($status_filter)) {
     $stmt->bind_param("sssss", $search, $search, $search, $search, $status_filter);
-} elseif (!empty($department_filter) && !empty($status_filter)) {
-    $stmt->bind_param("ss", $department_filter, $status_filter);
 } elseif (!empty($search)) {
     $stmt->bind_param("ssss", $search, $search, $search, $search);
-} elseif (!empty($department_filter)) {
-    $stmt->bind_param("s", $department_filter);
 } elseif (!empty($status_filter)) {
     $stmt->bind_param("s", $status_filter);
 }
@@ -449,17 +439,7 @@ $conn->close();
                                         <label for="search" class="block text-sm font-medium text-gray-700">Search</label>
                                         <input type="text" name="search" id="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Name, ID, Email, Department" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                     </div>
-                                    <div>
-                                        <label for="department" class="block text-sm font-medium text-gray-700">Department</label>
-                                        <select name="department" id="department" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                            <option value="">All Departments</option>
-                                            <?php foreach ($departments as $department): ?>
-                                                <option value="<?php echo $department; ?>" <?php echo ($department_filter == $department) ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($department); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
+                                    <!-- Department filter removed -->
                                     <div>
                                         <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
                                         <select name="status" id="status" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
@@ -507,13 +487,14 @@ $conn->close();
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee ID</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                                            <!-- Department column removed -->
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qualification</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subjects</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
+                                    <!-- Add data-phone attribute to each teacher row for printing -->
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         <?php if (empty($teachers)): ?>
                                             <tr>
@@ -521,7 +502,7 @@ $conn->close();
                                             </tr>
                                         <?php else: ?>
                                             <?php foreach ($teachers as $teacher): ?>
-                                                <tr class="hover:bg-gray-50">
+                                                <tr class="hover:bg-gray-50" data-phone="<?php echo htmlspecialchars($teacher['phone'] ?? ''); ?>">
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <input type="checkbox" name="selected_teachers[]" value="<?php echo $teacher['teacher_id']; ?>" form="bulkActionForm" class="teacher-checkbox form-checkbox h-5 w-5 text-blue-600">
                                                     </td>
@@ -536,9 +517,7 @@ $conn->close();
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                         <?php echo htmlspecialchars($teacher['email']); ?>
                                                     </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo htmlspecialchars($teacher['department']); ?>
-                                                    </td>
+                                                    <!-- Department cell removed -->
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                         <?php echo htmlspecialchars($teacher['qualification']); ?>
                                                     </td>
@@ -709,32 +688,21 @@ $conn->close();
                             <input type="text" name="employee_id" id="employee_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
                         </div>
                         
-                        <div>
-                            <label for="department" class="block text-sm font-medium text-gray-700">Department</label>
-                            <select name="department" id="department" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
-                                <option value="">Select Department</option>
-                                <?php foreach ($departments as $department): ?>
-                                    <option value="<?php echo $department; ?>">
-                                        <?php echo htmlspecialchars($department); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        
-                        <div id="otherDepartmentInput" class="hidden">
-                            <label for="other_department" class="block text-sm font-medium text-gray-700">Specify Department</label>
-                            <input type="text" name="other_department" id="other_department" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                        </div>
+                        <!-- Department field removed -->
                         
                         <div>
                             <label for="qualification" class="block text-sm font-medium text-gray-700">Qualification</label>
-                            <input type="text" name="qualification" id="qualification" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                            <input type="text" name="qualification" id="qualification" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                         </div>
                         
                         <div>
                             <label for="joining_date" class="block text-sm font-medium text-gray-700">Joining Date</label>
                             <input type="date" name="joining_date" id="joining_date" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        
+                        <div>
+                            <label for="experience" class="block text-sm font-medium text-gray-700">Experience (years)</label>
+                            <input type="number" name="experience" id="experience" min="0" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                         </div>
                         
                         <div>
@@ -812,6 +780,92 @@ $conn->close();
     </div>
 
     <script src="../js/teachers.js"></script>
+<script>
+    // Print Teacher List Function
+    function printTeacherList() {
+        // Get selected teachers
+        const checkboxes = document.querySelectorAll('.teacher-checkbox:checked');
+        const selectedTeachers = Array.from(checkboxes).map(cb => cb.value);
+        
+        // Create a new window for printing
+        const printWindow = window.open('', '_blank');
+        
+        // Get the table data
+        const table = document.querySelector('table');
+        const tableClone = table.cloneNode(true);
+        
+        // Remove checkboxes and action buttons from the print view
+        const checkboxCells = tableClone.querySelectorAll('td:first-child, th:first-child');
+        checkboxCells.forEach(cell => {
+            cell.remove();
+        });
+        
+        const actionCells = tableClone.querySelectorAll('td:last-child, th:last-child');
+        actionCells.forEach(cell => {
+            cell.remove();
+        });
+        
+        // If teachers are selected, filter the table to only show selected teachers
+        if (selectedTeachers.length > 0) {
+            const rows = tableClone.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                // Get the teacher ID from the checkbox value
+                const checkboxInOriginalRow = document.querySelectorAll('.teacher-checkbox')[Array.from(rows).indexOf(row)];
+                if (checkboxInOriginalRow && !selectedTeachers.includes(checkboxInOriginalRow.value)) {
+                    row.remove();
+                }
+            });
+        }
+        
+        // Create print HTML
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Teacher List</title>
+                <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                <style>
+                    @media print {
+                        body {
+                            font-size: 12px;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                        }
+                        th, td {
+                            border: 1px solid #ddd;
+                            padding: 8px;
+                            text-align: left;
+                        }
+                        th {
+                            background-color: #f2f2f2;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="p-4">
+                    <h1 class="text-2xl font-bold mb-4">Teacher List</h1>
+                    <p class="mb-4">Generated on: ${new Date().toLocaleString()}</p>
+                    ${tableClone.outerHTML}
+                </div>
+                <script>
+                    // Auto print when the page loads
+                    window.onload = function() {
+                        window.print();
+                    }
+                <\/script>
+            </body>
+            </html>
+        `;
+        
+        // Write to the new window and print
+        printWindow.document.open();
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+    }
+</script>
 </body>
 
 </html>

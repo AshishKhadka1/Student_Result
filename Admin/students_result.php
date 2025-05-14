@@ -112,7 +112,8 @@ if (isset($_GET['student_id'])) {
         FROM results r
         JOIN exams e ON r.exam_id = e.exam_id
         JOIN subjects s ON r.subject_id = s.subject_id
-        WHERE r.student_id = ?";
+        WHERE r.student_id = ?
+        ORDER BY e.created_at DESC, s.subject_name ASC";
 
     $stmt = $conn->prepare($query);
     $stmt->bind_param("s", $student_id);

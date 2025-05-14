@@ -102,6 +102,7 @@ if (isset($_GET['student_id']) && isset($_GET['exam_id'])) {
         FROM results r
         JOIN subjects s ON r.subject_id = s.subject_id
         WHERE r.student_id = ? AND r.exam_id = ?
+        ORDER BY s.subject_name
     ");
     
     if ($stmt) {

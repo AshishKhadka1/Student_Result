@@ -73,14 +73,14 @@ try {
     if ($table_check->num_rows == 0) {
         // Create the teachersubjects table
         $create_table_sql = "CREATE TABLE `teachersubjects` (
-            `assignment_id` int(11) NOT NULL AUTO_INCREMENT,
+            `id` int(11) NOT NULL AUTO_INCREMENT,
             `teacher_id` int(11) NOT NULL,
             `subject_id` int(11) NOT NULL,
             `class_id` int(11) NOT NULL,
             `is_active` tinyint(1) NOT NULL DEFAULT 1,
             `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
             `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-            PRIMARY KEY (`assignment_id`),
+            PRIMARY KEY (`id`),
             KEY `teacher_id` (`teacher_id`),
             KEY `subject_id` (`subject_id`),
             KEY `class_id` (`class_id`)
@@ -121,7 +121,7 @@ try {
 
         // Check if assignment already exists
         error_log("Checking if assignment already exists");
-        $stmt = $conn->prepare("SELECT assignment_id FROM teachersubjects WHERE teacher_id = ? AND subject_id = ? AND class_id = ?");
+        $stmt = $conn->prepare("SELECT id FROM teachersubjects WHERE teacher_id = ? AND subject_id = ? AND class_id = ?");
         if (!$stmt) {
             error_log("Prepare statement failed: " . $conn->error);
             throw new Exception('Database error: ' . $conn->error);
@@ -134,11 +134,11 @@ try {
         if ($result->num_rows > 0) {
             // Assignment exists, update it to active
             $row = $result->fetch_assoc();
-            $assignment_id = $row['assignment_id'];
+            $assignment_id = $row['id'];
             $stmt->close();
             
             error_log("Assignment exists, updating to active: $assignment_id");
-            $update_stmt = $conn->prepare("UPDATE teachersubjects SET is_active = 1 WHERE assignment_id = ?");
+            $update_stmt = $conn->prepare("UPDATE teachersubjects SET is_active = 1 WHERE id = ?");
             if (!$update_stmt) {
                 error_log("Prepare statement failed: " . $conn->error);
                 throw new Exception('Database error: ' . $conn->error);
@@ -197,7 +197,7 @@ try {
         $is_active = $status ? 1 : 0;
         
         error_log("Updating assignment status: $assignment_id to $is_active");
-        $stmt = $conn->prepare("UPDATE teachersubjects SET is_active = ? WHERE assignment_id = ? AND teacher_id = ?");
+        $stmt = $conn->prepare("UPDATE teachersubjects SET is_active = ? WHERE id = ? AND teacher_id = ?");
         if (!$stmt) {
             error_log("Prepare statement failed: " . $conn->error);
             throw new Exception('Database error: ' . $conn->error);
@@ -229,7 +229,7 @@ try {
         }
 
         error_log("Removing assignment: $assignment_id");
-        $stmt = $conn->prepare("DELETE FROM teachersubjects WHERE assignment_id = ? AND teacher_id = ?");
+        $stmt = $conn->prepare("DELETE FROM teachersubjects WHERE id = ? AND teacher_id = ?");
         if (!$stmt) {
             error_log("Prepare statement failed: " . $conn->error);
             throw new Exception('Database error: ' . $conn->error);

@@ -20,6 +20,15 @@ $uploadsQuery = "SELECT ru.*, u.full_name as uploaded_by_name, e.exam_name, c.cl
                 ORDER BY ru.upload_date DESC";
 $uploads = $conn->query($uploadsQuery);
 
+// Add this debug code to check if there are any uploads in the database
+if ($uploads->num_rows == 0) {
+    // Check if there are any uploads at all
+    $checkUploads = $conn->query("SELECT COUNT(*) as count FROM result_uploads");
+    $uploadCount = $checkUploads->fetch_assoc()['count'];
+    // You can uncomment this for debugging
+    // echo "<!-- Debug: Total uploads in database: $uploadCount -->";
+}
+
 // Get subjects for manual entry
 $subjectsQuery = "SELECT * FROM subjects ORDER BY subject_name";
 $subjects = $conn->query($subjectsQuery);
@@ -716,8 +725,8 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                             <button type="button" class="delete-student-row text-red-600 hover:text-red-800">
                                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                </svg>
-                                                            </button>
+                                                            </svg>
+                                                        </button>
                                                         </td>
                                                     </tr>
                                                 </tbody>
@@ -753,7 +762,26 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                     <div id="content-manage" class="tab-content <?php echo $activeTab == 'manage' ? 'active' : ''; ?>">
                         <div class="bg-white rounded-lg shadow-md overflow-hidden hover-scale">
                             <div class="p-6">
-                                <h2 class="text-lg font-semibold text-gray-800 mb-4">Manage Result Uploads</h2>
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-lg font-semibold text-gray-800">Manage Result Uploads</h2>
+                                    <a href="?tab=manage" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">
+                                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                                    </a>
+                                </div>
+                                <?php if ($uploads && $uploads->num_rows == 0): ?>
+                                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                                        <div class="flex">
+                                            <div class="flex-shrink-0">
+                                                <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                            </div>
+                                            <div class="ml-3">
+                                                <p class="text-sm text-yellow-700">
+                                                    No uploads found. If you've manually entered results, they should appear here.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
                                 <div class="overflow-x-auto">
                                     <table class="min-w-full divide-y divide-gray-200">
                                         <thead class="bg-gray-50">
@@ -1134,3 +1162,13 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 </body>
 
 </html>
+<?php
+function studentHasResults($conn, $student_id, $exam_id) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM results WHERE student_id = ? AND exam_id = ?");
+    $stmt->bind_param("si", $student_id, $exam_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    return $row['count'] > 0;
+}
+?>

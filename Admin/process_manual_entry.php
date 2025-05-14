@@ -92,15 +92,30 @@ try {
     $uploadDescription = "Manual entry for Student ID: $studentId, Exam ID: $examId";
     $userId = $_SESSION['user_id'];
     
+    // Verify that the user ID exists in the users table
+    $userCheckStmt = $conn->prepare("SELECT user_id FROM users WHERE user_id = ?");
+    $userCheckStmt->bind_param("i", $userId);
+    $userCheckStmt->execute();
+    $userResult = $userCheckStmt->get_result();
+    
+    if ($userResult->num_rows === 0) {
+        throw new Exception("Invalid user ID. Please log in again.");
+    }
+    
     // Check if we already have a manual entry upload for today
-    $checkUpload = $conn->prepare("SELECT id FROM $uploadsTable WHERE file_name = 'Manual Entry' AND DATE(upload_date) = CURDATE() AND uploaded_by = ? LIMIT 1");
-    $checkUpload->bind_param("i", $userId);
+    $checkUpload = $conn->prepare("SELECT id FROM $uploadsTable WHERE file_name = 'Manual Entry' AND DATE(upload_date) = CURDATE() AND uploaded_by = ? AND exam_id = ? LIMIT 1");
+    $checkUpload->bind_param("ii", $userId, $examId);
     $checkUpload->execute();
     $uploadResult = $checkUpload->get_result();
-    
+
     if ($uploadResult->num_rows > 0) {
         // Use existing upload record
         $uploadId = $uploadResult->fetch_assoc()['id'];
+        
+        // Update the description to include this student
+        $updateDesc = $conn->prepare("UPDATE $uploadsTable SET description = CONCAT(description, ', Student ID: $studentId') WHERE id = ?");
+        $updateDesc->bind_param("i", $uploadId);
+        $updateDesc->execute();
     } else {
         // Check if the required columns exist in the uploads table
         $columnsCheck = $conn->query("SHOW COLUMNS FROM $uploadsTable LIKE 'exam_id'");
@@ -109,23 +124,40 @@ try {
         $columnsCheck = $conn->query("SHOW COLUMNS FROM $uploadsTable LIKE 'class_id'");
         $classIdExists = $columnsCheck->num_rows > 0;
         
-        // Create new upload record
-        if ($examIdExists && $classIdExists) {
-            // If both columns exist, use them in the query
-            $uploadStmt = $conn->prepare("INSERT INTO $uploadsTable 
-                (file_name, description, status, uploaded_by, upload_date, exam_id, class_id) 
-                VALUES ('Manual Entry', ?, 'Published', ?, NOW(), ?, ?)");
-            $uploadStmt->bind_param("siis", $uploadDescription, $userId, $examId, $classId);
-        } else {
-            // Otherwise, use the original schema
-            $uploadStmt = $conn->prepare("INSERT INTO $uploadsTable 
-                (file_name, description, status, uploaded_by, upload_date) 
-                VALUES ('Manual Entry', ?, 'Published', ?, NOW())");
-            $uploadStmt->bind_param("si", $uploadDescription, $userId);
+        try {
+            // Create new upload record
+            if ($examIdExists && $classIdExists) {
+                // If both columns exist, use them in the query
+                $uploadStmt = $conn->prepare("INSERT INTO $uploadsTable 
+                    (file_name, description, status, uploaded_by, upload_date, exam_id, class_id) 
+                    VALUES ('Manual Entry', ?, 'Published', ?, NOW(), ?, ?)");
+                $uploadStmt->bind_param("siis", $uploadDescription, $userId, $examId, $classId);
+            } else {
+                // Otherwise, use the original schema
+                $uploadStmt = $conn->prepare("INSERT INTO $uploadsTable 
+                    (file_name, description, status, uploaded_by, upload_date) 
+                    VALUES ('Manual Entry', ?, 'Published', ?, NOW())");
+                $uploadStmt->bind_param("si", $uploadDescription, $userId);
+            }
+            
+            if (!$uploadStmt->execute()) {
+                throw new Exception("Error creating upload record: " . $conn->error);
+            }
+            
+            $uploadId = $conn->insert_id;
+        } catch (Exception $e) {
+            // If there's an error with the upload record, try a different approach
+            // This is a fallback in case there are issues with the foreign key
+            $conn->query("INSERT INTO $uploadsTable 
+                (file_name, description, status, uploaded_by, upload_date, exam_id, class_id, student_count, success_count) 
+                VALUES ('Manual Entry', '$uploadDescription', 'Published', $userId, NOW(), $examId, '$classId', 0, 0)");
+            
+            if ($conn->error) {
+                throw new Exception("Error creating upload record: " . $conn->error);
+            }
+            
+            $uploadId = $conn->insert_id;
         }
-        
-        $uploadStmt->execute();
-        $uploadId = $conn->insert_id;
     }
     
     // Process each subject

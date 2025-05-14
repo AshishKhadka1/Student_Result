@@ -52,12 +52,7 @@ if ($result->num_rows === 0) {
 $teacher = $result->fetch_assoc();
 $stmt->close();
 
-// Get departments for dropdown
-$departments = [];
-$dept_result = $conn->query("SELECT DISTINCT department FROM teachers WHERE department IS NOT NULL ORDER BY department");
-while ($row = $dept_result->fetch_assoc()) {
-    $departments[] = $row['department'];
-}
+// Departments query removed
 
 $conn->close();
 ?>
@@ -88,6 +83,25 @@ $conn->close();
         </div>
         
         <div>
+            <label for="gender" class="block text-sm font-medium text-gray-700">Gender</label>
+            <select name="gender" id="gender" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                <option value="male" <?php echo (isset($teacher['gender']) && $teacher['gender'] == 'male') ? 'selected' : ''; ?>>Male</option>
+                <option value="female" <?php echo (isset($teacher['gender']) && $teacher['gender'] == 'female') ? 'selected' : ''; ?>>Female</option>
+                <option value="other" <?php echo (isset($teacher['gender']) && $teacher['gender'] == 'other') ? 'selected' : ''; ?>>Other</option>
+            </select>
+        </div>
+        
+        <div>
+            <label for="date_of_birth" class="block text-sm font-medium text-gray-700">Date of Birth</label>
+            <input type="date" name="date_of_birth" id="date_of_birth" value="<?php echo !empty($teacher['date_of_birth']) ? date('Y-m-d', strtotime($teacher['date_of_birth'])) : ''; ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+        </div>
+        
+        <div>
+            <label for="address" class="block text-sm font-medium text-gray-700">Address</label>
+            <textarea name="address" id="address" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"><?php echo htmlspecialchars($teacher['address'] ?? ''); ?></textarea>
+        </div>
+        
+        <div>
             <label for="password" class="block text-sm font-medium text-gray-700">New Password (leave blank to keep current)</label>
             <input type="password" name="password" id="password" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         </div>
@@ -102,22 +116,7 @@ $conn->close();
             <input type="text" name="employee_id" id="employee_id" value="<?php echo htmlspecialchars($teacher['employee_id']); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
         </div>
         
-        <div>
-            <label for="department" class="block text-sm font-medium text-gray-700">Department</label>
-            <select name="department" id="department" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
-                <?php foreach ($departments as $department): ?>
-                    <option value="<?php echo $department; ?>" <?php echo ($teacher['department'] == $department) ? 'selected' : ''; ?>>
-                        <?php echo htmlspecialchars($department); ?>
-                    </option>
-                <?php endforeach; ?>
-                <option value="other">Other</option>
-            </select>
-        </div>
-        
-        <div id="otherDepartmentInput" class="<?php echo in_array($teacher['department'], $departments) ? 'hidden' : ''; ?>">
-            <label for="other_department" class="block text-sm font-medium text-gray-700">Specify Department</label>
-            <input type="text" name="other_department" id="other_department" value="<?php echo !in_array($teacher['department'], $departments) ? htmlspecialchars($teacher['department']) : ''; ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-        </div>
+        <!-- Department field removed -->
         
         <div>
             <label for="qualification" class="block text-sm font-medium text-gray-700">Qualification</label>
@@ -131,12 +130,7 @@ $conn->close();
         
         <div>
             <label for="experience" class="block text-sm font-medium text-gray-700">Experience (years)</label>
-            <input type="text" name="experience" id="experience" value="<?php echo htmlspecialchars($teacher['experience'] ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-        </div>
-        
-        <div>
-            <label for="specialization" class="block text-sm font-medium text-gray-700">Specialization</label>
-            <input type="text" name="specialization" id="specialization" value="<?php echo htmlspecialchars($teacher['specialization'] ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            <input type="number" name="experience" id="experience" value="<?php echo htmlspecialchars($teacher['experience'] ?? ''); ?>" min="0" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         </div>
         
         <div>
@@ -159,14 +153,4 @@ $conn->close();
     </div>
 </form>
 
-<script>
-    // Show/hide other department input
-    document.getElementById('department').addEventListener('change', function() {
-        const otherDepartmentInput = document.getElementById('otherDepartmentInput');
-        if (this.value === 'other') {
-            otherDepartmentInput.classList.remove('hidden');
-        } else {
-            otherDepartmentInput.classList.add('hidden');
-        }
-    });
-</script>
+<!-- Department script removed -->

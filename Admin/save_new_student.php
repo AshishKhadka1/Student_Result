@@ -2,6 +2,7 @@
 // Turn off error display but keep logging
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 
 // Start output buffering to catch any unexpected output
 ob_start();
@@ -13,6 +14,7 @@ session_start();
 
 // Check if user is logged in and is an admin
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
+    ob_end_clean();
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit();
 }
@@ -25,6 +27,7 @@ try {
         throw new Exception("Database connection failed: " . $conn->connect_error);
     }
 } catch (Exception $e) {
+    ob_end_clean();
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     exit();
 }
@@ -91,30 +94,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Begin transaction
         $conn->begin_transaction();
 
-        // Generate a student ID (S001, S002, etc.)
-        $stmt = $conn->prepare("SELECT MAX(SUBSTRING(student_id, 2)) as max_id FROM students");
+        // Generate a unique student ID (S001, S002, etc.)
+        // First, get all existing student IDs
+        $stmt = $conn->prepare("SELECT student_id FROM students ORDER BY student_id");
         if (!$stmt) {
             throw new Exception("Prepare failed: " . $conn->error);
         }
         
         $stmt->execute();
         $result = $stmt->get_result();
+        $existing_ids = [];
+        
+        while ($row = $result->fetch_assoc()) {
+            $existing_ids[] = $row['student_id'];
+        }
+        $stmt->close();
+        
+        // Find the next available ID
+        $next_id = 1;
+        $student_id = '';
+        $max_attempts = 1000; // Safety limit
+        $attempt = 0;
+        
+        while (empty($student_id) && $attempt < $max_attempts) {
+            $candidate_id = "S" . str_pad($next_id, 3, "0", STR_PAD_LEFT);
+            
+            // Check if this ID already exists
+            if (!in_array($candidate_id, $existing_ids)) {
+                $student_id = $candidate_id;
+                break;
+            }
+            
+            $next_id++;
+            $attempt++;
+        }
+        
+        if (empty($student_id)) {
+            throw new Exception("Could not generate a unique student ID after {$max_attempts} attempts");
+        }
+
+        // Double-check the ID doesn't exist (extra safety)
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM students WHERE student_id = ?");
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
+        }
+        
+        $stmt->bind_param("s", $student_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
         $row = $result->fetch_assoc();
-        $max_id = intval($row['max_id'] ?? 0);
-        $next_id = $max_id + 1;
-        $student_id = "S" . str_pad($next_id, 3, "0", STR_PAD_LEFT);
+        
+        if ($row['count'] > 0) {
+            throw new Exception("Generated student ID {$student_id} already exists. Please try again.");
+        }
         $stmt->close();
 
         // Hash password
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-        // Insert into users table
+        // Generate a username if not provided
+        $username = isset($_POST['username']) ? trim($_POST['username']) : '';
+        if (empty($username)) {
+            // Create username from full_name (remove spaces, lowercase)
+            $base_username = strtolower(str_replace(' ', '', $full_name));
+            
+            // Check if this username already exists
+            $check_stmt = $conn->prepare("SELECT user_id FROM users WHERE username LIKE ?");
+            if ($check_stmt) {
+                $search_username = $base_username . '%';
+                $check_stmt->bind_param("s", $search_username);
+                $check_stmt->execute();
+                $check_result = $check_stmt->get_result();
+                
+                if ($check_result->num_rows > 0) {
+                    // Username exists, add a random number
+                    $username = $base_username . rand(100, 999);
+                } else {
+                    // Username doesn't exist, use it as is
+                    $username = $base_username;
+                }
+                $check_stmt->close();
+            } else {
+                // If prepare fails, use email as username
+                $username = $email;
+            }
+        }
+
         $stmt = $conn->prepare("INSERT INTO users (username, password, email, full_name, role, status, phone, address, created_at) VALUES (?, ?, ?, ?, 'student', ?, ?, ?, NOW())");
         if (!$stmt) {
             throw new Exception("Prepare failed: " . $conn->error);
         }
-        
-        $stmt->bind_param("sssssss", $email, $hashed_password, $email, $full_name, $status, $phone, $address);
+
+        $stmt->bind_param("sssssss", $username, $hashed_password, $email, $full_name, $status, $phone, $address);
         if (!$stmt->execute()) {
             throw new Exception("Execute failed: " . $stmt->error);
         }
@@ -200,9 +271,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Commit transaction
         $conn->commit();
 
-        // Clear any buffered output
-        ob_clean();
-        
+        // Clear any buffered output and send JSON response
+        ob_end_clean();
         echo json_encode([
             'success' => true, 
             'message' => 'Student added successfully', 
@@ -215,13 +285,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Clear any buffered output
-        ob_clean();
+        ob_end_clean();
         
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
 } else {
     // Clear any buffered output
-    ob_clean();
+    ob_end_clean();
     
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
 }

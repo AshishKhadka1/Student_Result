@@ -333,14 +333,14 @@ $conn->close();
                 
                 const formData = new FormData();
                 formData.append('action', 'toggle_status');
-                formData.append('assignment_id', assignmentId);
+                formData.append('id', assignmentId);
                 formData.append('status', newStatus);
                 formData.append('teacher_id', '<?php echo $teacher_id; ?>');
                 
                 // Log the form data for debugging
                 console.log('Toggle status data:', {
                     action: 'toggle_status',
-                    assignment_id: assignmentId,
+                    id: assignmentId,
                     status: newStatus,
                     teacher_id: '<?php echo $teacher_id; ?>'
                 });
@@ -419,13 +419,13 @@ $conn->close();
                 
                 const formData = new FormData();
                 formData.append('action', 'remove');
-                formData.append('assignment_id', assignmentId);
+                formData.append('id', assignmentId);
                 formData.append('teacher_id', '<?php echo $teacher_id; ?>');
                 
                 // Log the form data for debugging
                 console.log('Remove subject data:', {
                     action: 'remove',
-                    assignment_id: assignmentId,
+                    id: assignmentId,
                     teacher_id: '<?php echo $teacher_id; ?>'
                 });
                 

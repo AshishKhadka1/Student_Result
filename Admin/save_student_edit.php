@@ -35,7 +35,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Get form data with validation
         $student_id = isset($_POST['student_id']) ? trim($_POST['student_id']) : '';
         $user_id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : 0;
-        $full_name = isset($_POST['full_name']) ? trim($_POST['full_name']) : '';
         $email = isset($_POST['email']) ? trim($_POST['email']) : '';
         $phone = isset($_POST['phone']) ? trim($_POST['phone']) : '';
         $gender = isset($_POST['gender']) ? trim($_POST['gender']) : '';
@@ -53,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $parent_email = isset($_POST['parent_email']) ? trim($_POST['parent_email']) : '';
 
         // Validate required fields
-        if (empty($student_id) || empty($user_id) || empty($full_name) || empty($email) || empty($roll_number) || empty($class_id) || empty($batch_year)) {
+        if (empty($student_id) || empty($user_id) || empty($email) || empty($roll_number) || empty($class_id) || empty($batch_year)) {
             throw new Exception('Please fill all required fields');
         }
 
@@ -96,12 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
 
         // Update users table
-        $stmt = $conn->prepare("UPDATE users SET full_name = ?, email = ?, status = ?, phone = ?, address = ? WHERE user_id = ?");
+        $stmt = $conn->prepare("UPDATE users SET email = ?, status = ?, phone = ?, address = ? WHERE user_id = ?");
         if (!$stmt) {
             throw new Exception("Prepare failed: " . $conn->error);
         }
         
-        $stmt->bind_param("sssssi", $full_name, $email, $status, $phone, $address, $user_id);
+        $stmt->bind_param("ssssi", $email, $status, $phone, $address, $user_id);
         if (!$stmt->execute()) {
             throw new Exception("Execute failed: " . $stmt->error);
         }

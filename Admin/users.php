@@ -47,15 +47,131 @@ if (isset($_GET['delete']) && isset($_GET['user_id'])) {
     } else if ($user_id == $_SESSION['user_id']) {
         $_SESSION['error'] = "You cannot delete your own account.";
     } else {
-        $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
-        $stmt->bind_param("i", $user_id);
+        // Begin transaction
+        $conn->begin_transaction();
         
-        if ($stmt->execute()) {
+        try {
+            // If student, delete student records first
+            if ($user['role'] == 'student') {
+                $stmt = $conn->prepare("DELETE FROM students WHERE user_id = ?");
+                $stmt->bind_param("i", $user_id);
+                $stmt->execute();
+                $stmt->close();
+                
+                // Delete student results if any
+                $stmt = $conn->prepare("DELETE FROM results WHERE student_id IN (SELECT student_id FROM students WHERE user_id = ?)");
+                $stmt->bind_param("i", $user_id);
+                $stmt->execute();
+                $stmt->close();
+            }
+            
+            // If teacher, delete teacher records first
+            if ($user['role'] == 'teacher') {
+                $stmt = $conn->prepare("DELETE FROM teachers WHERE user_id = ?");
+                $stmt->bind_param("i", $user_id);
+                $stmt->execute();
+                $stmt->close();
+                
+                // Delete teacher subject assignments if any
+                $stmt = $conn->prepare("DELETE FROM teacher_subjects WHERE teacher_id IN (SELECT teacher_id FROM teachers WHERE user_id = ?)");
+                $stmt->bind_param("i", $user_id);
+                $stmt->execute();
+                $stmt->close();
+            }
+            
+            // Delete user
+            $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            $conn->commit();
             $_SESSION['success'] = "User deleted successfully!";
-        } else {
-            $_SESSION['error'] = "Error deleting user: " . $conn->error;
+        } catch (Exception $e) {
+            $conn->rollback();
+            $_SESSION['error'] = "Error deleting user: " . $e->getMessage();
         }
+    }
+    
+    header("Location: users.php");
+    exit();
+}
+
+// Handle add user form submission
+if (isset($_POST['add_user'])) {
+    $full_name = $_POST['full_name'];
+    $email = $_POST['email'];
+    $username = $full_name; // Set username as full name input
+    $password = $_POST['password'];
+    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    $role = $_POST['role'];
+    $phone = isset($_POST['phone']) ? $_POST['phone'] : '';
+    $address = isset($_POST['address']) ? $_POST['address'] : '';
+    $status = 'active';
+    
+    // Begin transaction
+    $conn->begin_transaction();
+    
+    try {
+        // Check if email already exists
+        $stmt = $conn->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $stmt->bind_result($count);
+        $stmt->fetch();
         $stmt->close();
+        
+        if ($count > 0) {
+            throw new Exception("Email already exists");
+        }
+        
+        // Insert into users table
+        $stmt = $conn->prepare("INSERT INTO users (username, email, password, full_name, role, status, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->bind_param("ssssssss", $username, $email, $hashed_password, $full_name, $role, $status, $phone, $address);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error creating user: " . $stmt->error);
+        }
+        
+        $user_id = $stmt->insert_id;
+        $stmt->close();
+        
+        // If role is student, create student record
+        if ($role == 'student' && isset($_POST['student_id']) && !empty($_POST['student_id'])) {
+            $student_id = $_POST['student_id'];
+            $roll_number = isset($_POST['roll_number']) ? $_POST['roll_number'] : '';
+            $class_id = isset($_POST['class_id']) ? $_POST['class_id'] : 0;
+            $batch_year = isset($_POST['batch_year']) ? $_POST['batch_year'] : date('Y');
+            
+            $stmt = $conn->prepare("INSERT INTO students (student_id, user_id, roll_number, class_id, batch_year, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            $stmt->bind_param("sisss", $student_id, $user_id, $roll_number, $class_id, $batch_year);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Error creating student record: " . $stmt->error);
+            }
+            $stmt->close();
+        }
+        
+        // If role is teacher, create teacher record
+        if ($role == 'teacher' && isset($_POST['teacher_id']) && !empty($_POST['teacher_id'])) {
+            $teacher_id = $_POST['teacher_id'];
+            $qualification = isset($_POST['qualification']) ? $_POST['qualification'] : '';
+            $specialization = isset($_POST['specialization']) ? $_POST['specialization'] : '';
+            
+            $stmt = $conn->prepare("INSERT INTO teachers (teacher_id, user_id, qualification, specialization, created_at) VALUES (?, ?, ?, ?, NOW())");
+            $stmt->bind_param("siss", $teacher_id, $user_id, $qualification, $specialization);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Error creating teacher record: " . $stmt->error);
+            }
+            $stmt->close();
+        }
+        
+        $conn->commit();
+        $_SESSION['success'] = "User added successfully!";
+    } catch (Exception $e) {
+        $conn->rollback();
+        $_SESSION['error'] = $e->getMessage();
     }
     
     header("Location: users.php");
@@ -68,32 +184,40 @@ $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 
 // Build query based on filters
-$query = "SELECT * FROM users WHERE 1=1";
+$query = "SELECT u.*, 
+          s.student_id, s.roll_number, s.class_id, 
+          t.teacher_id, t.qualification 
+          FROM users u 
+          LEFT JOIN students s ON u.user_id = s.user_id 
+          LEFT JOIN teachers t ON u.user_id = t.user_id 
+          WHERE 1=1";
 $params = [];
 $types = "";
 
 if (!empty($role_filter)) {
-    $query .= " AND role = ?";
+    $query .= " AND u.role = ?";
     $params[] = $role_filter;
     $types .= "s";
 }
 
 if (!empty($status_filter)) {
-    $query .= " AND status = ?";
+    $query .= " AND u.status = ?";
     $params[] = $status_filter;
     $types .= "s";
 }
 
 if (!empty($search)) {
     $search_term = "%$search%";
-    $query .= " AND (username LIKE ? OR full_name LIKE ? OR email LIKE ?)";
+    $query .= " AND (u.username LIKE ? OR u.full_name LIKE ? OR u.email LIKE ? OR s.student_id LIKE ? OR t.teacher_id LIKE ?)";
     $params[] = $search_term;
     $params[] = $search_term;
     $params[] = $search_term;
-    $types .= "sss";
+    $params[] = $search_term;
+    $params[] = $search_term;
+    $types .= "sssss";
 }
 
-$query .= " ORDER BY created_at DESC";
+$query .= " ORDER BY u.created_at DESC";
 
 // Prepare and execute the query
 $stmt = $conn->prepare($query);
@@ -125,6 +249,16 @@ foreach ($users as $user) {
     if ($user['status'] == 'inactive') $inactive_count++;
 }
 
+// Get all classes for the form
+$stmt = $conn->prepare("SELECT class_id, class_name FROM classes ORDER BY class_name");
+$stmt->execute();
+$result = $stmt->get_result();
+$classes = [];
+while ($row = $result->fetch_assoc()) {
+    $classes[] = $row;
+}
+$stmt->close();
+
 $conn->close();
 ?>
 
@@ -140,12 +274,7 @@ $conn->close();
 <body class="bg-gray-100">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <!-- Sidebar -->
-        <?php
-        // Include the file that processes form data
-        include 'sidebar.php';
-        ?>
-
+        <?php include 'sidebar.php'; ?>
 
         <!-- Mobile sidebar -->
         <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
@@ -162,42 +291,7 @@ $conn->close();
                         <span class="text-white text-lg font-semibold">Result Management</span>
                     </div>
                     <nav class="mt-5 px-2 space-y-1">
-                        <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-tachometer-alt mr-3"></i>
-                            Dashboard
-                        </a>
-                        <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-clipboard-list mr-3"></i>
-                            Results
-                        </a>
-                        <a href="bulk_upload.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-upload mr-3"></i>
-                            Bulk Upload
-                        </a>
-                        <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-white bg-gray-700 rounded-md">
-                            <i class="fas fa-users mr-3"></i>
-                            Users
-                        </a>
-                        <a href="classes.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-chalkboard mr-3"></i>
-                            Classes
-                        </a>
-                        <a href="subject.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-book mr-3"></i>
-                            Subjects
-                        </a>
-                        <a href="teachers.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-chalkboard-teacher mr-3"></i>
-                            Teachers
-                        </a>
-                        <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-cog mr-3"></i>
-                            Settings
-                        </a>
-                        <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-sign-out-alt mr-3"></i>
-                            Logout
-                        </a>
+                        <!-- Mobile sidebar navigation items -->
                     </nav>
                 </div>
             </div>
@@ -206,10 +300,7 @@ $conn->close();
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
             <!-- Top Navigation -->
-            <?php
-        // Include the file that processes form data
-        include 'topBar.php';
-        ?>
+            <?php include 'topBar.php'; ?>
 
             <!-- Main Content -->
             <main class="flex-1 relative overflow-y-auto focus:outline-none">
@@ -339,12 +430,106 @@ $conn->close();
                             </div>
                         </div>
 
+                        <!-- Add User Form -->
+                        <div class="bg-white shadow rounded-lg p-6 mb-6">
+                            <h2 class="text-lg font-medium text-gray-900 mb-4">Add New User</h2>
+                            <form action="users.php" method="POST" class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label for="full_name" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                                        <input type="text" id="full_name" name="full_name" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                        <input type="email" id="email" name="email" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                        <input type="password" id="password" name="password" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label for="role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                                        <select id="role" name="role" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                            <option value="">Select Role</option>
+                                            <option value="admin">Admin</option>
+                                            <option value="teacher">Teacher</option>
+                                            <option value="student">Student</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                        <input type="text" id="phone" name="phone" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label for="address" class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                                        <input type="text" id="address" name="address" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                </div>
+                                
+                                <!-- Student specific fields -->
+                                <div id="student_fields" class="hidden space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label for="student_id" class="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
+                                            <input type="text" id="student_id" name="student_id" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        </div>
+                                        <div>
+                                            <label for="roll_number" class="block text-sm font-medium text-gray-700 mb-1">Roll Number</label>
+                                            <input type="text" id="roll_number" name="roll_number" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        </div>
+                                        <div>
+                                            <label for="class_id" class="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                                            <select id="class_id" name="class_id" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                                <option value="">Select Class</option>
+                                                <?php foreach ($classes as $class): ?>
+                                                <option value="<?php echo $class['class_id']; ?>"><?php echo $class['class_name']; ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label for="batch_year" class="block text-sm font-medium text-gray-700 mb-1">Batch Year</label>
+                                            <input type="text" id="batch_year" name="batch_year" value="<?php echo date('Y'); ?>" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Teacher specific fields -->
+                                <div id="teacher_fields" class="hidden space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label for="teacher_id" class="block text-sm font-medium text-gray-700 mb-1">Teacher ID</label>
+                                            <input type="text" id="teacher_id" name="teacher_id" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        </div>
+                                        <div>
+                                            <label for="qualification" class="block text-sm font-medium text-gray-700 mb-1">Qualification</label>
+                                            <input type="text" id="qualification" name="qualification" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        </div>
+                                        <div>
+                                            <label for="specialization" class="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
+                                            <input type="text" id="specialization" name="specialization" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <button type="submit" name="add_user" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        Add User
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
                         <!-- Filter and Search -->
                         <div class="bg-white shadow rounded-lg p-6 mb-6">
                             <form action="users.php" method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div>
                                     <label for="role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                                    <select id="role" name="role" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                    <select id="role_filter" name="role" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                                         <option value="">All Roles</option>
                                         <option value="admin" <?php echo $role_filter == 'admin' ? 'selected' : ''; ?>>Admin</option>
                                         <option value="teacher" <?php echo $role_filter == 'teacher' ? 'selected' : ''; ?>>Teacher</option>
@@ -373,9 +558,6 @@ $conn->close();
                                     <a href="users.php" class="ml-2 inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                         <i class="fas fa-times mr-2"></i> Clear
                                     </a>
-                                    <a href="add_user.php" class="ml-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                                        <i class="fas fa-user-plus mr-2"></i> Add User
-                                    </a>
                                 </div>
                             </form>
                         </div>
@@ -390,8 +572,8 @@ $conn->close();
                                     <table class="min-w-full divide-y divide-gray-200">
                                         <thead class="bg-gray-50">
                                             <tr>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -410,7 +592,7 @@ $conn->close();
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <div class="flex items-center">
                                                             <div class="flex-shrink-0 h-10 w-10">
-                                                                <?php if ($user['profile_image']): ?>
+                                                                <?php if (isset($user['profile_image']) && $user['profile_image']): ?>
                                                                     <img class="h-10 w-10 rounded-full" src="<?php echo $user['profile_image']; ?>" alt="Profile image">
                                                                 <?php else: ?>
                                                                     <span class="inline-flex items-center justify-center h-10 w-10 rounded-full bg-gray-500">
@@ -420,10 +602,21 @@ $conn->close();
                                                             </div>
                                                             <div class="ml-4">
                                                                 <div class="text-sm font-medium text-gray-900"><?php echo $user['full_name']; ?></div>
+                                                                <div class="text-sm text-gray-500"><?php echo $user['phone'] ? $user['phone'] : 'No phone'; ?></div>
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo $user['username']; ?></td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <?php 
+                                                        if ($user['role'] == 'student' && isset($user['student_id'])) {
+                                                            echo $user['student_id'];
+                                                        } elseif ($user['role'] == 'teacher' && isset($user['teacher_id'])) {
+                                                            echo $user['teacher_id'];
+                                                        } else {
+                                                            echo 'N/A';
+                                                        }
+                                                        ?>
+                                                    </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo $user['email']; ?></td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -470,6 +663,23 @@ $conn->close();
     </div>
 
     <script>
+        // Toggle role-specific fields
+        document.getElementById('role').addEventListener('change', function() {
+            const studentFields = document.getElementById('student_fields');
+            const teacherFields = document.getElementById('teacher_fields');
+            
+            if (this.value === 'student') {
+                studentFields.classList.remove('hidden');
+                teacherFields.classList.add('hidden');
+            } else if (this.value === 'teacher') {
+                teacherFields.classList.remove('hidden');
+                studentFields.classList.add('hidden');
+            } else {
+                studentFields.classList.add('hidden');
+                teacherFields.classList.add('hidden');
+            }
+        });
+        
         // Mobile sidebar toggle
         document.getElementById('sidebar-toggle').addEventListener('click', function() {
             document.getElementById('mobile-sidebar').classList.remove('-translate-x-full');
@@ -493,7 +703,7 @@ $conn->close();
             const userMenu = document.getElementById('user-menu');
             const userMenuButton = document.getElementById('user-menu-button');
             
-            if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
+            if (userMenu && userMenuButton && !userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
                 userMenu.classList.add('hidden');
             }
         });

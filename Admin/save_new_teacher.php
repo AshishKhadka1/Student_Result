@@ -75,7 +75,7 @@ try {
     $confirm_password = getPostValue('confirm_password');
     $phone = getPostValue('phone');
     $employee_id = getPostValue('employee_id');
-    $department = getPostValue('department') === 'other' ? getPostValue('other_department') : getPostValue('department');
+    // Department removed
     $qualification = getPostValue('qualification');
     $joining_date = !empty(getPostValue('joining_date')) ? getPostValue('joining_date') : null;
     $experience = !empty(getPostValue('experience')) ? intval(getPostValue('experience')) : null;
@@ -88,12 +88,11 @@ try {
         'full_name' => $full_name,
         'email' => $email,
         'employee_id' => $employee_id,
-        'department' => $department,
         'status' => $status
     ]));
 
     // Validate required fields
-    if (empty($full_name) || empty($email) || empty($password) || empty($employee_id) || empty($department)) {
+    if (empty($full_name) || empty($email) || empty($password) || empty($employee_id)) {
         error_log("Missing required fields");
         throw new Exception('Please fill all required fields');
     }
@@ -222,10 +221,8 @@ try {
     $dob_exists = $column_check && $column_check->num_rows > 0;
     error_log("DOB column exists: " . ($dob_exists ? 'yes' : 'no'));
     
-    // Prepare SQL based on existing columns
-    error_log("Preparing teacher insert statement");
     if ($gender_exists && $dob_exists) {
-        $query = "INSERT INTO teachers (user_id, employee_id, department, qualification, joining_date, experience, address, gender, date_of_birth, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+        $query = "INSERT INTO teachers (user_id, employee_id, qualification, joining_date, experience, address, gender, date_of_birth, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
         error_log("Using query with gender and DOB: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -233,9 +230,9 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("isssissss", $user_id, $employee_id, $department, $qualification, $joining_date, $experience, $address, $gender, $date_of_birth);
+        $stmt->bind_param("isssssss", $user_id, $employee_id, $qualification, $joining_date, $experience, $address, $gender, $date_of_birth);
     } elseif ($gender_exists) {
-        $query = "INSERT INTO teachers (user_id, employee_id, department, qualification, joining_date, experience, address, gender, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+        $query = "INSERT INTO teachers (user_id, employee_id, qualification, joining_date, experience, address, gender, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
         error_log("Using query with gender: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -243,9 +240,9 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("isssiss", $user_id, $employee_id, $department, $qualification, $joining_date, $experience, $address, $gender);
+        $stmt->bind_param("issssss", $user_id, $employee_id, $qualification, $joining_date, $experience, $address, $gender);
     } elseif ($dob_exists) {
-        $query = "INSERT INTO teachers (user_id, employee_id, department, qualification, joining_date, experience, address, date_of_birth, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+        $query = "INSERT INTO teachers (user_id, employee_id, qualification, joining_date, experience, address, date_of_birth, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
         error_log("Using query with DOB: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -253,9 +250,9 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("isssisss", $user_id, $employee_id, $department, $qualification, $joining_date, $experience, $address, $date_of_birth);
+        $stmt->bind_param("issssss", $user_id, $employee_id, $qualification, $joining_date, $experience, $address, $date_of_birth);
     } else {
-        $query = "INSERT INTO teachers (user_id, employee_id, department, qualification, joining_date, experience, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+        $query = "INSERT INTO teachers (user_id, employee_id, qualification, joining_date, experience, address, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())";
         error_log("Using basic query: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -263,7 +260,7 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("isssiss", $user_id, $employee_id, $department, $qualification, $joining_date, $experience, $address);
+        $stmt->bind_param("isssss", $user_id, $employee_id, $qualification, $joining_date, $experience, $address);
     }
     
     if (!$stmt->execute()) {

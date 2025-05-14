@@ -76,6 +76,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 exit();
             }
             
+            // Verify that the user ID exists in the users table
+            $userCheck = $conn->query("SELECT user_id FROM users WHERE user_id = '$user_id'");
+            if ($userCheck->num_rows == 0) {
+                throw new Exception("Invalid user ID. Please log out and log back in.");
+            }
+            
             // Create a record in result_uploads table for tracking
             $uploadQuery = "INSERT INTO result_uploads (
                 file_name, description, status, uploaded_by, upload_date, 

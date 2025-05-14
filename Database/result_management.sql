@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 12, 2025 at 11:36 AM
+-- Generation Time: May 13, 2025 at 06:24 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -302,6 +302,13 @@ CREATE TABLE `loginlogs` (
   `failure_reason` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `loginlogs`
+--
+
+INSERT INTO `loginlogs` (`log_id`, `user_id`, `ip_address`, `user_agent`, `login_time`, `logout_time`, `session_duration`, `status`, `failure_reason`) VALUES
+(65, 56, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-13 10:04:12', NULL, NULL, 'success', NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -321,13 +328,6 @@ CREATE TABLE `notifications` (
   `expires_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `notifications`
---
-
-INSERT INTO `notifications` (`notification_id`, `user_id`, `sender_id`, `title`, `message`, `notification_type`, `related_id`, `is_read`, `priority`, `expires_at`, `created_at`) VALUES
-(9, 33, NULL, 'Welcome to Result Management System', 'Thank you for registering. Your account has been created successfully.', 'system', NULL, 0, 'medium', NULL, '2025-05-12 09:34:39');
 
 -- --------------------------------------------------------
 
@@ -660,8 +660,8 @@ CREATE TABLE `students` (
 --
 
 INSERT INTO `students` (`student_id`, `user_id`, `roll_number`, `registration_number`, `class_id`, `batch_year`, `date_of_birth`, `gender`, `address`, `phone`, `parent_name`, `parent_phone`, `parent_email`, `is_active`, `created_at`, `updated_at`, `section_id`) VALUES
-('S002', 23, '12', 'S002', 5, '2018', '2009-09-09', 'male', NULL, NULL, 'deb khadka', '9842239607', 'gita12@gmail.com', 1, '2025-05-12 06:51:48', '2025-05-12 06:57:46', NULL),
-('S003', 29, '375', 'S003', 5, '1993', '2009-06-06', 'other', NULL, NULL, 'Ignatius Sanford', '+1 (666) 443-6718', 'vyte@mailinator.com', 1, '2025-05-12 09:12:32', '2025-05-12 09:12:32', NULL);
+('S001', 56, '10', 'S001', 3, '2012', '2002-07-27', 'male', NULL, NULL, 'Gita khadka', '9842239606', 'Gita@mailinator.com', 1, '2025-05-13 02:25:21', '2025-05-13 02:25:21', NULL),
+('S002', 58, '986', 'S002', 8, '1981', '1996-06-13', 'male', NULL, NULL, 'Shellie Hopper', '+1 (859) 838-2947', 'towulajy@mailinator.com', 1, '2025-05-13 04:20:57', '2025-05-13 04:20:57', NULL);
 
 -- --------------------------------------------------------
 
@@ -682,6 +682,13 @@ CREATE TABLE `student_performance` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `student_performance`
+--
+
+INSERT INTO `student_performance` (`performance_id`, `student_id`, `exam_id`, `average_marks`, `gpa`, `total_subjects`, `subjects_passed`, `rank`, `remarks`, `created_at`, `updated_at`) VALUES
+(47, 'S001', 5, 0.00, 0.00, 0, 0, NULL, NULL, '2025-05-13 02:32:29', '2025-05-13 03:01:20');
 
 -- --------------------------------------------------------
 
@@ -745,6 +752,7 @@ CREATE TABLE `teachers` (
   `user_id` int(11) NOT NULL,
   `employee_id` varchar(20) NOT NULL,
   `qualification` varchar(100) DEFAULT NULL,
+  `experience` varchar(255) DEFAULT NULL,
   `department` varchar(50) DEFAULT NULL,
   `joining_date` date DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
@@ -758,8 +766,8 @@ CREATE TABLE `teachers` (
 -- Dumping data for table `teachers`
 --
 
-INSERT INTO `teachers` (`teacher_id`, `user_id`, `employee_id`, `qualification`, `department`, `joining_date`, `phone`, `address`, `is_active`, `created_at`, `updated_at`) VALUES
-(5, 33, 'Sed culpa consectetu', 'Saepe dolore excepte', 'Nulla qui est fugiat', NULL, NULL, NULL, 1, '2025-05-12 09:34:39', '2025-05-12 09:34:39');
+INSERT INTO `teachers` (`teacher_id`, `user_id`, `employee_id`, `qualification`, `experience`, `department`, `joining_date`, `phone`, `address`, `is_active`, `created_at`, `updated_at`) VALUES
+(19, 57, '121', 'Bachelor', '2', NULL, '2030-05-03', NULL, 'biratchowk', 1, '2025-05-13 02:30:09', '2025-05-13 02:30:09');
 
 -- --------------------------------------------------------
 
@@ -776,6 +784,13 @@ CREATE TABLE `teachersubjects` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `teachersubjects`
+--
+
+INSERT INTO `teachersubjects` (`id`, `teacher_id`, `subject_id`, `class_id`, `is_active`, `created_at`, `updated_at`) VALUES
+(7, 19, 104, 5, 1, '2025-05-13 02:30:27', '2025-05-13 02:30:27');
 
 -- --------------------------------------------------------
 
@@ -865,9 +880,9 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`user_id`, `username`, `password`, `full_name`, `email`, `gender`, `role`, `status`, `profile_image`, `last_login`, `failed_login_attempts`, `last_failed_login`, `password_reset_token`, `password_reset_expires`, `email_verified`, `email_verification_token`, `created_at`, `updated_at`, `phone`, `address`) VALUES
-(23, 'ayush@gmail.com', '$2y$10$PBaVLi1Rkd5Xu4nr0Atve.Z41VuQNPM7oCEMDFUXyxpNYSHEFlaly', 'Ayush Khadka', 'ayush@gmail.com', NULL, 'student', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-12 06:51:48', '2025-05-12 06:51:48', '9846837536', 'biratchowk'),
-(29, 'qubokyweh@mailinator.com', '$2y$10$F0//ixobWc3BlVcidpiEHuV07aVvxqxJnNYGV83hjkm8UGhjXQkJ6', 'Karyn Holmes', 'qubokyweh@mailinator.com', NULL, 'student', 'inactive', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-12 09:12:32', '2025-05-12 09:12:32', '+1 (149) 384-5857', 'Duis est vel ipsam a'),
-(33, 'pyvunar', '$2y$10$U18FmzNkh7sFyh9.ZL5Af.zccOPUuSm3Gdbtq6nGl7rsWr1qVfbCm', 'Ishmael Austin', 'tulyqulyc@mailinator.com', NULL, 'teacher', 'inactive', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-12 09:34:39', '2025-05-12 09:34:39', NULL, NULL);
+(56, 'ayush@mailinator.com', '$2y$10$/joTEC2KlN5/7BOzSoNcXukZFLFtabN.8h/ascGJmRq04Ul8KUz6O', 'Ayush Khadka', 'ayush@mailinator.com', NULL, 'student', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 02:25:21', '2025-05-13 02:25:21', '9846837536', 'biratchowk'),
+(57, 'ashish', '$2y$10$V.OcXbfj5Bm.fHgk2x2KfO1cySIddPTYs3/qiOSb8WelxJKko9Cmu', 'AshishKhadka', 'ashish@gmail.com', NULL, 'teacher', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 02:30:09', '2025-05-13 02:30:09', '9846837536', NULL),
+(58, 'wawipezagu@mailinator.com', '$2y$10$QPrOlGEnbK84zFtHNhz00u4MFnpxlwyzdLmZRxVFj3gIe9XPKriRK', 'Pascale Matthews', 'wawipezagu@mailinator.com', NULL, 'student', 'inactive', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 04:20:57', '2025-05-13 04:20:57', '+1 (536) 208-8639', 'Et in eius quam veli');
 
 -- --------------------------------------------------------
 
@@ -1129,7 +1144,7 @@ ALTER TABLE `academic_years`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
 
 --
 -- AUTO_INCREMENT for table `batch_operations`
@@ -1165,13 +1180,13 @@ ALTER TABLE `grading_system`
 -- AUTO_INCREMENT for table `loginlogs`
 --
 ALTER TABLE `loginlogs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=62;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=67;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `resultdetails`
@@ -1183,7 +1198,7 @@ ALTER TABLE `resultdetails`
 -- AUTO_INCREMENT for table `results`
 --
 ALTER TABLE `results`
-  MODIFY `result_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
+  MODIFY `result_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=61;
 
 --
 -- AUTO_INCREMENT for table `result_history`
@@ -1195,7 +1210,7 @@ ALTER TABLE `result_history`
 -- AUTO_INCREMENT for table `result_uploads`
 --
 ALTER TABLE `result_uploads`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `sections`
@@ -1213,7 +1228,7 @@ ALTER TABLE `settings`
 -- AUTO_INCREMENT for table `student_performance`
 --
 ALTER TABLE `student_performance`
-  MODIFY `performance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
+  MODIFY `performance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
 
 --
 -- AUTO_INCREMENT for table `system_settings`
@@ -1225,13 +1240,13 @@ ALTER TABLE `system_settings`
 -- AUTO_INCREMENT for table `teachers`
 --
 ALTER TABLE `teachers`
-  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `teachersubjects`
 --
 ALTER TABLE `teachersubjects`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `teacher_activities`
@@ -1243,7 +1258,7 @@ ALTER TABLE `teacher_activities`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=59;
 
 --
 -- Constraints for dumped tables

@@ -75,7 +75,7 @@ try {
     $email = getPostValue('email');
     $phone = getPostValue('phone');
     $employee_id = getPostValue('employee_id');
-    $department = getPostValue('department') === 'other' ? getPostValue('other_department') : getPostValue('department');
+    // Department removed
     $qualification = getPostValue('qualification');
     $joining_date = !empty(getPostValue('joining_date')) ? getPostValue('joining_date') : null;
     $experience = !empty(getPostValue('experience')) ? intval(getPostValue('experience')) : null;
@@ -90,12 +90,11 @@ try {
         'full_name' => $full_name,
         'email' => $email,
         'employee_id' => $employee_id,
-        'department' => $department,
         'status' => $status
     ]));
 
     // Validate required fields
-    if (empty($teacher_id) || empty($user_id) || empty($full_name) || empty($email) || empty($employee_id) || empty($department)) {
+    if (empty($teacher_id) || empty($user_id) || empty($full_name) || empty($email) || empty($employee_id)) {
         error_log("Missing required fields");
         throw new Exception('Please fill all required fields');
     }
@@ -168,7 +167,7 @@ try {
     // Prepare SQL based on existing columns
     error_log("Preparing teacher update statement");
     if ($gender_exists && $dob_exists) {
-        $query = "UPDATE teachers SET employee_id = ?, department = ?, qualification = ?, joining_date = ?, experience = ?, address = ?, gender = ?, date_of_birth = ? WHERE teacher_id = ?";
+        $query = "UPDATE teachers SET employee_id = ?, qualification = ?, joining_date = ?, experience = ?, address = ?, gender = ?, date_of_birth = ? WHERE teacher_id = ?";
         error_log("Using query with gender and DOB: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -176,9 +175,9 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("ssssisssi", $employee_id, $department, $qualification, $joining_date, $experience, $address, $gender, $date_of_birth, $teacher_id);
+        $stmt->bind_param("sssisssi", $employee_id, $qualification, $joining_date, $experience, $address, $gender, $date_of_birth, $teacher_id);
     } elseif ($gender_exists) {
-        $query = "UPDATE teachers SET employee_id = ?, department = ?, qualification = ?, joining_date = ?, experience = ?, address = ?, gender = ? WHERE teacher_id = ?";
+        $query = "UPDATE teachers SET employee_id = ?, qualification = ?, joining_date = ?, experience = ?, address = ?, gender = ? WHERE teacher_id = ?";
         error_log("Using query with gender: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -186,9 +185,9 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("ssssissi", $employee_id, $department, $qualification, $joining_date, $experience, $address, $gender, $teacher_id);
+        $stmt->bind_param("ssisssi", $employee_id, $qualification, $joining_date, $experience, $address, $gender, $teacher_id);
     } elseif ($dob_exists) {
-        $query = "UPDATE teachers SET employee_id = ?, department = ?, qualification = ?, joining_date = ?, experience = ?, address = ?, date_of_birth = ? WHERE teacher_id = ?";
+        $query = "UPDATE teachers SET employee_id = ?, qualification = ?, joining_date = ?, experience = ?, address = ?, date_of_birth = ? WHERE teacher_id = ?";
         error_log("Using query with DOB: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -196,9 +195,9 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("ssssissi", $employee_id, $department, $qualification, $joining_date, $experience, $address, $date_of_birth, $teacher_id);
+        $stmt->bind_param("ssisssi", $employee_id, $qualification, $joining_date, $experience, $address, $date_of_birth, $teacher_id);
     } else {
-        $query = "UPDATE teachers SET employee_id = ?, department = ?, qualification = ?, joining_date = ?, experience = ?, address = ? WHERE teacher_id = ?";
+        $query = "UPDATE teachers SET employee_id = ?, qualification = ?, joining_date = ?, experience = ?, address = ? WHERE teacher_id = ?";
         error_log("Using basic query: $query");
         $stmt = $conn->prepare($query);
         if (!$stmt) {
@@ -206,7 +205,7 @@ try {
             throw new Exception('Database error: ' . $conn->error);
         }
         
-        $stmt->bind_param("ssssisi", $employee_id, $department, $qualification, $joining_date, $experience, $address, $teacher_id);
+        $stmt->bind_param("ssisi", $employee_id, $qualification, $joining_date, $experience, $address, $teacher_id);
     }
     
     if (!$stmt->execute()) {
@@ -239,10 +238,14 @@ try {
         error_log("Activities table does not exist, skipping activity log");
     }
     
+    error_log("All database operations completed successfully");
+
     // Commit transaction
     error_log("Committing transaction");
     $conn->commit();
     
+    error_log("Transaction committed successfully");
+
     // Clean any output that might have been generated
     ob_end_clean();
     
@@ -251,6 +254,7 @@ try {
     echo json_encode(['success' => true, 'message' => 'Teacher updated successfully', 'teacher_id' => $teacher_id]);
 } catch (Exception $e) {
     error_log("Error in save_teacher_edit.php: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
     // Rollback transaction on error if connection exists
     if (isset($conn) && $conn instanceof mysqli) {
         error_log("Rolling back transaction");
