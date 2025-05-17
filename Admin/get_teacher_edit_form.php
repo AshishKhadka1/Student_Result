@@ -81,6 +81,17 @@ $conn->close();
             <label for="phone" class="block text-sm font-medium text-gray-700">Phone</label>
             <input type="text" name="phone" id="phone" value="<?php echo htmlspecialchars($teacher['phone'] ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         </div>
+
+        <div>
+            <label for="password" class="block text-sm font-medium text-gray-700">New Password (leave blank to keep current)</label>
+            <input type="password" name="password" id="password" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            <p class="mt-1 text-xs text-gray-500">Minimum 6 characters. Only enter if you want to change the password.</p>
+        </div>
+        
+        <div>
+            <label for="confirm_password" class="block text-sm font-medium text-gray-700">Confirm New Password</label>
+            <input type="password" name="confirm_password" id="confirm_password" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+        </div>
         
         <div>
             <label for="gender" class="block text-sm font-medium text-gray-700">Gender</label>
@@ -101,10 +112,7 @@ $conn->close();
             <textarea name="address" id="address" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"><?php echo htmlspecialchars($teacher['address'] ?? ''); ?></textarea>
         </div>
         
-        <div>
-            <label for="password" class="block text-sm font-medium text-gray-700">New Password (leave blank to keep current)</label>
-            <input type="password" name="password" id="password" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-        </div>
+        
         
         <!-- Professional Information -->
         <div class="md:col-span-2 mt-4">

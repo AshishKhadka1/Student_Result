@@ -57,96 +57,52 @@ if (isset($_POST['action'])) {
         header("Location: result.php");
         exit();
     }
-    elseif ($_POST['action'] == 'update_subject_marks' && isset($_POST['detail_id'])) {
-        $detail_id = intval($_POST['detail_id']);
-        $marks_obtained = floatval($_POST['marks_obtained']);
-        $total_marks = floatval($_POST['total_marks']);
+    elseif ($_POST['action'] == 'update_subject_marks' && isset($_POST['result_id'])) {
+        $result_id = $_POST['result_id'];
+        $theory_marks = floatval($_POST['theory_marks']);
+        $practical_marks = !empty($_POST['practical_marks']) ? floatval($_POST['practical_marks']) : null;
         
-        // Calculate percentage
-        $percentage = ($marks_obtained / $total_marks) * 100;
+        // Get subject information
+        $stmt = $conn->prepare("SELECT subject_id FROM results WHERE result_id = ?");
+        $stmt->bind_param("i", $result_id);
+        $stmt->execute();
+        $subject_result = $stmt->get_result();
+        $subject_data = $subject_result->fetch_assoc();
+        $subject_id = $subject_data['subject_id'];
+        $stmt->close();
+        
+        // Calculate total and grade
+        $total_marks = $theory_marks + ($practical_marks ?? 0);
+        $percentage = ($total_marks / 100) * 100; // Assuming total possible marks is 100
         
         // Determine grade
         $grade = '';
-        $is_pass = 0;
-        
         if ($percentage >= 90) {
             $grade = 'A+';
-            $is_pass = 1;
         } elseif ($percentage >= 80) {
             $grade = 'A';
-            $is_pass = 1;
         } elseif ($percentage >= 70) {
             $grade = 'B+';
-            $is_pass = 1;
         } elseif ($percentage >= 60) {
             $grade = 'B';
-            $is_pass = 1;
         } elseif ($percentage >= 50) {
             $grade = 'C+';
-            $is_pass = 1;
         } elseif ($percentage >= 40) {
             $grade = 'C';
-            $is_pass = 1;
         } elseif ($percentage >= 33) {
             $grade = 'D';
-            $is_pass = 1;
         } else {
             $grade = 'F';
-            $is_pass = 0;
         }
         
-        // Update the subject result
-        $stmt = $conn->prepare("UPDATE ResultDetails SET marks_obtained = ?, total_marks = ?, percentage = ?, grade = ?, is_pass = ? WHERE detail_id = ?");
-        $stmt->bind_param("dddsii", $marks_obtained, $total_marks, $percentage, $grade, $is_pass, $detail_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Now update the overall result
-        $query = "SELECT SUM(marks_obtained) as total_obtained, SUM(total_marks) as total_marks, 
-                         MIN(is_pass) as all_pass
-                  FROM ResultDetails 
-                  WHERE result_id = ?";
-        
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("i", $result_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $stmt->close();
-        
-        $total_obtained = $row['total_obtained'];
-        $total_marks = $row['total_marks'];
-        $all_pass = $row['all_pass'];
-        
-        $overall_percentage = ($total_obtained / $total_marks) * 100;
-        
-        // Determine overall grade
-        $overall_grade = '';
-        if ($overall_percentage >= 90) {
-            $overall_grade = 'A+';
-        } elseif ($overall_percentage >= 80) {
-            $overall_grade = 'A';
-        } elseif ($overall_percentage >= 70) {
-            $overall_grade = 'B+';
-        } elseif ($overall_percentage >= 60) {
-            $overall_grade = 'B';
-        } elseif ($overall_percentage >= 50) {
-            $overall_grade = 'C+';
-        } elseif ($overall_percentage >= 40) {
-            $overall_grade = 'C';
-        } elseif ($overall_percentage >= 33) {
-            $overall_grade = 'D';
+        // Update the result
+        if ($practical_marks !== null) {
+            $stmt = $conn->prepare("UPDATE results SET theory_marks = ?, practical_marks = ?, grade = ?, updated_at = NOW() WHERE result_id = ?");
+            $stmt->bind_param("ddsi", $theory_marks, $practical_marks, $grade, $result_id);
         } else {
-            $overall_grade = 'F';
+            $stmt = $conn->prepare("UPDATE results SET theory_marks = ?, grade = ?, updated_at = NOW() WHERE result_id = ?");
+            $stmt->bind_param("dsi", $theory_marks, $grade, $result_id);
         }
-        
-        // Update the main result
-        $query = "UPDATE Results 
-                  SET total_marks = ?, marks_obtained = ?, percentage = ?, grade = ?, is_pass = ?
-                  WHERE result_id = ?";
-        
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("dddsii", $total_marks, $total_obtained, $overall_percentage, $overall_grade, $all_pass, $result_id);
         $stmt->execute();
         $stmt->close();
         
@@ -264,21 +220,19 @@ try {
     $result_data = $result->fetch_assoc();
     $stmt->close();
     
-    // Get subject-wise results
-    $query = "SELECT rd.*, s.subject_name, s.subject_code
-              FROM ResultDetails rd
-              JOIN Subjects s ON rd.subject_id = s.subject_id
-              WHERE rd.result_id = ?
-              ORDER BY s.subject_name";
-    
+    // Get subject-wise results for the specific exam
+    $query = "SELECT r.*, s.subject_name, s.subject_code, s.full_marks_theory, s.full_marks_practical
+          FROM results r
+          JOIN subjects s ON r.subject_id = s.subject_id
+          WHERE r.student_id = ? AND r.exam_id = ?
+          ORDER BY s.subject_name";
+
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("i", $result_id);
+    $stmt->bind_param("si", $result_data['student_id'], $result_data['exam_id']);
     $stmt->execute();
     $result = $stmt->get_result();
-    
-    while ($row = $result->fetch_assoc()) {
-        $subject_results[] = $row;
-    }
+
+    $subject_results = $result->fetch_all(MYSQLI_ASSOC);
     
     $stmt->close();
     
@@ -809,91 +763,89 @@ $conn->close();
                             <!-- Subject-wise Results -->
                             <div class="p-6 border-b border-gray-200">
                                 <h2 class="text-xl font-semibold text-gray-900 mb-4">Subject-wise Results</h2>
-                                <div class="overflow-x-auto">
-                                    <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marks</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider no-print">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200">
-                                            <?php if (empty($subject_results)): ?>
-                                            <tr>
-                                                <td colspan="7" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No subject results found</td>
-                                            </tr>
-                                            <?php else: ?>
-                                                <?php foreach ($subject_results as $subject): ?>
-                                                <tr>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm text-gray-900"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm text-gray-900"><?php echo htmlspecialchars($subject['marks_obtained'] . '/' . $subject['total_marks']); ?></div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm text-gray-900"><?php echo htmlspecialchars(number_format($subject['percentage'], 2)); ?>%</div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <?php
-                                                        $grade_class = '';
-                                                        switch ($subject['grade']) {
-                                                            case 'A+': $grade_class = 'bg-green-100 text-green-800'; break;
-                                                            case 'A': $grade_class = 'bg-green-100 text-green-800'; break;
-                                                            case 'B+': $grade_class = 'bg-blue-100 text-blue-800'; break;
-                                                            case 'B': $grade_class = 'bg-blue-100 text-blue-800'; break;
-                                                            case 'C+': $grade_class = 'bg-yellow-100 text-yellow-800'; break;
-                                                            case 'C': $grade_class = 'bg-yellow-100 text-yellow-800'; break;
-                                                            case 'D': $grade_class = 'bg-orange-100 text-orange-800'; break;
-                                                            case 'F': $grade_class = 'bg-red-100 text-red-800'; break;
-                                                            default: $grade_class = 'bg-gray-100 text-gray-800';
-                                                        }
-                                                        ?>
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $grade_class; ?>">
-                                                            <?php echo htmlspecialchars($subject['grade']); ?>
-                                                        </span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <?php if ($subject['is_pass']): ?>
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                            Pass
-                                                        </span>
-                                                        <?php else: ?>
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                                            Fail
-                                                        </span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium no-print">
-                                                        <div class="flex space-x-3">
-                                                            <button type="button" onclick="openEditSubjectMarksModal(<?php echo $subject['detail_id']; ?>, '<?php echo $subject['subject_name']; ?>', <?php echo $subject['marks_obtained']; ?>, <?php echo $subject['total_marks']; ?>)" class="text-blue-600 hover:text-blue-900 transition-colors duration-200">
-                                                                <i class="fas fa-edit"></i> Edit
-                                                            </button>
-                                                            
-                                                            <form method="POST" class="inline" onsubmit="return confirmDeleteSubject('<?php echo htmlspecialchars($subject['subject_name']); ?>');">
-                                                                <input type="hidden" name="action" value="delete_subject">
-                                                                <input type="hidden" name="detail_id" value="<?php echo $subject['detail_id']; ?>">
-                                                                <button type="submit" class="text-red-600 hover:text-red-900 transition-colors duration-200">
-                                                                    <i class="fas fa-trash"></i> Delete
-                                                                </button>
-                                                            </form>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                <?php endforeach; ?>
-                                            <?php endif; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Theory</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Practical</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider no-print">Action</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <?php if (empty($subject_results)): ?>
+                <tr>
+                    <td colspan="8" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No subject results found</td>
+                </tr>
+                <?php else: ?>
+                    <?php foreach ($subject_results as $subject): ?>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900"><?php echo htmlspecialchars($subject['theory_marks']); ?></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900"><?php echo isset($subject['practical_marks']) ? htmlspecialchars($subject['practical_marks']) : 'N/A'; ?></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                <?php 
+                                $total = $subject['theory_marks'] + ($subject['practical_marks'] ?? 0);
+                                echo htmlspecialchars(number_format($total, 2)); 
+                                ?>
                             </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <?php
+                            $grade_class = '';
+                            switch ($subject['grade']) {
+                                case 'A+': $grade_class = 'bg-green-100 text-green-800'; break;
+                                case 'A': $grade_class = 'bg-green-100 text-green-800'; break;
+                                case 'B+': $grade_class = 'bg-blue-100 text-blue-800'; break;
+                                case 'B': $grade_class = 'bg-blue-100 text-blue-800'; break;
+                                case 'C+': $grade_class = 'bg-yellow-100 text-yellow-800'; break;
+                                case 'C': $grade_class = 'bg-yellow-100 text-yellow-800'; break;
+                                case 'D': $grade_class = 'bg-orange-100 text-orange-800'; break;
+                                case 'F': $grade_class = 'bg-red-100 text-red-800'; break;
+                                default: $grade_class = 'bg-gray-100 text-gray-800';
+                            }
+                            ?>
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $grade_class; ?>">
+                                <?php echo htmlspecialchars($subject['grade']); ?>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <?php 
+                            $is_pass = ($subject['grade'] != 'F');
+                            ?>
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $is_pass ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
+                                <?php echo $is_pass ? 'Pass' : 'Fail'; ?>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium no-print">
+                            <div class="flex space-x-3">
+                                <button type="button" onclick="openEditSubjectMarksModal('<?php echo $subject['result_id']; ?>', '<?php echo $subject['subject_name']; ?>', <?php echo $subject['theory_marks']; ?>, <?php echo $subject['practical_marks'] ?? 0; ?>)" class="text-blue-600 hover:text-blue-900 transition-colors duration-200">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
                             
                             <!-- Overall Result -->
                             <div class="p-6">
@@ -980,23 +932,23 @@ $conn->close();
             <h2 class="text-xl font-semibold mb-4">Update Subject Marks</h2>
             <form id="editSubjectMarksForm" method="POST" class="space-y-4">
                 <input type="hidden" name="action" value="update_subject_marks">
-                <input type="hidden" id="edit_detail_id" name="detail_id" value="">
-                
+                <input type="hidden" id="edit_result_id" name="result_id" value="">
+            
                 <div>
                     <label for="subject_name" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                     <input type="text" id="subject_name" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" readonly>
                 </div>
-                
+            
                 <div>
-                    <label for="subject_marks_obtained" class="block text-sm font-medium text-gray-700 mb-1">Marks Obtained</label>
-                    <input type="number" id="subject_marks_obtained" name="marks_obtained" step="0.01" min="0" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" required>
+                    <label for="theory_marks" class="block text-sm font-medium text-gray-700 mb-1">Theory Marks</label>
+                    <input type="number" id="theory_marks" name="theory_marks" step="0.01" min="0" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" required>
                 </div>
-                
+            
                 <div>
-                    <label for="subject_total_marks" class="block text-sm font-medium text-gray-700 mb-1">Total Marks</label>
-                    <input type="number" id="subject_total_marks" name="total_marks" step="0.01" min="0.01" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" required>
+                    <label for="practical_marks" class="block text-sm font-medium text-gray-700 mb-1">Practical Marks</label>
+                    <input type="number" id="practical_marks" name="practical_marks" step="0.01" min="0" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                 </div>
-                
+            
                 <div class="flex justify-end">
                     <button type="button" onclick="closeEditSubjectMarksModal()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-2">
                         Cancel
@@ -1011,11 +963,11 @@ $conn->close();
 
     <script>
         // Modal functions
-        function openEditSubjectMarksModal(detailId, subjectName, marksObtained, totalMarks) {
-            document.getElementById('edit_detail_id').value = detailId;
+        function openEditSubjectMarksModal(resultId, subjectName, theoryMarks, practicalMarks) {
+            document.getElementById('edit_result_id').value = resultId;
             document.getElementById('subject_name').value = subjectName;
-            document.getElementById('subject_marks_obtained').value = marksObtained;
-            document.getElementById('subject_total_marks').value = totalMarks;
+            document.getElementById('theory_marks').value = theoryMarks;
+            document.getElementById('practical_marks').value = practicalMarks;
             document.getElementById('editSubjectMarksModal').style.display = 'block';
         }
         

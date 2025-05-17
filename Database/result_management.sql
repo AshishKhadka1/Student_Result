@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 13, 2025 at 06:24 AM
+-- Generation Time: May 15, 2025 at 06:11 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -20,81 +20,6 @@ SET time_zone = "+00:00";
 --
 -- Database: `result_management`
 --
-
-DELIMITER $$
---
--- Procedures
---
-CREATE DEFINER=`root`@`localhost` PROCEDURE `update_student_performance` (IN `p_student_id` VARCHAR(20), IN `p_exam_id` INT)   BEGIN
-  DECLARE v_avg_marks DECIMAL(5,2);
-  DECLARE v_gpa DECIMAL(3,2);
-  DECLARE v_total_subjects INT;
-  DECLARE v_subjects_passed INT;
-  DECLARE v_rank INT;
-  
-  -- Calculate average marks
-  SELECT 
-    AVG(theory_marks + practical_marks) INTO v_avg_marks
-  FROM 
-    results
-  WHERE 
-    student_id = p_student_id AND exam_id = p_exam_id;
-  
-  -- Calculate GPA (weighted average)
-  SELECT 
-    SUM(gpa * credit_hours) / SUM(credit_hours) INTO v_gpa
-  FROM 
-    results
-  WHERE 
-    student_id = p_student_id AND exam_id = p_exam_id;
-  
-  -- Count total subjects
-  SELECT 
-    COUNT(*) INTO v_total_subjects
-  FROM 
-    results
-  WHERE 
-    student_id = p_student_id AND exam_id = p_exam_id;
-  
-  -- Count passed subjects
-  SELECT 
-    COUNT(*) INTO v_subjects_passed
-  FROM 
-    results
-  WHERE 
-    student_id = p_student_id AND exam_id = p_exam_id AND grade <> 'F';
-  
-  -- Calculate rank (this is a simplified version)
-  SELECT 
-    COUNT(*) + 1 INTO v_rank
-  FROM 
-    (SELECT 
-      student_id, 
-      AVG(gpa) as avg_gpa
-     FROM 
-      results
-     WHERE 
-      exam_id = p_exam_id
-     GROUP BY 
-      student_id
-     HAVING 
-      AVG(gpa) > v_gpa) AS better_students;
-  
-  -- Insert or update performance record
-  INSERT INTO student_performance 
-    (student_id, exam_id, average_marks, gpa, total_subjects, subjects_passed, rank)
-  VALUES 
-    (p_student_id, p_exam_id, v_avg_marks, v_gpa, v_total_subjects, v_subjects_passed, v_rank)
-  ON DUPLICATE KEY UPDATE
-    average_marks = v_avg_marks,
-    gpa = v_gpa,
-    total_subjects = v_total_subjects,
-    subjects_passed = v_subjects_passed,
-    rank = v_rank,
-    updated_at = CURRENT_TIMESTAMP;
-END$$
-
-DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -133,6 +58,16 @@ CREATE TABLE `activity_logs` (
   `ip_address` varchar(45) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `activity_logs`
+--
+
+INSERT INTO `activity_logs` (`log_id`, `user_id`, `action`, `details`, `ip_address`, `created_at`) VALUES
+(52, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 2', NULL, '2025-05-15 03:41:42'),
+(53, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 2', NULL, '2025-05-15 03:47:00'),
+(54, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 12', NULL, '2025-05-15 03:53:11'),
+(55, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 12', NULL, '2025-05-15 04:00:39');
 
 -- --------------------------------------------------------
 
@@ -301,13 +236,6 @@ CREATE TABLE `loginlogs` (
   `status` enum('success','failed') NOT NULL DEFAULT 'success',
   `failure_reason` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `loginlogs`
---
-
-INSERT INTO `loginlogs` (`log_id`, `user_id`, `ip_address`, `user_agent`, `login_time`, `logout_time`, `session_duration`, `status`, `failure_reason`) VALUES
-(65, 56, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-13 10:04:12', NULL, NULL, 'success', NULL);
 
 -- --------------------------------------------------------
 
@@ -487,17 +415,58 @@ CREATE TABLE `results` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Dumping data for table `results`
+--
+
+INSERT INTO `results` (`result_id`, `student_id`, `subject_id`, `exam_id`, `theory_marks`, `practical_marks`, `credit_hours`, `grade`, `gpa`, `remarks`, `upload_id`, `batch_id`, `status`, `status_changed_at`, `status_changed_by`, `created_by`, `updated_by`, `created_at`, `updated_at`, `is_published`, `percentage`, `is_pass`, `total_marks`, `marks_obtained`) VALUES
+(91, 'S002', '103', 12, 91.00, 34.00, 1.0, 'A+', 4.00, 'Alias quia ut dolore', 35, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-15 04:00:39', '2025-05-15 04:00:39', 0, 0.00, 0, 0.00, 0.00);
+
+--
 -- Triggers `results`
 --
 DELIMITER $$
 CREATE TRIGGER `after_result_insert` AFTER INSERT ON `results` FOR EACH ROW BEGIN
-  CALL update_student_performance(NEW.student_id, NEW.exam_id);
-END
-$$
-DELIMITER ;
-DELIMITER $$
-CREATE TRIGGER `after_result_update` AFTER UPDATE ON `results` FOR EACH ROW BEGIN
-  CALL update_student_performance(NEW.student_id, NEW.exam_id);
+    -- Update student_performance table directly instead of calling the stored procedure
+    DECLARE v_avg_marks DECIMAL(5,2);
+    DECLARE v_gpa DECIMAL(3,2);
+    DECLARE v_total_subjects INT;
+    DECLARE v_subjects_passed INT;
+    
+    -- Calculate average marks
+    SELECT AVG(theory_marks + practical_marks) INTO v_avg_marks
+    FROM results
+    WHERE student_id = NEW.student_id AND exam_id = NEW.exam_id;
+    
+    -- Calculate GPA (weighted average)
+    SELECT 
+        CASE 
+            WHEN SUM(credit_hours) > 0 THEN SUM(gpa * credit_hours) / SUM(credit_hours)
+            ELSE 0
+        END INTO v_gpa
+    FROM results
+    WHERE student_id = NEW.student_id AND exam_id = NEW.exam_id;
+    
+    -- Count total subjects
+    SELECT COUNT(*) INTO v_total_subjects
+    FROM results
+    WHERE student_id = NEW.student_id AND exam_id = NEW.exam_id;
+    
+    -- Count passed subjects
+    SELECT COUNT(*) INTO v_subjects_passed
+    FROM results
+    WHERE student_id = NEW.student_id AND exam_id = NEW.exam_id AND grade <> 'F';
+    
+    -- Insert or update performance record
+    INSERT INTO student_performance 
+        (student_id, exam_id, average_marks, gpa, total_subjects, subjects_passed, created_at, updated_at)
+    VALUES 
+        (NEW.student_id, NEW.exam_id, v_avg_marks, v_gpa, v_total_subjects, v_subjects_passed, NOW(), NOW())
+    ON DUPLICATE KEY UPDATE
+        average_marks = v_avg_marks,
+        gpa = v_gpa,
+        total_subjects = v_total_subjects,
+        subjects_passed = v_subjects_passed,
+        updated_at = NOW();
 END
 $$
 DELIMITER ;
@@ -564,6 +533,13 @@ CREATE TABLE `result_uploads` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `result_uploads`
+--
+
+INSERT INTO `result_uploads` (`id`, `file_name`, `description`, `status`, `uploaded_by`, `upload_date`, `student_count`, `success_count`, `error_count`, `error_details`, `is_manual_entry`, `exam_id`, `class_id`, `created_at`, `updated_at`) VALUES
+(35, 'Manual Entry', 'Manual entry for Student ID: S002, Exam ID: 12', 'Published', 1, '2025-05-15 09:45:39', 1, 1, 0, NULL, 0, 12, 8, '2025-05-15 04:00:39', '2025-05-15 04:00:39');
 
 -- --------------------------------------------------------
 
@@ -660,8 +636,7 @@ CREATE TABLE `students` (
 --
 
 INSERT INTO `students` (`student_id`, `user_id`, `roll_number`, `registration_number`, `class_id`, `batch_year`, `date_of_birth`, `gender`, `address`, `phone`, `parent_name`, `parent_phone`, `parent_email`, `is_active`, `created_at`, `updated_at`, `section_id`) VALUES
-('S001', 56, '10', 'S001', 3, '2012', '2002-07-27', 'male', NULL, NULL, 'Gita khadka', '9842239606', 'Gita@mailinator.com', 1, '2025-05-13 02:25:21', '2025-05-13 02:25:21', NULL),
-('S002', 58, '986', 'S002', 8, '1981', '1996-06-13', 'male', NULL, NULL, 'Shellie Hopper', '+1 (859) 838-2947', 'towulajy@mailinator.com', 1, '2025-05-13 04:20:57', '2025-05-13 04:20:57', NULL);
+('S002', 79, '357', 'S002', 8, '1982', '1995-07-08', 'male', NULL, NULL, 'Brenda Bauer', '+1 (785) 665-5721', 'beqigyhyq@mailinator.com', 1, '2025-05-14 15:25:09', '2025-05-14 15:25:09', NULL);
 
 -- --------------------------------------------------------
 
@@ -688,7 +663,9 @@ CREATE TABLE `student_performance` (
 --
 
 INSERT INTO `student_performance` (`performance_id`, `student_id`, `exam_id`, `average_marks`, `gpa`, `total_subjects`, `subjects_passed`, `rank`, `remarks`, `created_at`, `updated_at`) VALUES
-(47, 'S001', 5, 0.00, 0.00, 0, 0, NULL, NULL, '2025-05-13 02:32:29', '2025-05-13 03:01:20');
+(49, 'S002', 5, 0.00, 0.00, 0, 0, NULL, NULL, '2025-05-14 19:09:42', '2025-05-14 19:09:42'),
+(50, 'S002', 2, 0.00, 0.00, 0, 0, NULL, NULL, '2025-05-14 19:14:47', '2025-05-15 03:47:00'),
+(53, 'S002', 12, 125.00, 4.00, 1, 1, NULL, NULL, '2025-05-15 03:53:11', '2025-05-15 04:00:39');
 
 -- --------------------------------------------------------
 
@@ -767,7 +744,10 @@ CREATE TABLE `teachers` (
 --
 
 INSERT INTO `teachers` (`teacher_id`, `user_id`, `employee_id`, `qualification`, `experience`, `department`, `joining_date`, `phone`, `address`, `is_active`, `created_at`, `updated_at`) VALUES
-(19, 57, '121', 'Bachelor', '2', NULL, '2030-05-03', NULL, 'biratchowk', 1, '2025-05-13 02:30:09', '2025-05-13 02:30:09');
+(19, 57, '121', 'Bachelor', '2', NULL, '2030-05-03', NULL, 'biratchowk', 1, '2025-05-13 02:30:09', '2025-05-13 02:30:09'),
+(20, 63, 'Est in tempore est', 'Dolore sed officia v', '1971', NULL, '2002-08-24', NULL, 'Molestias tenetur cu', 1, '2025-05-13 14:21:13', '2025-05-13 14:21:13'),
+(21, 74, 'Est sunt illo dolore', 'Tempora odit lorem v', '1976', NULL, '2019-04-08', NULL, 'Nam eum cum placeat', 1, '2025-05-13 14:37:02', '2025-05-13 14:37:02'),
+(22, 75, 'Autem accusantium in', 'Tenetur obcaecati ei', '1995', NULL, '2021-10-24', NULL, 'Quaerat minima nihil', 1, '2025-05-13 14:41:58', '2025-05-13 14:41:58');
 
 -- --------------------------------------------------------
 
@@ -880,9 +860,12 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`user_id`, `username`, `password`, `full_name`, `email`, `gender`, `role`, `status`, `profile_image`, `last_login`, `failed_login_attempts`, `last_failed_login`, `password_reset_token`, `password_reset_expires`, `email_verified`, `email_verification_token`, `created_at`, `updated_at`, `phone`, `address`) VALUES
-(56, 'ayush@mailinator.com', '$2y$10$/joTEC2KlN5/7BOzSoNcXukZFLFtabN.8h/ascGJmRq04Ul8KUz6O', 'Ayush Khadka', 'ayush@mailinator.com', NULL, 'student', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 02:25:21', '2025-05-13 02:25:21', '9846837536', 'biratchowk'),
-(57, 'ashish', '$2y$10$V.OcXbfj5Bm.fHgk2x2KfO1cySIddPTYs3/qiOSb8WelxJKko9Cmu', 'AshishKhadka', 'ashish@gmail.com', NULL, 'teacher', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 02:30:09', '2025-05-13 02:30:09', '9846837536', NULL),
-(58, 'wawipezagu@mailinator.com', '$2y$10$QPrOlGEnbK84zFtHNhz00u4MFnpxlwyzdLmZRxVFj3gIe9XPKriRK', 'Pascale Matthews', 'wawipezagu@mailinator.com', NULL, 'student', 'inactive', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 04:20:57', '2025-05-13 04:20:57', '+1 (536) 208-8639', 'Et in eius quam veli');
+(1, 'admin', '$2y$10$HEpg59r5H32OQeDScuRh.eJxniPZbKV0Wzlh.ij/Pg4mZn6zvL7oi', '', 'admin@example.com', NULL, 'admin', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-15 03:41:06', '2025-05-15 03:41:06', NULL, NULL),
+(57, 'ashish', '$2y$10$V.OcXbfj5Bm.fHgk2x2KfO1cySIddPTYs3/qiOSb8WelxJKko9Cmu', 'AshishKhadka', 'ashish@gmail.com', NULL, 'teacher', 'inactive', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 02:30:09', '2025-05-13 14:16:00', '9846837536', NULL),
+(63, 'sufubatozu', '$2y$10$0lr139ch1Z.kgJdP7xrZj.WOMhQomYMcZXxv9s1JqG/Te1nuLnDMi', 'Hayfa Hughes', 'sufubatozu@mailinator.com', NULL, 'teacher', 'inactive', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 14:21:13', '2025-05-13 14:21:13', '+1 (583) 146-8453', NULL),
+(74, 'nekicir', '$2y$10$vXjtgG.HfXGfO0.mfqkaeulBFT4KXPsXzI7T6he8OsXnFyIKMaz2i', 'Mari Harris', 'nekicir@mailinator.com', NULL, 'teacher', 'pending', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 14:37:02', '2025-05-13 14:37:02', '+1 (506) 144-6912', NULL),
+(75, 'qilos', '$2y$10$iNlkHSqlnIGghAMJYoKBhOm2Fry6kYxox0Zt2dLa0B6J4hCLfW0Hy', 'Isabelle Irwin', 'qilos@mailinator.com', NULL, 'teacher', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-13 14:41:58', '2025-05-13 14:41:58', '+1 (126) 543-7562', NULL),
+(79, 'befygu', '$2y$10$uuRioRDNvMOI8GAuneAp0OHPhPRYx52buknz.rvtpP4ZHWfjSDQlW', 'befygu', 'ginewo@mailinator.com', NULL, 'student', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-14 15:25:09', '2025-05-14 17:23:54', '+1 (415) 205-2995', 'Eaque culpa qui des');
 
 -- --------------------------------------------------------
 
@@ -1144,7 +1127,7 @@ ALTER TABLE `academic_years`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
 
 --
 -- AUTO_INCREMENT for table `batch_operations`
@@ -1180,13 +1163,13 @@ ALTER TABLE `grading_system`
 -- AUTO_INCREMENT for table `loginlogs`
 --
 ALTER TABLE `loginlogs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=67;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=88;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `resultdetails`
@@ -1198,7 +1181,7 @@ ALTER TABLE `resultdetails`
 -- AUTO_INCREMENT for table `results`
 --
 ALTER TABLE `results`
-  MODIFY `result_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=61;
+  MODIFY `result_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=92;
 
 --
 -- AUTO_INCREMENT for table `result_history`
@@ -1210,7 +1193,7 @@ ALTER TABLE `result_history`
 -- AUTO_INCREMENT for table `result_uploads`
 --
 ALTER TABLE `result_uploads`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=36;
 
 --
 -- AUTO_INCREMENT for table `sections`
@@ -1228,7 +1211,7 @@ ALTER TABLE `settings`
 -- AUTO_INCREMENT for table `student_performance`
 --
 ALTER TABLE `student_performance`
-  MODIFY `performance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
+  MODIFY `performance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=55;
 
 --
 -- AUTO_INCREMENT for table `system_settings`
@@ -1240,7 +1223,7 @@ ALTER TABLE `system_settings`
 -- AUTO_INCREMENT for table `teachers`
 --
 ALTER TABLE `teachers`
-  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `teachersubjects`
@@ -1258,7 +1241,7 @@ ALTER TABLE `teacher_activities`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=59;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
 
 --
 -- Constraints for dumped tables

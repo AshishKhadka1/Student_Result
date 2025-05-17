@@ -116,27 +116,37 @@ function saveNewTeacher() {
 
 // Save teacher edit
 function saveTeacherEdit() {
+  // Get form data
   const form = document.getElementById("editTeacherForm")
-
-  // Prevent multiple submissions
-  if (form.dataset.submitting === "true") {
-    console.log("Form already being submitted, preventing duplicate submission")
-    return false
-  }
-
-  // Mark form as being submitted
-  form.dataset.submitting = "true"
-
-  // Disable submit button
-  const submitButton = form.querySelector('button[type="submit"]')
-  if (submitButton) {
-    submitButton.disabled = true
-    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...'
-  }
-
   const formData = new FormData(form)
 
-  // Department handling removed
+  // Validate password if provided
+  const password = formData.get("password")
+  const confirmPassword = formData.get("confirm_password")
+
+  if (password && password.length > 0) {
+    // Check if passwords match
+    if (password !== confirmPassword) {
+      Swal.fire({
+        title: "Error!",
+        text: "Passwords do not match.",
+        icon: "error",
+        confirmButtonColor: "#3085d6",
+      })
+      return false
+    }
+
+    // Check password length
+    if (password.length < 6) {
+      Swal.fire({
+        title: "Error!",
+        text: "Password must be at least 6 characters long.",
+        icon: "error",
+        confirmButtonColor: "#3085d6",
+      })
+      return false
+    }
+  }
 
   // Add a unique token to prevent duplicate submissions
   const token = Date.now().toString() + Math.random().toString(36).substr(2, 5)
@@ -145,7 +155,7 @@ function saveTeacherEdit() {
   // Show loading state
   Swal.fire({
     title: "Saving...",
-    html: "Please wait while we update the teacher information.",
+    html: "Please wait while we save the changes.",
     allowOutsideClick: false,
     didOpen: () => {
       Swal.showLoading()
@@ -172,26 +182,21 @@ function saveTeacherEdit() {
       if (data.success) {
         Swal.fire({
           title: "Success!",
-          text: data.message,
+          text: data.message || "Teacher updated successfully!",
           icon: "success",
           confirmButtonColor: "#3085d6",
         }).then(() => {
+          // Close the edit modal and refresh the page
           closeEditModal()
-          window.location.reload() // Force page reload to show updated data
+          window.location.reload()
         })
       } else {
         Swal.fire({
           title: "Error!",
-          text: data.message || "An unknown error occurred.",
+          text: data.message || "Failed to update teacher.",
           icon: "error",
           confirmButtonColor: "#3085d6",
         })
-        // Reset submission state
-        form.dataset.submitting = "false"
-        if (submitButton) {
-          submitButton.disabled = false
-          submitButton.innerHTML = "Save Changes"
-        }
       }
     })
     .catch((error) => {
@@ -202,12 +207,6 @@ function saveTeacherEdit() {
         icon: "error",
         confirmButtonColor: "#3085d6",
       })
-      // Reset submission state
-      form.dataset.submitting = "false"
-      if (submitButton) {
-        submitButton.disabled = false
-        submitButton.innerHTML = "Save Changes"
-      }
     })
 
   return false // Prevent form submission

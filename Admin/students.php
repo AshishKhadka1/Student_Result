@@ -338,11 +338,6 @@ $conn->close();
                                     <button onclick="showAddStudentModal()" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                         <i class="fas fa-user-plus mr-2"></i> Add Student
                                     </button>
-                                    <button onclick="showImportModal()" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                                        <i class="fas fa-file-import mr-2"></i> Import
-                                    </button>
-                                    <button onclick="exportStudents()" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                                        <i class="fas fa-file-export mr-2"></i> Export
                                     </button>
                                     <button onclick="printStudentList()" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                                         <i class="fas fa-print mr-2"></i> Print
@@ -607,40 +602,7 @@ $conn->close();
         </div>
     </div>
 
-    <!-- Import Modal -->
-    <div id="importModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Import Students</h3>
-                <div class="mt-2 px-7 py-3">
-                    <p class="text-sm text-gray-500 mb-4">
-                        Upload a CSV file with student data. The file should have the following columns: full_name, email, password, roll_number, class_id, gender, batch_year
-                    </p>
-                    <form action="import_students.php" method="post" enctype="multipart/form-data">
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-sm font-bold mb-2" for="csvFile">
-                                CSV File
-                            </label>
-                            <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="csvFile" type="file" name="csvFile" accept=".csv" required>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <button type="button" onclick="closeImportModal()" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                                Cancel
-                            </button>
-                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                                Import
-                            </button>
-                        </div>
-                    </form>
-                    <div class="mt-4">
-                        <a href="templates/student_import_template.csv" download class="text-blue-500 hover:text-blue-700 text-sm">
-                            <i class="fas fa-download mr-1"></i> Download Template
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+ 
 
     <!-- Add Student Modal -->
     <div id="addStudentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
@@ -946,14 +908,7 @@ $conn->close();
             }
         });
         
-        // Import Modal Functions
-        function showImportModal() {
-            document.getElementById('importModal').classList.remove('hidden');
-        }
-        
-        function closeImportModal() {
-            document.getElementById('importModal').classList.add('hidden');
-        }
+
         
         // Add Student Modal Functions
         function showAddStudentModal() {
@@ -1018,35 +973,6 @@ $conn->close();
             });
             
             return false;
-        }
-        
-        // Export Students Function
-        function exportStudents() {
-            // Get selected students
-            const checkboxes = document.querySelectorAll('.student-checkbox:checked');
-            const selectedStudents = Array.from(checkboxes).map(cb => cb.value);
-            
-            // Get current filter parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            const search = urlParams.get('search') || '';
-            const classFilter = urlParams.get('class') || '';
-            const statusFilter = urlParams.get('status') || '';
-            const batchFilter = urlParams.get('batch') || '';
-            
-            // Create export URL with filters and selected students
-            let exportUrl = 'export_students.php?';
-            if (search) exportUrl += `search=${encodeURIComponent(search)}&`;
-            if (classFilter) exportUrl += `class=${encodeURIComponent(classFilter)}&`;
-            if (statusFilter) exportUrl += `status=${encodeURIComponent(statusFilter)}&`;
-            if (batchFilter) exportUrl += `batch=${encodeURIComponent(batchFilter)}&`;
-            
-            // Add selected students if any
-            if (selectedStudents.length > 0) {
-                exportUrl += `selected=${encodeURIComponent(JSON.stringify(selectedStudents))}&`;
-            }
-            
-            // Redirect to export URL
-            window.location.href = exportUrl;
         }
         
         // Print Student List Function
@@ -1304,6 +1230,12 @@ function showResultsModal(studentId) {
         })
         .then(data => {
             resultsContent.innerHTML = data;
+            
+            // Set the student ID on the exam selector after content is loaded
+            const examSelector = document.getElementById('exam_selector');
+            if (examSelector) {
+                examSelector.setAttribute('data-student-id', studentId);
+            }
         })
         .catch(error => {
             resultsContent.innerHTML = `
@@ -1356,6 +1288,68 @@ function confirmDelete(studentId) {
             // Redirect to delete URL
             window.location.href = 'students.php?delete=' + studentId;
         }
+    });
+}
+
+function changeExam(examId) {
+    // Show loading indicator only in the table body
+    const tableBody = document.querySelector('#resultsContent table tbody');
+    if (tableBody) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="px-6 py-4 text-center">
+                    <div class="flex justify-center items-center space-x-2">
+                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                        <span class="text-sm text-gray-500">Loading results...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+    } else {
+        // Fallback if table body not found
+        document.getElementById('resultsContent').innerHTML = '<div class="flex justify-center"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
+    }
+    
+    // Get the student ID from the data attribute
+    const studentId = document.getElementById('exam_selector').getAttribute('data-student-id');
+    
+    // Add a timestamp to prevent caching
+    const timestamp = new Date().getTime();
+    
+    // Use fetch with cache control
+    fetch(`get_student_results.php?id=${studentId}&exam_id=${examId}&_=${timestamp}`, {
+        headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.text();
+    })
+    .then(data => {
+        document.getElementById('resultsContent').innerHTML = data;
+        
+        // Update the exam selector to maintain the selected value
+        const newExamSelector = document.getElementById('exam_selector');
+        if (newExamSelector) {
+            newExamSelector.value = examId;
+            newExamSelector.setAttribute('data-student-id', studentId);
+        }
+    })
+    .catch(error => {
+        document.getElementById('resultsContent').innerHTML = `
+            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
+                <p class="font-bold">Error</p>
+                <p>Failed to load results: ${error.message}</p>
+                <button onclick="closeResultsModal()" class="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                    Close
+                </button>
+            </div>
+        `;
     });
 }
     </script>
