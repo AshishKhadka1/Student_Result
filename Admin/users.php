@@ -53,27 +53,51 @@ if (isset($_GET['delete']) && isset($_GET['user_id'])) {
         try {
             // If student, delete student records first
             if ($user['role'] == 'student') {
-                $stmt = $conn->prepare("DELETE FROM students WHERE user_id = ?");
+                // First get the student_id
+                $stmt = $conn->prepare("SELECT student_id FROM students WHERE user_id = ?");
+                if ($stmt === false) {
+                    throw new Exception("Error preparing statement: " . $conn->error);
+                }
                 $stmt->bind_param("i", $user_id);
                 $stmt->execute();
+                $result = $stmt->get_result();
+                $student = $result->fetch_assoc();
                 $stmt->close();
                 
-                // Delete student results if any
-                $stmt = $conn->prepare("DELETE FROM results WHERE student_id IN (SELECT student_id FROM students WHERE user_id = ?)");
+                // If student_id exists, delete related results first
+                if ($student && isset($student['student_id'])) {
+                    $student_id = $student['student_id'];
+                    
+                    // Check if results table exists
+                    $result = $conn->query("SHOW TABLES LIKE 'results'");
+                    if ($result->num_rows > 0) {
+                        $stmt = $conn->prepare("DELETE FROM results WHERE student_id = ?");
+                        if ($stmt === false) {
+                            throw new Exception("Error preparing results deletion statement: " . $conn->error);
+                        }
+                        $stmt->bind_param("s", $student_id);
+                        $stmt->execute();
+                        $stmt->close();
+                    }
+                }
+                
+                // Now delete the student record
+                $stmt = $conn->prepare("DELETE FROM students WHERE user_id = ?");
+                if ($stmt === false) {
+                    throw new Exception("Error preparing statement: " . $conn->error);
+                }
                 $stmt->bind_param("i", $user_id);
                 $stmt->execute();
                 $stmt->close();
             }
-            
-            // If teacher, delete teacher records first
+
+            // If teacher, delete teacher records
             if ($user['role'] == 'teacher') {
+                // Delete the teacher record directly
                 $stmt = $conn->prepare("DELETE FROM teachers WHERE user_id = ?");
-                $stmt->bind_param("i", $user_id);
-                $stmt->execute();
-                $stmt->close();
-                
-                // Delete teacher subject assignments if any
-                $stmt = $conn->prepare("DELETE FROM teacher_subjects WHERE teacher_id IN (SELECT teacher_id FROM teachers WHERE user_id = ?)");
+                if ($stmt === false) {
+                    throw new Exception("Error preparing statement: " . $conn->error);
+                }
                 $stmt->bind_param("i", $user_id);
                 $stmt->execute();
                 $stmt->close();
@@ -81,6 +105,9 @@ if (isset($_GET['delete']) && isset($_GET['user_id'])) {
             
             // Delete user
             $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
+            if ($stmt === false) {
+                throw new Exception("Error preparing statement: " . $conn->error);
+            }
             $stmt->bind_param("i", $user_id);
             $stmt->execute();
             $stmt->close();
