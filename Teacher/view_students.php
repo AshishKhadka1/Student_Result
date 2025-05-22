@@ -1,465 +1,469 @@
 <?php
 session_start();
-include '../includes/config.php';
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'teacher') {
+   header("Location: ../login.php");
+   exit();
+}
+
 include '../includes/db_connetc.php';
 
-// Check if user is logged in and is a teacher
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
-    header("Location: ../login.php");
-    exit();
-}
-
+// Get teacher information
 $teacher_id = $_SESSION['user_id'];
+$teacher_record_id = '';
 
-// Get classes and subjects taught by this teacher
-// Updated column names to match database schema (class_id instead of id)
-$query = "
-    SELECT DISTINCT c.class_id, c.name AS class_name, s.subject_id, s.name AS subject_name
-    FROM Classes c
-    JOIN Sections sec ON c.class_id = sec.class_id
-    JOIN TeacherSubjects ts ON sec.section_id = ts.section_id
-    JOIN Subjects s ON ts.subject_id = s.subject_id
-    WHERE ts.teacher_id = ?
-    ORDER BY c.name, s.name
-";
-
-// Check if query preparation was successful
-$stmt = $conn->prepare($query);
-if ($stmt === false) {
-    die("Error preparing statement: " . $conn->error);
-}
-
+$stmt = $conn->prepare("SELECT teacher_id FROM teachers WHERE user_id = ?");
 $stmt->bind_param("i", $teacher_id);
 $stmt->execute();
 $result = $stmt->get_result();
+if ($row = $result->fetch_assoc()) {
+   $teacher_record_id = $row['teacher_id'];
+}
+$stmt->close();
 
-$classes = [];
-while ($row = $result->fetch_assoc()) {
-    $class_id = $row['class_id'];
-    if (!isset($classes[$class_id])) {
-        $classes[$class_id] = [
-            'id' => $class_id,
-            'name' => $row['class_name'],
-            'subjects' => []
-        ];
-    }
-    $classes[$class_id]['subjects'][] = [
-        'id' => $row['subject_id'],
-        'name' => $row['subject_name']
-    ];
+// Get filter values
+$class_filter = isset($_GET['class_id']) ? $_GET['class_id'] : '';
+$subject_filter = isset($_GET['subject_id']) ? $_GET['subject_id'] : '';
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$show_all = isset($_GET['show_all']) ? $_GET['show_all'] : 'no'; // Default to showing only teacher's students
+
+// Get all classes for filter dropdown
+$all_classes = [];
+$classes_query = "SELECT class_id, class_name, section FROM classes ORDER BY class_name, section";
+$classes_result = $conn->query($classes_query);
+while ($class = $classes_result->fetch_assoc()) {
+   $all_classes[] = [
+       'class_id' => $class['class_id'],
+       'class_name' => $class['class_name'] . ' ' . $class['section']
+   ];
 }
 
-// Get selected class and subject
-$selected_class_id = isset($_GET['class_id']) ? intval($_GET['class_id']) : (count($classes) > 0 ? array_key_first($classes) : 0);
-$selected_subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 
-    (isset($classes[$selected_class_id]) && count($classes[$selected_class_id]['subjects']) > 0 ? 
-    $classes[$selected_class_id]['subjects'][0]['id'] : 0);
+// Get classes taught by this teacher
+$teacher_classes = [];
+$stmt = $conn->prepare("
+   SELECT DISTINCT c.class_id, CONCAT(c.class_name, ' ', c.section) as class_name
+   FROM classes c
+   JOIN teachersubjects ts ON c.class_id = ts.class_id
+   WHERE ts.teacher_id = ?
+   ORDER BY c.class_name
+");
 
-// Get students in the selected class
+if ($stmt === false) {
+   // If the query fails, try a simpler approach
+   $teacher_classes = $all_classes; // Fallback to all classes
+} else {
+   $stmt->bind_param("s", $teacher_record_id);
+   $stmt->execute();
+   $result = $stmt->get_result();
+   while ($row = $result->fetch_assoc()) {
+       $teacher_classes[] = $row;
+   }
+   $stmt->close();
+}
+
+// Get subjects taught by this teacher
+$teacher_subjects = [];
+$subjects_query = "
+   SELECT DISTINCT s.subject_id, s.subject_name
+   FROM subjects s
+   JOIN teachersubjects ts ON s.subject_id = ts.subject_id
+   WHERE ts.teacher_id = ?
+   ORDER BY s.subject_name
+";
+
+$subjects_stmt = $conn->prepare($subjects_query);
+if ($subjects_stmt) {
+   $subjects_stmt->bind_param("s", $teacher_record_id);
+   $subjects_stmt->execute();
+   $subjects_result = $subjects_stmt->get_result();
+   while ($subject = $subjects_result->fetch_assoc()) {
+       $teacher_subjects[] = $subject;
+   }
+   $subjects_stmt->close();
+}
+
+// Build query based on filters
+if ($show_all == 'yes') {
+   // Show all students
+   $query = "
+       SELECT u.user_id, u.full_name, u.email, u.status, u.phone,
+              s.student_id, s.roll_number, s.batch_year,
+              c.class_id, CONCAT(c.class_name, ' ', c.section) as class_name
+       FROM users u
+       JOIN students s ON u.user_id = s.user_id
+       LEFT JOIN classes c ON s.class_id = c.class_id
+       WHERE u.role = 'student'
+   ";
+   
+   $params = [];
+   $types = "";
+   
+   if (!empty($class_filter)) {
+       $query .= " AND c.class_id = ?";
+       $params[] = $class_filter;
+       $types .= "s";
+   }
+} else {
+   // Show only students in classes taught by this teacher
+   $query = "
+       SELECT DISTINCT u.user_id, u.full_name, u.email, u.status, u.phone,
+              s.student_id, s.roll_number, s.batch_year,
+              c.class_id, CONCAT(c.class_name, ' ', c.section) as class_name
+       FROM users u
+       JOIN students s ON u.user_id = s.user_id
+       JOIN classes c ON s.class_id = c.class_id
+       JOIN teachersubjects ts ON c.class_id = ts.class_id
+       WHERE u.role = 'student' AND ts.teacher_id = ?
+   ";
+   
+   $params = [$teacher_record_id];
+   $types = "s";
+   
+   if (!empty($class_filter)) {
+       $query .= " AND c.class_id = ?";
+       $params[] = $class_filter;
+       $types .= "s";
+   }
+   
+   if (!empty($subject_filter)) {
+       $query .= " AND ts.subject_id = ?";
+       $params[] = $subject_filter;
+       $types .= "s";
+   }
+}
+
+if (!empty($search)) {
+   $search_term = "%$search%";
+   $query .= " AND (u.full_name LIKE ? OR u.email LIKE ? OR s.student_id LIKE ? OR s.roll_number LIKE ?)";
+   $params[] = $search_term;
+   $params[] = $search_term;
+   $params[] = $search_term;
+   $params[] = $search_term;
+   $types .= "ssss";
+}
+
+$query .= " ORDER BY c.class_name, s.roll_number";
+
+// Prepare and execute the query
+$stmt = $conn->prepare($query);
+if ($stmt === false) {
+   die("Error preparing statement: " . $conn->error);
+}
+
+if (!empty($types)) {
+   $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$result = $stmt->get_result();
+
+// Fetch all students
 $students = [];
-if ($selected_class_id > 0) {
-    // Get all sections for this class
-    $sections_query = "
-        SELECT sec.section_id
-        FROM Sections sec
-        JOIN TeacherSubjects ts ON sec.section_id = ts.section_id
-        WHERE sec.class_id = ? AND ts.teacher_id = ? AND ts.subject_id = ?
-    ";
-    $sections_stmt = $conn->prepare($sections_query);
-    if ($sections_stmt === false) {
-        die("Error preparing sections statement: " . $conn->error);
-    }
-    
-    $sections_stmt->bind_param("iii", $selected_class_id, $teacher_id, $selected_subject_id);
-    $sections_stmt->execute();
-    $sections_result = $sections_stmt->get_result();
-    
-    $section_ids = [];
-    while ($section = $sections_result->fetch_assoc()) {
-        $section_ids[] = $section['section_id'];
-    }
-    
-    if (!empty($section_ids)) {
-        // Convert array to comma-separated string for IN clause
-        $section_ids_str = implode(',', $section_ids);
-        
-        // Get students in these sections
-        $students_query = "
-            SELECT s.student_id, s.roll_number, u.full_name, sec.name AS section_name, sec.section_id
-            FROM Students s
-            JOIN Users u ON s.user_id = u.id
-            JOIN Sections sec ON s.section_id = sec.section_id
-            WHERE s.section_id IN ($section_ids_str)
-            ORDER BY sec.name, s.roll_number
-        ";
-        
-        $students_result = $conn->query($students_query);
-        if ($students_result === false) {
-            die("Error executing students query: " . $conn->error);
-        }
-        
-        while ($student = $students_result->fetch_assoc()) {
-            $students[] = $student;
-        }
-        
-        // Get performance data for each student in the selected subject
-        if (!empty($students) && $selected_subject_id > 0) {
-            foreach ($students as &$student) {
-                // Get average marks for this student in this subject
-                $performance_query = "
-                    SELECT 
-                        AVG(sr.marks) AS avg_marks,
-                        COUNT(sr.result_id) AS exam_count,
-                        MAX(CASE WHEN e.date = (SELECT MIN(date) FROM Exams WHERE exam_id IN (
-                            SELECT exam_id FROM StudentResults WHERE student_id = ? AND subject_id = ?
-                        )) THEN sr.marks END) AS first_exam_marks,
-                        MAX(CASE WHEN e.date = (SELECT MAX(date) FROM Exams WHERE exam_id IN (
-                            SELECT exam_id FROM StudentResults WHERE student_id = ? AND subject_id = ?
-                        )) THEN sr.marks END) AS last_exam_marks
-                    FROM StudentResults sr
-                    JOIN Exams e ON sr.exam_id = e.exam_id
-                    WHERE sr.student_id = ? AND sr.subject_id = ?
-                ";
-                
-                $performance_stmt = $conn->prepare($performance_query);
-                if ($performance_stmt === false) {
-                    die("Error preparing performance statement: " . $conn->error);
-                }
-                
-                $performance_stmt->bind_param("iiiiii", 
-                    $student['student_id'], $selected_subject_id,
-                    $student['student_id'], $selected_subject_id,
-                    $student['student_id'], $selected_subject_id
-                );
-                $performance_stmt->execute();
-                $performance_result = $performance_stmt->get_result();
-                $performance = $performance_result->fetch_assoc();
-                
-                $student['performance'] = [
-                    'avg_marks' => $performance['avg_marks'] ? round($performance['avg_marks'], 1) : null,
-                    'exam_count' => $performance['exam_count'],
-                    'first_exam_marks' => $performance['first_exam_marks'],
-                    'last_exam_marks' => $performance['last_exam_marks'],
-                    'progress' => $performance['first_exam_marks'] && $performance['last_exam_marks'] ? 
-                        round($performance['last_exam_marks'] - $performance['first_exam_marks'], 1) : null
-                ];
-                
-                // Get attendance data if available
-                $attendance_query = "
-                    SELECT 
-                        COUNT(CASE WHEN status = 'present' THEN 1 END) AS present_count,
-                        COUNT(CASE WHEN status = 'absent' THEN 1 END) AS absent_count,
-                        COUNT(*) AS total_classes
-                    FROM Attendance
-                    WHERE student_id = ? AND subject_id = ?
-                ";
-                
-                $attendance_stmt = $conn->prepare($attendance_query);
-                if ($attendance_stmt !== false) {
-                    $attendance_stmt->bind_param("ii", $student['student_id'], $selected_subject_id);
-                    $attendance_stmt->execute();
-                    $attendance_result = $attendance_stmt->get_result();
-                    $attendance = $attendance_result->fetch_assoc();
-                    
-                    $student['attendance'] = [
-                        'present' => $attendance['present_count'],
-                        'absent' => $attendance['absent_count'],
-                        'total' => $attendance['total_classes'],
-                        'percentage' => $attendance['total_classes'] > 0 ? 
-                            round(($attendance['present_count'] / $attendance['total_classes']) * 100, 1) : null
-                    ];
-                } else {
-                    // Attendance table might not exist
-                    $student['attendance'] = null;
-                }
-            }
-        }
-    }
+while ($row = $result->fetch_assoc()) {
+   // Get subjects taught by this teacher to this student
+   $student_subjects_query = "
+       SELECT DISTINCT s.subject_id, s.subject_name
+       FROM subjects s
+       JOIN teachersubjects ts ON s.subject_id = ts.subject_id
+       WHERE ts.teacher_id = ? AND ts.class_id = ?
+       ORDER BY s.subject_name
+   ";
+   
+   $student_subjects_stmt = $conn->prepare($student_subjects_query);
+   $student_subjects = [];
+   
+   if ($student_subjects_stmt) {
+       $student_subjects_stmt->bind_param("ss", $teacher_record_id, $row['class_id']);
+       $student_subjects_stmt->execute();
+       $student_subjects_result = $student_subjects_stmt->get_result();
+       
+       while ($subject = $student_subjects_result->fetch_assoc()) {
+           $student_subjects[] = $subject;
+       }
+       $student_subjects_stmt->close();
+   }
+   
+   $row['subjects'] = $student_subjects;
+   $students[] = $row;
 }
+$stmt->close();
 
-// Get class average for comparison
-$class_avg = null;
-if ($selected_class_id > 0 && $selected_subject_id > 0) {
-    $avg_query = "
-        SELECT AVG(sr.marks) AS class_avg
-        FROM StudentResults sr
-        JOIN Students s ON sr.student_id = s.student_id
-        JOIN Sections sec ON s.section_id = sec.section_id
-        WHERE sec.class_id = ? AND sr.subject_id = ?
-    ";
-    
-    $avg_stmt = $conn->prepare($avg_query);
-    if ($avg_stmt !== false) {
-        $avg_stmt->bind_param("ii", $selected_class_id, $selected_subject_id);
-        $avg_stmt->execute();
-        $avg_result = $avg_stmt->get_result();
-        $avg_data = $avg_result->fetch_assoc();
-        $class_avg = $avg_data['class_avg'] ? round($avg_data['class_avg'], 1) : null;
-    }
-}
+// Get counts
+$total_students = count($students);
+
+$conn->close();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Students - Teacher Dashboard</title>
-    <link rel="stylesheet" href="../css/tailwind.css">
-    <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>View Students | Teacher Dashboard</title>
+   <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+   <style>
+       .student-card {
+           transition: all 0.3s ease;
+       }
+       .student-card:hover {
+           transform: translateY(-5px);
+           box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+       }
+       /* Sidebar styles */
+       .sidebar-link {
+           transition: all 0.2s ease;
+       }
+       .sidebar-link:hover {
+           background-color: rgba(255, 255, 255, 0.1);
+       }
+       .sidebar-link.active {
+           background-color: rgba(255, 255, 255, 0.2);
+           border-left: 4px solid #fff;
+       }
+       /* Mobile sidebar */
+       .mobile-sidebar {
+           transition: transform 0.3s ease-in-out;
+       }
+   </style>
 </head>
-<body class="bg-gray-100">
-    <?php include 'includes/teacher_topbar.php'; ?>
-    
-    <div class="flex">
+<body class="bg-gray-50">
+   <div class="flex h-screen overflow-hidden">
+       <!-- Sidebar - Desktop -->
+        <!-- Sidebar -->
         <?php include 'includes/teacher_sidebar.php'; ?>
-        
-        <div class="w-full p-4 md:ml-64">
-            <div class="mb-6">
-                <h1 class="text-3xl font-bold text-gray-800">View Students</h1>
-                <p class="text-gray-600">Manage and view students in your classes</p>
-            </div>
-            
-            <!-- Display Messages -->
-            <?php if (isset($_SESSION['success'])): ?>
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-                    <span class="block sm:inline"><?php echo $_SESSION['success']; ?></span>
-                    <?php unset($_SESSION['success']); ?>
-                </div>
-            <?php endif; ?>
-            
-            <?php if (isset($_SESSION['error'])): ?>
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                    <span class="block sm:inline"><?php echo $_SESSION['error']; ?></span>
-                    <?php unset($_SESSION['error']); ?>
-                </div>
-            <?php endif; ?>
-            
-            <!-- Filter Form -->
-            <div class="bg-white rounded-lg shadow p-4 mb-6">
-                <form method="GET" action="" class="md:flex items-center space-y-4 md:space-y-0 md:space-x-4">
-                    <div class="flex-1">
-                        <label for="class_id" class="block text-sm font-medium text-gray-700 mb-1">Class</label>
-                        <select id="class_id" name="class_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
-                            <?php foreach ($classes as $class): ?>
-                                <option value="<?php echo $class['id']; ?>" <?php echo $selected_class_id == $class['id'] ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($class['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="flex-1">
-                        <label for="subject_id" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                        <select id="subject_id" name="subject_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
-                            <?php if (isset($classes[$selected_class_id])): ?>
-                                <?php foreach ($classes[$selected_class_id]['subjects'] as $subject): ?>
-                                    <option value="<?php echo $subject['id']; ?>" <?php echo $selected_subject_id == $subject['id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($subject['name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </select>
-                    </div>
-                </form>
-            </div>
-            
-            <!-- Class Performance Summary -->
-            <?php if ($class_avg !== null): ?>
-            <div class="bg-white rounded-lg shadow p-4 mb-6">
-                <h2 class="text-xl font-semibold mb-3">Class Performance Summary</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-blue-50 p-4 rounded-lg">
-                        <h3 class="text-sm font-medium text-blue-800">Class Average</h3>
-                        <p class="text-2xl font-bold text-blue-600"><?php echo $class_avg; ?>%</p>
-                    </div>
-                    
-                    <div class="bg-green-50 p-4 rounded-lg">
-                        <h3 class="text-sm font-medium text-green-800">Top Performer</h3>
-                        <?php
-                        $top_performer = null;
-                        $top_marks = 0;
-                        foreach ($students as $student) {
-                            if (isset($student['performance']['avg_marks']) && $student['performance']['avg_marks'] > $top_marks) {
-                                $top_performer = $student;
-                                $top_marks = $student['performance']['avg_marks'];
-                            }
-                        }
-                        ?>
-                        <?php if ($top_performer): ?>
-                            <p class="text-lg font-semibold text-green-600"><?php echo htmlspecialchars($top_performer['full_name']); ?></p>
-                            <p class="text-2xl font-bold text-green-600"><?php echo $top_performer['performance']['avg_marks']; ?>%</p>
-                        <?php else: ?>
-                            <p class="text-lg text-green-600">No data available</p>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <div class="bg-yellow-50 p-4 rounded-lg">
-                        <h3 class="text-sm font-medium text-yellow-800">Most Improved</h3>
-                        <?php
-                        $most_improved = null;
-                        $highest_progress = 0;
-                        foreach ($students as $student) {
-                            if (isset($student['performance']['progress']) && $student['performance']['progress'] > $highest_progress) {
-                                $most_improved = $student;
-                                $highest_progress = $student['performance']['progress'];
-                            }
-                        }
-                        ?>
-                        <?php if ($most_improved): ?>
-                            <p class="text-lg font-semibold text-yellow-600"><?php echo htmlspecialchars($most_improved['full_name']); ?></p>
-                            <p class="text-2xl font-bold text-yellow-600">+<?php echo $most_improved['performance']['progress']; ?>%</p>
-                        <?php else: ?>
-                            <p class="text-lg text-yellow-600">No data available</p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
-            
-            <!-- Students Table -->
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="p-4 border-b">
-                    <h2 class="text-xl font-semibold">Students List</h2>
-                    <p class="text-gray-600">
-                        <?php if (isset($classes[$selected_class_id])): ?>
-                            <?php echo htmlspecialchars($classes[$selected_class_id]['name']); ?> - 
-                            <?php 
-                                $subject_name = '';
-                                foreach ($classes[$selected_class_id]['subjects'] as $subject) {
-                                    if ($subject['id'] == $selected_subject_id) {
-                                        $subject_name = $subject['name'];
-                                        break;
-                                    }
-                                }
-                                echo htmlspecialchars($subject_name);
-                            ?>
-                        <?php endif; ?>
-                    </p>
-                </div>
-                
-                <?php if (empty($students)): ?>
-                    <div class="p-6 text-center">
-                        <p class="text-gray-500">No students found for the selected class and subject.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Performance</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Attendance</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <?php foreach ($students as $student): ?>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            <?php echo htmlspecialchars($student['roll_number']); ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <?php echo htmlspecialchars($student['full_name']); ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <?php echo htmlspecialchars($student['section_name']); ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <?php if (isset($student['performance']['avg_marks'])): ?>
-                                                <div class="flex items-center">
-                                                    <?php 
-                                                        $avg_marks = $student['performance']['avg_marks'];
-                                                        $color_class = '';
-                                                        $icon_class = '';
-                                                        
-                                                        if ($avg_marks >= 80) {
-                                                            $color_class = 'text-green-600 bg-green-100';
-                                                            $icon_class = 'fas fa-arrow-up text-green-600';
-                                                        } elseif ($avg_marks >= 60) {
-                                                            $color_class = 'text-blue-600 bg-blue-100';
-                                                            $icon_class = 'fas fa-equals text-blue-600';
-                                                        } elseif ($avg_marks >= 40) {
-                                                            $color_class = 'text-yellow-600 bg-yellow-100';
-                                                            $icon_class = 'fas fa-exclamation text-yellow-600';
-                                                        } else {
-                                                            $color_class = 'text-red-600 bg-red-100';
-                                                            $icon_class = 'fas fa-arrow-down text-red-600';
-                                                        }
-                                                    ?>
-                                                    <span class="px-2 py-1 rounded-full text-xs font-medium <?php echo $color_class; ?>">
-                                                        <?php echo $avg_marks; ?>%
-                                                    </span>
-                                                    <span class="ml-2 text-xs text-gray-500">
-                                                        (<?php echo $student['performance']['exam_count']; ?> exams)
-                                                    </span>
-                                                    
-                                                    <?php if (isset($student['performance']['progress']) && $student['performance']['progress'] != 0): ?>
-                                                        <span class="ml-2">
-                                                            <?php if ($student['performance']['progress'] > 0): ?>
-                                                                <i class="fas fa-arrow-up text-green-600"></i>
-                                                                <span class="text-xs text-green-600">+<?php echo $student['performance']['progress']; ?>%</span>
-                                                            <?php else: ?>
-                                                                <i class="fas fa-arrow-down text-red-600"></i>
-                                                                <span class="text-xs text-red-600"><?php echo $student['performance']['progress']; ?>%</span>
-                                                            <?php endif; ?>
-                                                        </span>
-                                                    <?php endif; ?>
-                                                </div>
-                                            <?php else: ?>
-                                                <span class="text-gray-400">No data</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <?php if (isset($student['attendance']) && $student['attendance']['total'] > 0): ?>
-                                                <div class="flex items-center">
-                                                    <?php 
-                                                        $attendance_pct = $student['attendance']['percentage'];
-                                                        $att_color_class = '';
-                                                        
-                                                        if ($attendance_pct >= 90) {
-                                                            $att_color_class = 'text-green-600 bg-green-100';
-                                                        } elseif ($attendance_pct >= 75) {
-                                                            $att_color_class = 'text-blue-600 bg-blue-100';
-                                                        } elseif ($attendance_pct >= 60) {
-                                                            $att_color_class = 'text-yellow-600 bg-yellow-100';
-                                                        } else {
-                                                            $att_color_class = 'text-red-600 bg-red-100';
-                                                        }
-                                                    ?>
-                                                    <span class="px-2 py-1 rounded-full text-xs font-medium <?php echo $att_color_class; ?>">
-                                                        <?php echo $attendance_pct; ?>%
-                                                    </span>
-                                                    <span class="ml-2 text-xs text-gray-500">
-                                                        (<?php echo $student['attendance']['present']; ?>/<?php echo $student['attendance']['total']; ?>)
-                                                    </span>
-                                                </div>
-                                            <?php else: ?>
-                                                <span class="text-gray-400">No data</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <a href="student_results.php?student_id=<?php echo $student['student_id']; ?>&subject_id=<?php echo $selected_subject_id; ?>" class="text-blue-600 hover:text-blue-900 mr-3">
-                                                <i class="fas fa-chart-line mr-1"></i> Results
-                                            </a>
-                                            <a href="student_profile.php?student_id=<?php echo $student['student_id']; ?>" class="text-green-600 hover:text-green-900">
-                                                <i class="fas fa-user mr-1"></i> Profile
-                                            </a>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
 
-    <script src="../js/dashboard.js"></script>
+        <!-- Main Content -->
+        <!-- <div class="flex flex-col flex-1 w-0 overflow-hidden"> -->
+            <!-- Top Navigation -->
+
+       <!-- Main Content -->
+       <div class="flex flex-col flex-1 w-0 overflow-hidden">
+           <!-- Top Navigation -->
+           <div class="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
+             
+               
+            
+           </div>
+
+           <!-- Main Content -->
+           <main class="flex-1 relative overflow-y-auto focus:outline-none">
+               <div class="py-6">
+                   <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                       <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                           <h1 class="text-2xl font-semibold text-gray-900">Students</h1>
+                           <div class="mt-4 md:mt-0">
+                               <span class="bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1.5 rounded-full">
+                                   Total: <?php echo $total_students; ?> Students
+                               </span>
+                           </div>
+                       </div>
+                       
+                       <!-- Notification Messages -->
+                       <?php if(isset($_SESSION['success'])): ?>
+                       <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
+                           <div class="flex">
+                               <div class="flex-shrink-0">
+                                   <i class="fas fa-check-circle text-green-500"></i>
+                               </div>
+                               <div class="ml-3">
+                                   <p class="text-sm text-green-700">
+                                       <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
+                                   </p>
+                               </div>
+                           </div>
+                       </div>
+                       <?php endif; ?>
+
+                       <?php if(isset($_SESSION['error'])): ?>
+                       <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
+                           <div class="flex">
+                               <div class="flex-shrink-0">
+                                   <i class="fas fa-exclamation-circle text-red-500"></i>
+                               </div>
+                               <div class="ml-3">
+                                   <p class="text-sm text-red-700">
+                                       <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
+                                   </p>
+                               </div>
+                           </div>
+                       </div>
+                       <?php endif; ?>
+
+                       <!-- Filter and Search -->
+                       <div class="bg-white shadow rounded-lg p-6 mb-6">
+                           <form action="view_students.php" method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                               <div>
+                                   <label for="class_id" class="block text-sm font-medium text-gray-700 mb-1">Filter by Class</label>
+                                   <select id="class_id" name="class_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                       <option value="">All Classes</option>
+                                       <?php foreach ($teacher_classes as $class): ?>
+                                       <option value="<?php echo $class['class_id']; ?>" <?php echo $class_filter == $class['class_id'] ? 'selected' : ''; ?>>
+                                           <?php echo $class['class_name']; ?>
+                                       </option>
+                                       <?php endforeach; ?>
+                                   </select>
+                               </div>
+                               
+                               <div>
+                                   <label for="subject_id" class="block text-sm font-medium text-gray-700 mb-1">Filter by Subject</label>
+                                   <select id="subject_id" name="subject_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                       <option value="">All Subjects</option>
+                                       <?php foreach ($teacher_subjects as $subject): ?>
+                                       <option value="<?php echo $subject['subject_id']; ?>" <?php echo $subject_filter == $subject['subject_id'] ? 'selected' : ''; ?>>
+                                           <?php echo $subject['subject_name']; ?>
+                                       </option>
+                                       <?php endforeach; ?>
+                                   </select>
+                               </div>
+                               
+                               <div>
+                                   <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search Students</label>
+                                   <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Name, ID, or Roll Number" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                               </div>
+                               
+                               <div class="flex items-end">
+                                   <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                       <i class="fas fa-filter mr-2"></i> Apply Filters
+                                   </button>
+                                   <a href="view_students.php" class="ml-2 inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                       <i class="fas fa-times mr-2"></i> Clear
+                                   </a>
+                               </div>
+                           </form>
+                       </div>
+
+                       <?php if (empty($students)): ?>
+                           <div class="bg-white shadow rounded-lg p-8 text-center">
+                               <div class="text-gray-500 mb-4">
+                                   <i class="fas fa-user-graduate text-5xl"></i>
+                               </div>
+                               <h3 class="text-lg font-medium text-gray-900 mb-2">No Students Found</h3>
+                               <p class="text-gray-500">There are no students matching your search criteria.</p>
+                           </div>
+                       <?php else: ?>
+                           <!-- Students Grid View -->
+                           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                               <?php foreach ($students as $student): ?>
+                                   <div class="bg-white shadow rounded-lg overflow-hidden transition-all duration-300 student-card">
+                                       <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 text-white">
+                                           <h3 class="font-medium truncate">
+                                               <?php echo !empty($student['class_name']) ? $student['class_name'] : 'No Class Assigned'; ?>
+                                           </h3>
+                                       </div>
+                                       <div class="p-5">
+                                           <div class="flex items-center mb-4">
+                                               <div class="flex-shrink-0 h-12 w-12">
+                                                   <span class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 text-blue-800">
+                                                       <span class="text-lg font-medium"><?php echo substr($student['full_name'], 0, 1); ?></span>
+                                                   </span>
+                                               </div>
+                                               <div class="ml-4">
+                                                   <h4 class="text-lg font-medium text-gray-900"><?php echo $student['full_name']; ?></h4>
+                                                   <p class="text-sm text-gray-500"><?php echo $student['email']; ?></p>
+                                               </div>
+                                           </div>
+                                           
+                                           <div class="grid grid-cols-2 gap-4 mb-4">
+                                               <div>
+                                                   <p class="text-xs text-gray-500">Student ID</p>
+                                                   <p class="text-sm font-medium"><?php echo $student['student_id']; ?></p>
+                                               </div>
+                                               <div>
+                                                   <p class="text-xs text-gray-500">Roll Number</p>
+                                                   <p class="text-sm font-medium"><?php echo $student['roll_number']; ?></p>
+                                               </div>
+                                               <div>
+                                                   <p class="text-xs text-gray-500">Batch Year</p>
+                                                   <p class="text-sm font-medium"><?php echo $student['batch_year']; ?></p>
+                                               </div>
+                                               <div>
+                                                   <p class="text-xs text-gray-500">Status</p>
+                                                   <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                       <?php echo $student['status'] == 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
+                                                       <?php echo ucfirst($student['status']); ?>
+                                                   </span>
+                                               </div>
+                                           </div>
+                                           
+                                           <div class="border-t border-gray-200 pt-4">
+                                               <p class="text-sm font-medium text-gray-700 mb-2">Subjects:</p>
+                                               <?php if (!empty($student['subjects'])): ?>
+                                                   <div class="flex flex-wrap gap-2 mb-3">
+                                                       <?php foreach ($student['subjects'] as $subject): ?>
+                                                           <a href="student_results.php?student_id=<?php echo $student['student_id']; ?>&subject_id=<?php echo $subject['subject_id']; ?>" 
+                                                              class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full hover:bg-blue-200">
+                                                               <?php echo $subject['subject_name']; ?>
+                                                           </a>
+                                                       <?php endforeach; ?>
+                                                   </div>
+                                               <?php else: ?>
+                                                   <p class="text-sm text-gray-500 mb-3">No subjects assigned</p>
+                                               <?php endif; ?>
+                                               
+                                               <div class="flex justify-between">
+                                                   <a href="student_profile.php?student_id=<?php echo $student['student_id']; ?>" class="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                                                       <i class="fas fa-user mr-1"></i> View Profile
+                                                   </a>
+                                                   <?php if (!empty($student['subjects']) && count($student['subjects']) === 1): ?>
+                                                       <a href="student_results.php?student_id=<?php echo $student['student_id']; ?>&subject_id=<?php echo $student['subjects'][0]['subject_id']; ?>" class="text-green-600 hover:text-green-900 text-sm font-medium">
+                                                           <i class="fas fa-chart-bar mr-1"></i> View Results
+                                                       </a>
+                                                   <?php endif; ?>
+                                               </div>
+                                           </div>
+                                       </div>
+                                   </div>
+                               <?php endforeach; ?>
+                           </div>
+                       <?php endif; ?>
+                   </div>
+               </div>
+           </main>
+       </div>
+   </div>
+
+   <script>
+       // Mobile sidebar toggle
+       document.addEventListener('DOMContentLoaded', function() {
+           const sidebarToggle = document.getElementById('sidebar-toggle');
+           const closeSidebar = document.getElementById('close-sidebar');
+           const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+           const mobileSidebar = document.getElementById('mobile-sidebar');
+           
+           if (sidebarToggle) {
+               sidebarToggle.addEventListener('click', function() {
+                   mobileSidebar.classList.remove('-translate-x-full');
+               });
+           }
+           
+           if (closeSidebar) {
+               closeSidebar.addEventListener('click', function() {
+                   mobileSidebar.classList.add('-translate-x-full');
+               });
+           }
+           
+           if (sidebarBackdrop) {
+               sidebarBackdrop.addEventListener('click', function() {
+                   mobileSidebar.classList.add('-translate-x-full');
+               });
+           }
+           
+           // User menu toggle
+           const userMenuButton = document.getElementById('user-menu-button');
+           const userMenu = document.getElementById('user-menu');
+           
+           if (userMenuButton && userMenu) {
+               userMenuButton.addEventListener('click', function() {
+                   userMenu.classList.toggle('hidden');
+               });
+               
+               // Close user menu when clicking outside
+               document.addEventListener('click', function(event) {
+                   if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
+                       userMenu.classList.add('hidden');
+                   }
+               });
+           }
+       });
+   </script>
 </body>
 </html>

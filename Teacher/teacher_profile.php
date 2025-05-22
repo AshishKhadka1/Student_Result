@@ -15,9 +15,9 @@ $teacher_id = $_SESSION['user_id'];
 $query = "
     SELECT u.full_name, u.email, u.phone, u.profile_image, 
            t.qualification, t.experience, t.joining_date
-    FROM Users u
-    LEFT JOIN Teachers t ON u.id = t.user_id
-    WHERE u.id = ?
+    FROM users u
+    LEFT JOIN teachers t ON u.user_id = t.user_id
+    WHERE u.user_id = ?
 ";
 
 // Check if query preparation was successful
@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Check if email already exists (excluding current user)
     if (!empty($email)) {
-        $check_stmt = $conn->prepare("SELECT id FROM Users WHERE email = ? AND id != ?");
+        $check_stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
         if ($check_stmt === false) {
             $errors[] = "Database error: " . $conn->error;
         } else {
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Handle password change if requested
     if (!empty($current_password)) {
         // Verify current password
-        $pwd_stmt = $conn->prepare("SELECT password FROM Users WHERE id = ?");
+        $pwd_stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
         if ($pwd_stmt === false) {
             $errors[] = "Database error: " . $conn->error;
         } else {
@@ -137,9 +137,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             // Update Users table
             $update_user_stmt = $conn->prepare("
-                UPDATE Users 
+                UPDATE users 
                 SET full_name = ?, email = ?, phone = ?, profile_image = ?
-                WHERE id = ?
+                WHERE user_id = ?
             ");
             if ($update_user_stmt === false) {
                 throw new Exception("Error preparing user update statement: " . $conn->error);
@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $update_user_stmt->close();
             
             // Check if Teachers table has a record for this user
-            $check_teacher_stmt = $conn->prepare("SELECT user_id FROM Teachers WHERE user_id = ?");
+            $check_teacher_stmt = $conn->prepare("SELECT user_id FROM teachers WHERE user_id = ?");
             if ($check_teacher_stmt === false) {
                 throw new Exception("Error checking teacher record: " . $conn->error);
             }
@@ -162,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($teacher_exists) {
                 // Update Teachers table - removed bio field
                 $update_teacher_stmt = $conn->prepare("
-                    UPDATE Teachers 
+                    UPDATE teachers 
                     SET qualification = ?, experience = ?
                     WHERE user_id = ?
                 ");
@@ -175,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // Insert into Teachers table - removed bio field
                 $insert_teacher_stmt = $conn->prepare("
-                    INSERT INTO Teachers (user_id, qualification, experience, joining_date)
+                    INSERT INTO teachers (user_id, qualification, experience, joining_date)
                     VALUES (?, ?, ?, CURRENT_DATE())
                 ");
                 if ($insert_teacher_stmt === false) {
@@ -189,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Update password if requested
             if (!empty($current_password) && !empty($new_password)) {
                 $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-                $update_pwd_stmt = $conn->prepare("UPDATE Users SET password = ? WHERE id = ?");
+                $update_pwd_stmt = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ?");
                 if ($update_pwd_stmt === false) {
                     throw new Exception("Error preparing password update statement: " . $conn->error);
                 }

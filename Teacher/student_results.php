@@ -10,84 +10,126 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
 }
 
 $teacher_id = $_SESSION['user_id'];
-$student_id = isset($_GET['student_id']) ? intval($_GET['student_id']) : 0;
-$subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
+$student_id = isset($_GET['student_id']) ? $_GET['student_id'] : '';
+$subject_id = isset($_GET['subject_id']) ? $_GET['subject_id'] : '';
+$exam_id = isset($_GET['exam_id']) ? intval($_GET['exam_id']) : 0;
 
-// Verify that this teacher teaches this student in this subject
+// Get teacher's ID from teachers table
+$teacher_query = "SELECT teacher_id FROM teachers WHERE user_id = ?";
+$stmt = $conn->prepare($teacher_query);
+if ($stmt) {
+    $stmt->bind_param("i", $teacher_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $teacher_data = $result->fetch_assoc();
+        $teacher_record_id = $teacher_data['teacher_id'];
+    } else {
+        $_SESSION['error'] = "Teacher record not found.";
+        header("Location: teacher_dashboard.php");
+        exit();
+    }
+    $stmt->close();
+} else {
+    $_SESSION['error'] = "Database error: " . $conn->error;
+    header("Location: teacher_dashboard.php");
+    exit();
+}
+
+// Verify that this teacher teaches this subject
 $verify_query = "
     SELECT 1
-    FROM Students s
-    JOIN Sections sec ON s.section_id = sec.id
-    JOIN TeacherSubjects ts ON sec.id = ts.section_id
-    WHERE s.id = ? AND ts.teacher_id = ? AND ts.subject_id = ?
+    FROM teachersubjects ts
+    WHERE ts.teacher_id = ? AND ts.subject_id = ?
 ";
 
 $verify_stmt = $conn->prepare($verify_query);
-if ($verify_stmt === false) {
-    die("Error preparing verification statement: " . $conn->error);
-}
-
-$verify_stmt->bind_param("iii", $student_id, $teacher_id, $subject_id);
-$verify_stmt->execute();
-$verify_result = $verify_stmt->get_result();
-
-if ($verify_result->num_rows === 0) {
-    $_SESSION['error'] = "You are not authorized to view this student's results.";
-    header("Location: view_students.php");
+if ($verify_stmt) {
+    $verify_stmt->bind_param("is", $teacher_record_id, $subject_id);
+    $verify_stmt->execute();
+    $verify_result = $verify_stmt->get_result();
+    
+    if ($verify_result->num_rows === 0) {
+        $_SESSION['error'] = "You are not authorized to view this student's results for this subject.";
+        header("Location: teacher_dashboard.php");
+        exit();
+    }
+    $verify_stmt->close();
+} else {
+    $_SESSION['error'] = "Database error: " . $conn->error;
+    header("Location: teacher_dashboard.php");
     exit();
 }
 
 // Get student details
 $student_query = "
-    SELECT s.id, s.roll_number, u.name, c.name AS class_name, sec.name AS section_name, 
-           sub.name AS subject_name, sub.id AS subject_id
-    FROM Students s
-    JOIN Users u ON s.user_id = u.id
-    JOIN Sections sec ON s.section_id = sec.id
-    JOIN Classes c ON sec.class_id = c.id
-    JOIN TeacherSubjects ts ON sec.id = ts.section_id
-    JOIN Subjects sub ON ts.subject_id = sub.id
-    WHERE s.id = ? AND ts.teacher_id = ? AND ts.subject_id = ?
+    SELECT s.student_id, s.roll_number, u.full_name, c.class_name, c.section, 
+           sub.subject_name, sub.subject_id
+    FROM students s
+    JOIN users u ON s.user_id = u.user_id
+    JOIN classes c ON s.class_id = c.class_id
+    JOIN subjects sub ON sub.subject_id = ?
+    WHERE s.student_id = ?
 ";
 
 $student_stmt = $conn->prepare($student_query);
-if ($student_stmt === false) {
-    die("Error preparing student statement: " . $conn->error);
+if ($student_stmt) {
+    $student_stmt->bind_param("ss", $subject_id, $student_id);
+    $student_stmt->execute();
+    $student_result = $student_stmt->get_result();
+    $student = $student_result->fetch_assoc();
+    
+    if (!$student) {
+        $_SESSION['error'] = "Student not found.";
+        header("Location: teacher_dashboard.php");
+        exit();
+    }
+    $student_stmt->close();
+} else {
+    $_SESSION['error'] = "Database error: " . $conn->error;
+    header("Location: teacher_dashboard.php");
+    exit();
 }
 
-$student_stmt->bind_param("iii", $student_id, $teacher_id, $subject_id);
-$student_stmt->execute();
-$student_result = $student_stmt->get_result();
-$student = $student_result->fetch_assoc();
+// Get all exams
+$exams_query = "
+    SELECT exam_id, exam_name, exam_type, start_date, end_date, total_marks, passing_marks
+    FROM exams
+    WHERE is_active = 1
+    ORDER BY start_date DESC
+";
 
-if (!$student) {
-    $_SESSION['error'] = "Student not found.";
-    header("Location: view_students.php");
-    exit();
+$exams_result = $conn->query($exams_query);
+$exams = [];
+if ($exams_result) {
+    while ($exam = $exams_result->fetch_assoc()) {
+        $exams[$exam['exam_id']] = $exam;
+    }
 }
 
 // Get all results for this student in this subject
 $results_query = "
-    SELECT sr.id, sr.marks, sr.grade, sr.remarks, e.name AS exam_name, e.date AS exam_date, 
-           e.max_marks, e.passing_marks
-    FROM StudentResults sr
-    JOIN Exams e ON sr.exam_id = e.id
-    WHERE sr.student_id = ? AND sr.subject_id = ?
-    ORDER BY e.date DESC
+    SELECT r.result_id, r.exam_id, r.theory_marks, r.practical_marks, r.grade, r.gpa, 
+           r.remarks, r.percentage, r.is_pass, e.exam_name, e.start_date, e.total_marks, e.passing_marks
+    FROM results r
+    JOIN exams e ON r.exam_id = e.exam_id
+    WHERE r.student_id = ? AND r.subject_id = ?
+    ORDER BY e.start_date DESC
 ";
 
 $results_stmt = $conn->prepare($results_query);
-if ($results_stmt === false) {
-    die("Error preparing results statement: " . $conn->error);
-}
-
-$results_stmt->bind_param("ii", $student_id, $subject_id);
-$results_stmt->execute();
-$results_result = $results_stmt->get_result();
-
-$results = [];
-while ($result = $results_result->fetch_assoc()) {
-    $results[] = $result;
+if ($results_stmt) {
+    $results_stmt->bind_param("ss", $student_id, $subject_id);
+    $results_stmt->execute();
+    $results_result = $results_stmt->get_result();
+    
+    $results = [];
+    while ($result = $results_result->fetch_assoc()) {
+        $results[] = $result;
+    }
+    $results_stmt->close();
+} else {
+    $_SESSION['error'] = "Database error: " . $conn->error;
 }
 
 // Calculate performance metrics
@@ -103,32 +145,33 @@ $lowest_marks = 100;
 $marks_array = [];
 
 foreach ($results as $index => $result) {
-    $total_marks += $result['marks'];
-    $total_max_marks += $result['max_marks'];
+    $total_marks_obtained = $result['theory_marks'] + $result['practical_marks'];
+    $total_marks += $total_marks_obtained;
+    $total_max_marks += $result['total_marks'];
     
-    if ($result['marks'] >= $result['passing_marks']) {
+    if ($result['is_pass']) {
         $pass_count++;
     } else {
         $fail_count++;
     }
     
     if ($index === $exam_count - 1) {
-        $first_exam_marks = $result['marks'];
+        $first_exam_marks = $total_marks_obtained;
     }
     
     if ($index === 0) {
-        $last_exam_marks = $result['marks'];
+        $last_exam_marks = $total_marks_obtained;
     }
     
-    if ($result['marks'] > $highest_marks) {
-        $highest_marks = $result['marks'];
+    if ($total_marks_obtained > $highest_marks) {
+        $highest_marks = $total_marks_obtained;
     }
     
-    if ($result['marks'] < $lowest_marks) {
-        $lowest_marks = $result['marks'];
+    if ($total_marks_obtained < $lowest_marks && $exam_count > 0) {
+        $lowest_marks = $total_marks_obtained;
     }
     
-    $marks_array[] = $result['marks'];
+    $marks_array[] = $total_marks_obtained;
 }
 
 $average_marks = $exam_count > 0 ? round($total_marks / $exam_count, 1) : 0;
@@ -149,54 +192,29 @@ if ($exam_count > 1) {
 
 // Get class average for comparison
 $class_avg_query = "
-    SELECT AVG(sr.marks) AS class_avg
-    FROM StudentResults sr
-    JOIN Students s ON sr.student_id = s.id
-    JOIN Sections sec ON s.section_id = sec.id
-    WHERE sec.id = (SELECT section_id FROM Students WHERE id = ?) 
-    AND sr.subject_id = ?
+    SELECT AVG(r.theory_marks + r.practical_marks) AS class_avg
+    FROM results r
+    JOIN students s ON r.student_id = s.student_id
+    WHERE s.class_id = (SELECT class_id FROM students WHERE student_id = ?) 
+    AND r.subject_id = ?
 ";
 
 $class_avg_stmt = $conn->prepare($class_avg_query);
-if ($class_avg_stmt === false) {
-    die("Error preparing class average statement: " . $conn->error);
-}
-
-$class_avg_stmt->bind_param("ii", $student_id, $subject_id);
-$class_avg_stmt->execute();
-$class_avg_result = $class_avg_stmt->get_result();
-$class_avg_data = $class_avg_result->fetch_assoc();
-$class_avg = $class_avg_data['class_avg'] ? round($class_avg_data['class_avg'], 1) : 0;
-
-// Get attendance data if available
-$attendance_query = "
-    SELECT 
-        COUNT(CASE WHEN status = 'present' THEN 1 END) AS present_count,
-        COUNT(CASE WHEN status = 'absent' THEN 1 END) AS absent_count,
-        COUNT(*) AS total_classes
-    FROM Attendance
-    WHERE student_id = ? AND subject_id = ?
-";
-
-$attendance_stmt = $conn->prepare($attendance_query);
-$attendance = null;
-if ($attendance_stmt !== false) {
-    $attendance_stmt->bind_param("ii", $student_id, $subject_id);
-    $attendance_stmt->execute();
-    $attendance_result = $attendance_stmt->get_result();
-    $attendance = $attendance_result->fetch_assoc();
-    
-    if ($attendance['total_classes'] > 0) {
-        $attendance['percentage'] = round(($attendance['present_count'] / $attendance['total_classes']) * 100, 1);
-    } else {
-        $attendance['percentage'] = null;
-    }
+$class_avg = 0;
+if ($class_avg_stmt) {
+    $class_avg_stmt->bind_param("ss", $student_id, $subject_id);
+    $class_avg_stmt->execute();
+    $class_avg_result = $class_avg_stmt->get_result();
+    $class_avg_data = $class_avg_result->fetch_assoc();
+    $class_avg = $class_avg_data['class_avg'] ? round($class_avg_data['class_avg'], 1) : 0;
+    $class_avg_stmt->close();
 }
 
 // Process form submission for adding a new result
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_result'])) {
     $exam_id = isset($_POST['exam_id']) ? intval($_POST['exam_id']) : 0;
-    $marks = isset($_POST['marks']) ? floatval($_POST['marks']) : 0;
+    $theory_marks = isset($_POST['theory_marks']) ? floatval($_POST['theory_marks']) : 0;
+    $practical_marks = isset($_POST['practical_marks']) ? floatval($_POST['practical_marks']) : 0;
     $remarks = isset($_POST['remarks']) ? trim($_POST['remarks']) : '';
     
     // Validate inputs
@@ -206,91 +224,107 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_result'])) {
         $errors[] = "Please select a valid exam.";
     }
     
-    if ($marks < 0) {
-        $errors[] = "Marks cannot be negative.";
+    if ($theory_marks < 0) {
+        $errors[] = "Theory marks cannot be negative.";
+    }
+    
+    if ($practical_marks < 0) {
+        $errors[] = "Practical marks cannot be negative.";
     }
     
     // Check if result already exists
     $check_query = "
-        SELECT id FROM StudentResults 
+        SELECT result_id FROM results 
         WHERE student_id = ? AND subject_id = ? AND exam_id = ?
     ";
     
     $check_stmt = $conn->prepare($check_query);
-    if ($check_stmt === false) {
-        die("Error preparing check statement: " . $conn->error);
-    }
-    
-    $check_stmt->bind_param("iii", $student_id, $subject_id, $exam_id);
-    $check_stmt->execute();
-    $check_result = $check_stmt->get_result();
-    
-    if ($check_result->num_rows > 0) {
-        $errors[] = "Result for this exam already exists. Please edit the existing result instead.";
+    if ($check_stmt) {
+        $check_stmt->bind_param("ssi", $student_id, $subject_id, $exam_id);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        
+        if ($check_result->num_rows > 0) {
+            $errors[] = "Result for this exam already exists. Please edit the existing result instead.";
+        }
+        $check_stmt->close();
+    } else {
+        $errors[] = "Database error: " . $conn->error;
     }
     
     // Get exam details for grade calculation
-    $exam_query = "SELECT max_marks, passing_marks FROM Exams WHERE id = ?";
-    $exam_stmt = $conn->prepare($exam_query);
-    if ($exam_stmt === false) {
-        die("Error preparing exam statement: " . $conn->error);
-    }
-    
-    $exam_stmt->bind_param("i", $exam_id);
-    $exam_stmt->execute();
-    $exam_result = $exam_stmt->get_result();
-    $exam = $exam_result->fetch_assoc();
-    
-    if (!$exam) {
-        $errors[] = "Invalid exam selected.";
-    } else {
-        // Validate marks against max marks
-        if ($marks > $exam['max_marks']) {
-            $errors[] = "Marks cannot exceed maximum marks for this exam (" . $exam['max_marks'] . ").";
-        }
-        
-        // Calculate grade based on marks
-        $percentage = ($marks / $exam['max_marks']) * 100;
-        
-        if ($percentage >= 90) {
-            $grade = 'A+';
-        } elseif ($percentage >= 80) {
-            $grade = 'A';
-        } elseif ($percentage >= 70) {
-            $grade = 'B+';
-        } elseif ($percentage >= 60) {
-            $grade = 'B';
-        } elseif ($percentage >= 50) {
-            $grade = 'C+';
-        } elseif ($percentage >= 40) {
-            $grade = 'C';
-        } elseif ($percentage >= 33) {
-            $grade = 'D';
+    if (empty($errors)) {
+        $exam_query = "SELECT total_marks, passing_marks FROM exams WHERE exam_id = ?";
+        $exam_stmt = $conn->prepare($exam_query);
+        if ($exam_stmt) {
+            $exam_stmt->bind_param("i", $exam_id);
+            $exam_stmt->execute();
+            $exam_result = $exam_stmt->get_result();
+            $exam = $exam_result->fetch_assoc();
+            
+            if (!$exam) {
+                $errors[] = "Invalid exam selected.";
+            } else {
+                // Validate marks against max marks
+                $total_marks_obtained = $theory_marks + $practical_marks;
+                if ($total_marks_obtained > $exam['total_marks']) {
+                    $errors[] = "Total marks cannot exceed maximum marks for this exam (" . $exam['total_marks'] . ").";
+                }
+                
+                // Calculate percentage and determine grade
+                $percentage = ($total_marks_obtained / $exam['total_marks']) * 100;
+                $is_pass = ($total_marks_obtained >= $exam['passing_marks']) ? 1 : 0;
+                
+                // Get grade based on percentage
+                $grade_query = "SELECT grade, gpa FROM grading_system WHERE ? BETWEEN min_percentage AND max_percentage";
+                $grade_stmt = $conn->prepare($grade_query);
+                if ($grade_stmt) {
+                    $grade_stmt->bind_param("d", $percentage);
+                    $grade_stmt->execute();
+                    $grade_result = $grade_stmt->get_result();
+                    
+                    if ($grade_result->num_rows > 0) {
+                        $grade_data = $grade_result->fetch_assoc();
+                        $grade = $grade_data['grade'];
+                        $gpa = $grade_data['gpa'];
+                    } else {
+                        $grade = 'F';
+                        $gpa = 0.0;
+                    }
+                    $grade_stmt->close();
+                } else {
+                    $errors[] = "Database error: " . $conn->error;
+                }
+            }
+            $exam_stmt->close();
         } else {
-            $grade = 'F';
+            $errors[] = "Database error: " . $conn->error;
         }
     }
     
     // Insert result if no errors
     if (empty($errors)) {
         $insert_query = "
-            INSERT INTO StudentResults (student_id, subject_id, exam_id, marks, grade, remarks)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO results (student_id, subject_id, exam_id, theory_marks, practical_marks, 
+                               grade, gpa, remarks, percentage, is_pass, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ";
         
         $insert_stmt = $conn->prepare($insert_query);
-        if ($insert_stmt === false) {
-            die("Error preparing insert statement: " . $conn->error);
-        }
-        
-        $insert_stmt->bind_param("iiidss", $student_id, $subject_id, $exam_id, $marks, $grade, $remarks);
-        
-        if ($insert_stmt->execute()) {
-            $_SESSION['success'] = "Result added successfully.";
-            header("Location: student_results.php?student_id=$student_id&subject_id=$subject_id");
-            exit();
+        if ($insert_stmt) {
+            $insert_stmt->bind_param("ssiiddsddii", $student_id, $subject_id, $exam_id, $theory_marks, $practical_marks, 
+                                  $grade, $gpa, $remarks, $percentage, $is_pass, $teacher_id);
+            
+            if ($insert_stmt->execute()) {
+                $_SESSION['success'] = "Result added successfully.";
+                header("Location: student_results.php?student_id=$student_id&subject_id=$subject_id");
+                exit();
+            } else {
+                $_SESSION['error'] = "Failed to add result: " . $conn->error;
+            }
+            $insert_stmt->close();
         } else {
-            $_SESSION['error'] = "Failed to add result: " . $conn->error;
+            $_SESSION['error'] = "Database error: " . $conn->error;
         }
     } else {
         $_SESSION['error'] = implode("<br>", $errors);
@@ -298,109 +332,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_result'])) {
 }
 
 // Get available exams for adding new results
-$exams_query = "
-    SELECT e.id, e.name, e.date, e.max_marks
-    FROM Exams e
-    WHERE e.id NOT IN (
-        SELECT exam_id FROM StudentResults 
+$available_exams_query = "
+    SELECT e.exam_id, e.exam_name, e.start_date, e.total_marks
+    FROM exams e
+    WHERE e.exam_id NOT IN (
+        SELECT exam_id FROM results 
         WHERE student_id = ? AND subject_id = ?
     )
-    ORDER BY e.date DESC
+    AND e.is_active = 1
+    ORDER BY e.start_date DESC
 ";
 
-$exams_stmt = $conn->prepare($exams_query);
-if ($exams_stmt === false) {
-    die("Error preparing exams statement: " . $conn->error);
-}
-
-$exams_stmt->bind_param("ii", $student_id, $subject_id);
-$exams_stmt->execute();
-$exams_result = $exams_stmt->get_result();
-
+$available_exams_stmt = $conn->prepare($available_exams_query);
 $available_exams = [];
-while ($exam = $exams_result->fetch_assoc()) {
-    $available_exams[] = $exam;
+if ($available_exams_stmt) {
+    $available_exams_stmt->bind_param("ss", $student_id, $subject_id);
+    $available_exams_stmt->execute();
+    $available_exams_result = $available_exams_stmt->get_result();
+    
+    while ($exam = $available_exams_result->fetch_assoc()) {
+        $available_exams[] = $exam;
+    }
+    $available_exams_stmt->close();
 }
 
-// Get teacher notes for this student
-$notes_query = "
-    SELECT n.id, n.note, n.created_at, u.name AS teacher_name
-    FROM StudentNotes n
-    JOIN Users u ON n.teacher_id = u.id
-    WHERE n.student_id = ? AND n.subject_id = ?
-    ORDER BY n.created_at DESC
-";
-
-$notes_stmt = $conn->prepare($notes_query);
-$notes = [];
-
-if ($notes_stmt !== false) {
-    $notes_stmt->bind_param("ii", $student_id, $subject_id);
-    $notes_stmt->execute();
-    $notes_result = $notes_stmt->get_result();
-    
-    while ($note = $notes_result->fetch_assoc()) {
-        $notes[] = $note;
-    }
-} else {
-    // StudentNotes table might not exist
-    // Create the table
-    $create_notes_table = "
-        CREATE TABLE IF NOT EXISTS StudentNotes (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            student_id INT NOT NULL,
-            teacher_id INT NOT NULL,
-            subject_id INT NOT NULL,
-            note TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (student_id) REFERENCES Students(id) ON DELETE CASCADE,
-            FOREIGN KEY (teacher_id) REFERENCES Users(id) ON DELETE CASCADE,
-            FOREIGN KEY (subject_id) REFERENCES Subjects(id) ON DELETE CASCADE
-        )
-    ";
-    
-    if ($conn->query($create_notes_table) === TRUE) {
-        // Table created successfully
-    } else {
-        // Error creating table
-    }
-}
-
-// Process form submission for adding a new note
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
-    $note_text = isset($_POST['note_text']) ? trim($_POST['note_text']) : '';
-    
-    // Validate inputs
-    $errors = [];
-    
-    if (empty($note_text)) {
-        $errors[] = "Note text cannot be empty.";
-    }
-    
-    // Insert note if no errors
-    if (empty($errors)) {
-        $insert_note_query = "
-            INSERT INTO StudentNotes (student_id, teacher_id, subject_id, note)
-            VALUES (?, ?, ?, ?)
-        ";
-        
-        $insert_note_stmt = $conn->prepare($insert_note_query);
-        if ($insert_note_stmt === false) {
-            die("Error preparing insert note statement: " . $conn->error);
-        }
-        
-        $insert_note_stmt->bind_param("iiis", $student_id, $teacher_id, $subject_id, $note_text);
-        
-        if ($insert_note_stmt->execute()) {
-            $_SESSION['success'] = "Note added successfully.";
-            header("Location: student_results.php?student_id=$student_id&subject_id=$subject_id");
-            exit();
-        } else {
-            $_SESSION['error'] = "Failed to add note: " . $conn->error;
-        }
-    } else {
-        $_SESSION['error'] = implode("<br>", $errors);
-    }
+// Get subject details
+$subject_query = "SELECT * FROM subjects WHERE subject_id = ?";
+$subject_stmt = $conn->prepare($subject_query);
+$subject = null;
+if ($subject_stmt) {
+    $subject_stmt->bind_param("s", $subject_id);
+    $subject_stmt->execute();
+    $subject_result = $subject_stmt->get_result();
+    $subject = $subject_result->fetch_assoc();
+    $subject_stmt->close();
 }
 ?>
 
@@ -425,11 +390,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
             <div class="mb-6">
                 <h1 class="text-3xl font-bold text-gray-800">Student Results</h1>
                 <p class="text-gray-600">
-                    Viewing results for <?php echo htmlspecialchars($student['name']); ?> in <?php echo htmlspecialchars($student['subject_name']); ?>
+                    Viewing results for <?php echo htmlspecialchars($student['full_name']); ?> in <?php echo htmlspecialchars($student['subject_name']); ?>
                 </p>
                 <div class="mt-2">
-                    <a href="view_students.php?class_id=<?php echo $student['class_id']; ?>&subject_id=<?php echo $student['subject_id']; ?>" class="text-blue-600 hover:text-blue-800">
-                        <i class="fas fa-arrow-left mr-1"></i> Back to Students List
+                    <a href="grade_sheet.php" class="text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-arrow-left mr-1"></i> Back to Grade Sheets
                     </a>
                 </div>
             </div>
@@ -453,14 +418,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
             <div class="bg-white rounded-lg shadow p-4 mb-6">
                 <div class="md:flex justify-between">
                     <div>
-                        <h2 class="text-xl font-semibold"><?php echo htmlspecialchars($student['name']); ?></h2>
+                        <h2 class="text-xl font-semibold"><?php echo htmlspecialchars($student['full_name']); ?></h2>
                         <p class="text-gray-600">Roll No: <?php echo htmlspecialchars($student['roll_number']); ?></p>
-                        <p class="text-gray-600">Class: <?php echo htmlspecialchars($student['class_name']); ?> - Section: <?php echo htmlspecialchars($student['section_name']); ?></p>
+                        <p class="text-gray-600">Class: <?php echo htmlspecialchars($student['class_name']); ?> - Section: <?php echo htmlspecialchars($student['section']); ?></p>
                         <p class="text-gray-600">Subject: <?php echo htmlspecialchars($student['subject_name']); ?></p>
                     </div>
                     <div class="mt-4 md:mt-0">
-                        <a href="student_profile.php?student_id=<?php echo $student_id; ?>" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                            <i class="fas fa-user mr-2"></i> View Full Profile
+                        <a href="edit_results.php?student_id=<?php echo $student_id; ?>&subject_id=<?php echo $subject_id; ?>" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                            <i class="fas fa-edit mr-2"></i> Edit Results
                         </a>
                     </div>
                 </div>
@@ -536,7 +501,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                         
                         <div>
                             <p class="text-sm text-gray-600">Lowest Marks</p>
-                            <p class="text-xl font-semibold text-red-600"><?php echo $lowest_marks; ?></p>
+                            <p class="text-xl font-semibold text-red-600"><?php echo $exam_count > 0 ? $lowest_marks : 'N/A'; ?></p>
                         </div>
                         
                         <div>
@@ -595,36 +560,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                     </div>
                 </div>
                 
-                <!-- Attendance & Recommendations -->
+                <!-- Subject Details & Recommendations -->
                 <div class="bg-white rounded-lg shadow p-4">
-                    <h3 class="text-lg font-semibold mb-3">Attendance & Recommendations</h3>
+                    <h3 class="text-lg font-semibold mb-3">Subject Details</h3>
                     
-                    <?php if ($attendance !== null && $attendance['total_classes'] > 0): ?>
+                    <?php if ($subject): ?>
                         <div class="mb-4">
-                            <p class="text-sm text-gray-600">Attendance Rate</p>
-                            <?php 
-                                $att_color = '';
-                                if ($attendance['percentage'] >= 90) {
-                                    $att_color = 'text-green-600';
-                                } elseif ($attendance['percentage'] >= 75) {
-                                    $att_color = 'text-blue-600';
-                                } elseif ($attendance['percentage'] >= 60) {
-                                    $att_color = 'text-yellow-600';
-                                } else {
-                                    $att_color = 'text-red-600';
-                                }
-                            ?>
-                            <p class="text-xl font-semibold <?php echo $att_color; ?>"><?php echo $attendance['percentage']; ?>%</p>
+                            <p class="text-sm text-gray-600">Subject Information</p>
+                            <p class="font-medium"><?php echo htmlspecialchars($subject['subject_name']); ?> (<?php echo htmlspecialchars($subject['subject_id']); ?>)</p>
                             <p class="text-sm text-gray-500">
-                                Present: <?php echo $attendance['present_count']; ?> / 
-                                Absent: <?php echo $attendance['absent_count']; ?> / 
-                                Total: <?php echo $attendance['total_classes']; ?>
+                                Theory: <?php echo $subject['full_marks_theory']; ?> marks (Pass: <?php echo $subject['pass_marks_theory']; ?>)<br>
+                                Practical: <?php echo $subject['full_marks_practical']; ?> marks (Pass: <?php echo $subject['pass_marks_practical']; ?>)
                             </p>
-                        </div>
-                    <?php else: ?>
-                        <div class="mb-4">
-                            <p class="text-sm text-gray-600">Attendance Data</p>
-                            <p class="text-gray-500">No attendance data available</p>
                         </div>
                     <?php endif; ?>
                     
@@ -645,10 +592,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                                 
                                 if ($progress !== null && $progress < -5) {
                                     $recommendations[] = "<li class='text-red-600'><i class='fas fa-arrow-down mr-1'></i> Declining performance trend - needs attention</li>";
-                                }
-                                
-                                if ($attendance !== null && $attendance['percentage'] < 75) {
-                                    $recommendations[] = "<li class='text-red-600'><i class='fas fa-calendar-times mr-1'></i> Poor attendance affecting performance</li>";
                                 }
                                 
                                 if ($average_percentage >= 80) {
@@ -686,14 +629,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                             // Prepare data for chart
                             const examDates = <?php 
                                 $dates = array_map(function($result) {
-                                    return date('M d, Y', strtotime($result['exam_date']));
+                                    return date('M d, Y', strtotime($result['start_date']));
                                 }, array_reverse($results));
                                 echo json_encode($dates);
                             ?>;
                             
                             const studentMarks = <?php 
                                 $marks = array_map(function($result) {
-                                    return $result['marks'];
+                                    return $result['theory_marks'] + $result['practical_marks'];
                                 }, array_reverse($results));
                                 echo json_encode($marks);
                             ?>;
@@ -707,7 +650,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                             
                             const maxMarks = <?php 
                                 $max = array_map(function($result) {
-                                    return $result['max_marks'];
+                                    return $result['total_marks'];
                                 }, array_reverse($results));
                                 echo json_encode($max);
                             ?>;
@@ -812,9 +755,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                                     <tr>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marks</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Theory</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Practical</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remarks</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
@@ -825,19 +770,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                                                 <?php echo htmlspecialchars($result['exam_name']); ?>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <?php echo date('d M Y', strtotime($result['exam_date'])); ?>
+                                                <?php echo $result['start_date'] ? date('d M Y', strtotime($result['start_date'])) : 'N/A'; ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <?php echo $result['theory_marks']; ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <?php echo $result['practical_marks']; ?>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <?php 
+                                                    $total_marks = $result['theory_marks'] + $result['practical_marks'];
                                                     $mark_color = '';
-                                                    if ($result['marks'] >= $result['passing_marks']) {
+                                                    if ($result['is_pass']) {
                                                         $mark_color = 'text-green-600';
                                                     } else {
                                                         $mark_color = 'text-red-600';
                                                     }
                                                 ?>
                                                 <span class="<?php echo $mark_color; ?> font-medium">
-                                                    <?php echo $result['marks']; ?> / <?php echo $result['max_marks']; ?>
+                                                    <?php echo $total_marks; ?> / <?php echo $result['total_marks']; ?>
                                                 </span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
@@ -857,15 +809,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                                                     <?php echo $result['grade']; ?>
                                                 </span>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <?php echo !empty($result['remarks']) ? htmlspecialchars($result['remarks']) : '-'; ?>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                <?php if ($result['is_pass']): ?>
+                                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Pass</span>
+                                                <?php else: ?>
+                                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Fail</span>
+                                                <?php endif; ?>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <a href="edit_result.php?id=<?php echo $result['id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">
-                                                    <i class="fas fa-edit"></i>
-                                                </a>
-                                                <a href="delete_result.php?id=<?php echo $result['id']; ?>" class="text-red-600 hover:text-red-900" onclick="return confirm('Are you sure you want to delete this result?');">
-                                                    <i class="fas fa-trash"></i>
+                                                <a href="edit_results.php?student_id=<?php echo $student_id; ?>&subject_id=<?php echo $subject_id; ?>&exam_id=<?php echo $result['exam_id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">
+                                                    <i class="fas fa-edit"></i> Edit
                                                 </a>
                                             </td>
                                         </tr>
@@ -891,17 +844,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                                 <select id="exam_id" name="exam_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
                                     <option value="">Select Exam</option>
                                     <?php foreach ($available_exams as $exam): ?>
-                                        <option value="<?php echo $exam['id']; ?>">
-                                            <?php echo htmlspecialchars($exam['name']); ?> (<?php echo date('d M Y', strtotime($exam['date'])); ?>)
+                                        <option value="<?php echo $exam['exam_id']; ?>">
+                                            <?php echo htmlspecialchars($exam['exam_name']); ?> 
+                                            <?php echo $exam['start_date'] ? '(' . date('d M Y', strtotime($exam['start_date'])) . ')' : ''; ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
                             
                             <div class="mb-4">
-                                <label for="marks" class="block text-sm font-medium text-gray-700 mb-1">Marks</label>
-                                <input type="number" id="marks" name="marks" step="0.01" min="0" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                                <p class="text-xs text-gray-500 mt-1">Enter marks obtained by the student</p>
+                                <label for="theory_marks" class="block text-sm font-medium text-gray-700 mb-1">Theory Marks</label>
+                                <input type="number" id="theory_marks" name="theory_marks" step="0.01" min="0" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                                <p class="text-xs text-gray-500 mt-1">Enter theory marks obtained by the student</p>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="practical_marks" class="block text-sm font-medium text-gray-700 mb-1">Practical Marks</label>
+                                <input type="number" id="practical_marks" name="practical_marks" step="0.01" min="0" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                                <p class="text-xs text-gray-500 mt-1">Enter practical marks obtained by the student</p>
                             </div>
                             
                             <div class="mb-4">
@@ -919,51 +879,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_note'])) {
                 </div>
             </div>
             
-            <!-- Teacher Notes -->
+            <!-- Quick Links -->
             <div class="bg-white rounded-lg shadow p-4 mb-6">
-                <h3 class="text-lg font-semibold mb-3">Teacher Notes</h3>
+                <h3 class="text-lg font-semibold mb-3">Quick Links</h3>
                 
-                <div class="mb-4">
-                    <form method="POST" action="">
-                        <div class="mb-3">
-                            <label for="note_text" class="block text-sm font-medium text-gray-700 mb-1">Add a Note</label>
-                            <textarea id="note_text" name="note_text" rows="3" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required></textarea>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <a href="edit_results.php?class_id=<?php echo $student['class_id']; ?>&subject_id=<?php echo $subject_id; ?>" class="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                        <div class="bg-blue-500 text-white p-2 rounded-full mr-3">
+                            <i class="fas fa-users"></i>
                         </div>
-                        
-                        <div class="flex justify-end">
-                            <button type="submit" name="add_note" class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                                <i class="fas fa-plus mr-2"></i> Add Note
-                            </button>
+                        <div>
+                            <p class="font-medium">Class Results</p>
+                            <p class="text-sm text-gray-600">Edit results for entire class</p>
                         </div>
-                    </form>
+                    </a>
+                    
+                    <a href="grade_sheet.php" class="flex items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+                        <div class="bg-green-500 text-white p-2 rounded-full mr-3">
+                            <i class="fas fa-table"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium">Grade Sheets</p>
+                            <p class="text-sm text-gray-600">View all grade sheets</p>
+                        </div>
+                    </a>
+                    
+                    <a href="teacher_dashboard.php" class="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
+                        <div class="bg-purple-500 text-white p-2 rounded-full mr-3">
+                            <i class="fas fa-tachometer-alt"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium">Dashboard</p>
+                            <p class="text-sm text-gray-600">Return to dashboard</p>
+                        </div>
+                    </a>
                 </div>
-                
-                <?php if (empty($notes)): ?>
-                    <div class="p-4 text-center text-gray-500">
-                        <p>No notes found for this student in this subject.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="space-y-4">
-                        <?php foreach ($notes as $note): ?>
-                            <div class="border rounded-lg p-3">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($note['teacher_name']); ?></p>
-                                        <p class="text-xs text-gray-500"><?php echo date('d M Y, h:i A', strtotime($note['created_at'])); ?></p>
-                                    </div>
-                                    <div>
-                                        <a href="save_student_notes.php?action=delete&id=<?php echo $note['id']; ?>&student_id=<?php echo $student_id; ?>&subject_id=<?php echo $subject_id; ?>" class="text-red-600 hover:text-red-900" onclick="return confirm('Are you sure you want to delete this note?');">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </div>
-                                </div>
-                                <div class="mt-2">
-                                    <p class="text-sm text-gray-700"><?php echo nl2br(htmlspecialchars($note['note'])); ?></p>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
     </div>
