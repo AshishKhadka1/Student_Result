@@ -380,7 +380,6 @@ $conn->close();
     </style>
 </head>
 <body class="bg-gray-100">
-    <?php include 'includes/teacher_topbar.php'; ?>
     
     <div class="flex">
         <?php include 'includes/teacher_sidebar.php'; ?>
@@ -727,99 +726,7 @@ $conn->close();
                     </div>
                 <?php endif; ?>
             </div>
-            
-            <!-- Pending Tasks and Recent Activity -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Pending Tasks -->
-                <div class="bg-white shadow rounded-lg p-6">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">
-                        <i class="fas fa-tasks text-blue-500 mr-2"></i> Pending Tasks
-                    </h2>
-                    
-                    <?php if (empty($pending_tasks)): ?>
-                        <div class="bg-green-50 p-4 rounded-md">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-check-circle text-green-400"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium text-green-800">All caught up!</p>
-                                    <p class="mt-2 text-sm text-green-700">You have no pending result entries. Great job!</p>
-                                </div>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                        <div class="space-y-4">
-                            <?php foreach ($pending_tasks as $task): ?>
-                                <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <h3 class="font-medium text-gray-900"><?php echo $task['exam_name']; ?></h3>
-                                            <p class="text-sm text-gray-600">
-                                                <?php echo $task['class_name'] . ' ' . $task['section']; ?> - 
-                                                <?php echo $task['subject_name']; ?>
-                                            </p>
-                                            <?php if (isset($task['end_date'])): ?>
-                                                <p class="text-xs text-gray-500 mt-1">
-                                                    Exam ended: <?php echo date('d M Y', strtotime($task['end_date'])); ?>
-                                                </p>
-                                            <?php endif; ?>
-                                        </div>
-                                        <a href="edit_results.php?subject_id=<?php echo $task['subject_id']; ?>&class_id=<?php echo $task['class_id']; ?>&exam_id=<?php echo $task['exam_id']; ?>" 
-                                           class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                            <i class="fas fa-plus-circle mr-1"></i> Add Results
-                                        </a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-                
-                <!-- Recent Activity -->
-                <div class="bg-white shadow rounded-lg p-6">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">
-                        <i class="fas fa-history text-blue-500 mr-2"></i> Recent Activity
-                    </h2>
-                    
-                    <?php if (empty($recent_activity)): ?>
-                        <div class="bg-yellow-50 p-4 rounded-md">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-exclamation-circle text-yellow-400"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium text-yellow-800">No recent activity</p>
-                                    <p class="mt-2 text-sm text-yellow-700">You haven't entered any results recently. Start by adding results for your classes.</p>
-                                </div>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                        <div class="space-y-4">
-                            <?php foreach ($recent_activity as $activity): ?>
-                                <div class="border-l-4 <?php echo ($activity['remarks'] == 'Pass') ? 'border-green-500' : 'border-red-500'; ?> pl-4 py-2">
-                                    <p class="text-sm font-medium text-gray-900">
-                                        <?php echo $activity['student_name']; ?> - 
-                                        <span class="font-normal text-gray-600"><?php echo $activity['subject_name']; ?></span>
-                                    </p>
-                                    <p class="text-xs text-gray-500">
-                                        <?php echo $activity['class_name'] . ' ' . $activity['section']; ?> | 
-                                        <?php echo $activity['exam_name']; ?>
-                                    </p>
-                                    <div class="flex justify-between items-center mt-1">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium <?php echo ($activity['remarks'] == 'Pass') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
-                                            Grade: <?php echo $activity['grade']; ?> (<?php echo $activity['remarks']; ?>)
-                                        </span>
-                                        <span class="text-xs text-gray-500">
-                                            <?php echo date('d M Y, h:i A', strtotime($activity['updated_at'])); ?>
-                                        </span>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
+                  
         </div>
     </div>
     

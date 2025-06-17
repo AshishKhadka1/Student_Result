@@ -845,59 +845,7 @@ $conn->close();
                             </div>
                         </div>
 
-                        <!-- Notifications -->
-                        <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover mb-6">
-                            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                <h3 class="text-lg font-medium text-gray-900">Notifications</h3>
-                                <p class="mt-1 text-sm text-gray-500">Latest updates and announcements</p>
-                            </div>
-                            <div class="px-4 py-5 sm:p-6">
-                                <?php if (empty($notifications)): ?>
-                                    <div class="text-center py-4">
-                                        <i class="fas fa-bell-slash text-gray-400 text-2xl mb-2"></i>
-                                        <p class="text-gray-500">No new notifications.</p>
-                                    </div>
-                                <?php else: ?>
-                                    <ul class="divide-y divide-gray-200">
-                                        <?php foreach ($notifications as $notification): ?>
-                                            <li class="py-4">
-                                                <div class="flex space-x-3">
-                                                    <div class="flex-shrink-0">
-                                                        <?php 
-                                                        $icon_class = 'bg-blue-500';
-                                                        $icon = '<i class="fas fa-bell text-white"></i>';
-                                                        
-                                                        if (strpos(strtolower($notification['message']), 'result') !== false) {
-                                                            $icon_class = 'bg-green-500';
-                                                            $icon = '<i class="fas fa-clipboard-check text-white"></i>';
-                                                        } elseif (strpos(strtolower($notification['message']), 'exam') !== false) {
-                                                            $icon_class = 'bg-purple-500';
-                                                            $icon = '<i class="fas fa-calendar-alt text-white"></i>';
-                                                        } elseif (strpos(strtolower($notification['message']), 'assignment') !== false) {
-                                                            $icon_class = 'bg-yellow-500';
-                                                            $icon = '<i class="fas fa-tasks text-white"></i>';
-                                                        }
-                                                        ?>
-                                                        <div class="h-10 w-10 rounded-full <?php echo $icon_class; ?> flex items-center justify-center">
-                                                            <?php echo $icon; ?>
-                                                        </div>
-                                                    </div>
-                                                    <div class="flex-1 space-y-1">
-                                                        <div class="flex items-center justify-between">
-                                                            <h3 class="text-sm font-medium"><?php echo htmlspecialchars($notification['title']); ?></h3>
-                                                            <p class="text-sm text-gray-500"><?php echo date('M d, h:i A', strtotime($notification['created_at'])); ?></p>
-                                                        </div>
-                                                        <p class="text-sm text-gray-500">
-                                                            <?php echo htmlspecialchars($notification['message']); ?>
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                <?php endif; ?>
-                            </div>
-                        </div>
+                      
 
                     </div>
                 </div>

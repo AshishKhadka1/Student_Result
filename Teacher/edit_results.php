@@ -31,6 +31,92 @@ if (!$stmt) {
     $stmt->close();
 }
 
+// Handle AJAX request for individual mark updates
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_individual_marks') {
+    header('Content-Type: application/json');
+    
+    $result_id = intval($_POST['result_id']);
+    $theory_marks = floatval($_POST['theory_marks']);
+    $practical_marks = isset($_POST['practical_marks']) ? floatval($_POST['practical_marks']) : 0;
+    
+    // Get subject details for calculations
+    $subject_query = "SELECT s.full_marks_theory, s.full_marks_practical, s.pass_marks_theory, s.pass_marks_practical
+                     FROM results r
+                     JOIN subjects s ON r.subject_id = s.subject_id
+                     WHERE r.result_id = ?";
+    
+    $stmt = $conn->prepare($subject_query);
+    $stmt->bind_param("i", $result_id);
+    $stmt->execute();
+    $subject_result = $stmt->get_result();
+    $subject_data = $subject_result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$subject_data) {
+        echo json_encode(['success' => false, 'message' => 'Subject data not found']);
+        exit();
+    }
+    
+    // Calculate new values
+    $total_marks = $theory_marks + $practical_marks;
+    $full_marks = ($subject_data['full_marks_theory'] ?? 100) + ($subject_data['full_marks_practical'] ?? 0);
+    $percentage = ($full_marks > 0) ? ($total_marks / $full_marks) * 100 : 0;
+    
+    // Check pass/fail
+    $theory_pass = $theory_marks >= ($subject_data['pass_marks_theory'] ?? 33);
+    $practical_pass = true;
+    if (isset($subject_data['full_marks_practical']) && $subject_data['full_marks_practical'] > 0) {
+        $practical_pass = $practical_marks >= ($subject_data['pass_marks_practical'] ?? 0);
+    }
+    
+    // Determine grade and GPA
+    $grade = 'F';
+    $gpa = 0;
+    $remarks = 'Fail';
+    
+    if ($theory_pass && $practical_pass) {
+        if ($percentage >= 90) { $grade = 'A+'; $gpa = 4.0; }
+        elseif ($percentage >= 80) { $grade = 'A'; $gpa = 3.7; }
+        elseif ($percentage >= 70) { $grade = 'B+'; $gpa = 3.3; }
+        elseif ($percentage >= 60) { $grade = 'B'; $gpa = 3.0; }
+        elseif ($percentage >= 50) { $grade = 'C+'; $gpa = 2.7; }
+        elseif ($percentage >= 40) { $grade = 'C'; $gpa = 2.3; }
+        elseif ($percentage >= 33) { $grade = 'D'; $gpa = 1.0; }
+        else { $grade = 'F'; $gpa = 0.0; }
+        
+        if ($grade != 'F') $remarks = 'Pass';
+    }
+    
+    // Update the result
+    $update_query = "UPDATE results SET 
+                     theory_marks = ?, practical_marks = ?, total_marks = ?,
+                     percentage = ?, grade = ?, gpa = ?, remarks = ?,
+                     updated_by = ?, updated_at = NOW()
+                     WHERE result_id = ?";
+    
+    $stmt = $conn->prepare($update_query);
+    $stmt->bind_param("ddddsdsii", $theory_marks, $practical_marks, $total_marks,
+                     $percentage, $grade, $gpa, $remarks, $user_id, $result_id);
+    
+    if ($stmt->execute()) {
+        echo json_encode([
+            'success' => true,
+            'message' => 'Marks updated successfully',
+            'data' => [
+                'total_marks' => number_format($total_marks, 2),
+                'percentage' => number_format($percentage, 2),
+                'grade' => $grade,
+                'gpa' => number_format($gpa, 2),
+                'remarks' => $remarks
+            ]
+        ]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Failed to update marks']);
+    }
+    $stmt->close();
+    exit();
+}
+
 // Get subject ID, class ID, and exam ID from URL parameters
 $subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
 $class_id = isset($_GET['class_id']) ? intval($_GET['class_id']) : 0;
@@ -277,17 +363,20 @@ if ($grade_result && $grade_result->num_rows > 0) {
     ];
 }
 
-// Handle form submission
+// Handle form submission for bulk updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results']) && !$missing_params && empty($error_message)) {
     // Begin transaction
     $conn->begin_transaction();
     try {
+        $updated_students = [];
+        $total_updated = 0;
+        
         foreach ($_POST['student_id'] as $index => $student_id) {
             $theory_marks = isset($_POST['theory_marks'][$index]) ? floatval($_POST['theory_marks'][$index]) : 0;
             $practical_marks = isset($_POST['practical_marks'][$index]) ? floatval($_POST['practical_marks'][$index]) : 0;
             $result_id = $_POST['result_id'][$index];
             
-            // Skip if no marks are entered
+            // Skip if no marks are entered and no existing result
             if ($theory_marks == 0 && $practical_marks == 0 && empty($result_id)) {
                 continue;
             }
@@ -336,10 +425,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results']) && !$
                 if (!$stmt) {
                     throw new Exception("Database error: " . $conn->error);
                 }
-                $stmt->bind_param("iiiddddssdsi", $student_id, $subject_id, $exam_id, $theory_marks, $practical_marks, 
+                $stmt->bind_param("iiiddddssi", $student_id, $subject_id, $exam_id, $theory_marks, $practical_marks, 
                                 $total_marks, $percentage, $grade, $gpa, $remarks, $user_id);
-                $stmt->execute();
+                if (!$stmt->execute()) {
+                    throw new Exception("Failed to insert result: " . $stmt->error);
+                }
                 $stmt->close();
+                $total_updated++;
             } else {
                 // Update existing result
                 $update_query = "UPDATE results SET theory_marks = ?, practical_marks = ?, total_marks = ?, 
@@ -349,29 +441,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results']) && !$
                 if (!$stmt) {
                     throw new Exception("Database error: " . $conn->error);
                 }
-                $stmt->bind_param("ddddsdsii", $theory_marks, $practical_marks, $total_marks, 
+                $stmt->bind_param("ddddssdii", $theory_marks, $practical_marks, $total_marks, 
                                 $percentage, $grade, $gpa, $remarks, $user_id, $result_id);
-                $stmt->execute();
+                if (!$stmt->execute()) {
+                    throw new Exception("Failed to update result: " . $stmt->error);
+                }
                 $stmt->close();
+                $total_updated++;
             }
+            
+            // Store updated student data for response
+            $updated_students[$index] = [
+                'student_id' => $student_id,
+                'theory_marks' => $theory_marks,
+                'practical_marks' => $practical_marks,
+                'total_marks' => $total_marks,
+                'percentage' => $percentage,
+                'grade' => $grade,
+                'gpa' => $gpa,
+                'remarks' => $remarks
+            ];
         }
         
         // Commit transaction
         $conn->commit();
-        $success_message = "Results saved successfully!";
-        
-        // Refresh the student data
+
+        // Refresh the student data after successful save
+        $students = [];
         if ($student_id) {
+            // If editing a specific student
             $students_query = "SELECT s.student_id, s.roll_number, s.registration_number, u.full_name,
                               r.result_id, r.theory_marks, r.practical_marks, r.total_marks, r.percentage, r.grade, r.gpa, r.remarks
                               FROM students s
                               JOIN users u ON s.user_id = u.user_id
                               LEFT JOIN results r ON s.student_id = r.student_id 
                                   AND r.subject_id = ? AND r.exam_id = ?
-                              WHERE s.student_id = ?";
+                              WHERE s.student_id = ?
+                              ORDER BY s.roll_number";
             $stmt = $conn->prepare($students_query);
-            $stmt->bind_param("iis", $subject_id, $exam_id, $student_id);
+            if ($stmt) {
+                $stmt->bind_param("iis", $subject_id, $exam_id, $student_id);
+                $stmt->execute();
+                $students_result = $stmt->get_result();
+                while ($student = $students_result->fetch_assoc()) {
+                    $students[] = $student;
+                }
+                $stmt->close();
+            }
         } else {
+            // If editing all students in the class
             $students_query = "SELECT s.student_id, s.roll_number, s.registration_number, u.full_name,
                               r.result_id, r.theory_marks, r.practical_marks, r.total_marks, r.percentage, r.grade, r.gpa, r.remarks
                               FROM students s
@@ -381,25 +499,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results']) && !$
                               WHERE s.class_id = ?
                               ORDER BY s.roll_number";
             $stmt = $conn->prepare($students_query);
-            $stmt->bind_param("iii", $subject_id, $exam_id, $class_id);
+            if ($stmt) {
+                $stmt->bind_param("iii", $subject_id, $exam_id, $class_id);
+                $stmt->execute();
+                $students_result = $stmt->get_result();
+                while ($student = $students_result->fetch_assoc()) {
+                    $students[] = $student;
+                }
+                $stmt->close();
+            }
         }
         
-        if (!$stmt) {
-            $error_message = "Database error: " . $conn->error;
-        } else {
-            $stmt->execute();
-            $students_result = $stmt->get_result();
-            $students = [];
-            while ($student = $students_result->fetch_assoc()) {
-                $students[] = $student;
-            }
-            $stmt->close();
+        $success_message = "Results saved successfully! Updated $total_updated student records.";
+        
+        // If this is an AJAX request, return JSON response
+        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => $success_message,
+                'updated_students' => $updated_students
+            ]);
+            exit;
         }
         
     } catch (Exception $e) {
         // Rollback transaction on error
         $conn->rollback();
         $error_message = "Error: " . $e->getMessage();
+        
+        // If this is an AJAX request, return JSON error response
+        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => $error_message
+            ]);
+            exit;
+        }
     }
 }
 
@@ -480,115 +617,22 @@ $issue_date = date('Y-m-d');
             min-width: 2rem;
         }
         
-        .grade-A-plus {
-            background-color: #10B981;
-            color: white;
-        }
+        .grade-A-plus { background-color: #10B981; color: white; }
+        .grade-A { background-color: #34D399; color: white; }
+        .grade-B-plus { background-color: #3B82F6; color: white; }
+        .grade-B { background-color: #60A5FA; color: white; }
+        .grade-C-plus { background-color: #F59E0B; color: white; }
+        .grade-C { background-color: #FBBF24; color: white; }
+        .grade-D { background-color: #F97316; color: white; }
+        .grade-F { background-color: #EF4444; color: white; }
         
-        .grade-A {
-            background-color: #34D399;
-            color: white;
-        }
+        .result-row:hover { background-color: #F3F4F6; }
+        .result-row.editing { background-color: #EFF6FF; border-left: 3px solid #3B82F6; }
         
-        .grade-B-plus {
-            background-color: #3B82F6;
-            color: white;
-        }
+        .marks-input { transition: all 0.2s; }
+        .marks-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
+        .marks-input.invalid { border-color: #EF4444; background-color: #FEF2F2; }
         
-        .grade-B {
-            background-color: #60A5FA;
-            color: white;
-        }
-        
-        .grade-C-plus {
-            background-color: #F59E0B;
-            color: white;
-        }
-        
-        .grade-C {
-            background-color: #FBBF24;
-            color: white;
-        }
-        
-        .grade-D {
-            background-color: #F97316;
-            color: white;
-        }
-        
-        .grade-F {
-            background-color: #EF4444;
-            color: white;
-        }
-        
-        .result-row:hover {
-            background-color: #F3F4F6;
-        }
-        
-        .result-row.editing {
-            background-color: #EFF6FF;
-            border-left: 3px solid #3B82F6;
-        }
-        
-        .marks-input {
-            transition: all 0.2s;
-        }
-        
-        .marks-input:focus {
-            border-color: #3B82F6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
-        }
-        
-        .marks-input.invalid {
-            border-color: #EF4444;
-            background-color: #FEF2F2;
-        }
-        
-        .tooltip {
-            position: relative;
-            display: inline-block;
-        }
-        
-        .tooltip .tooltip-text {
-            visibility: hidden;
-            width: 200px;
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 6px;
-            padding: 5px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        
-        .tooltip:hover .tooltip-text {
-            visibility: visible;
-            opacity: 1;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .fade-in {
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        
-        .stat-card {
-            transition: all 0.3s;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-        
-        /* Loading spinner */
         .spinner {
             border: 3px solid #f3f3f3;
             border-radius: 50%;
@@ -606,269 +650,31 @@ $issue_date = date('Y-m-d');
             100% { transform: rotate(360deg); }
         }
         
-        /* Grade Sheet Styles */
-        @page {
-            size: A4;
-            margin: 0;
-        }
-
-        .grade-sheet-container {
-            width: 21cm;
-            min-height: 29.7cm;
-            padding: 1cm;
-            margin: 20px auto;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            position: relative;
-            box-sizing: border-box;
-        }
-
-        .watermark {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 100px;
-            color: rgba(0, 0, 0, 0.03);
-            z-index: 0;
-            pointer-events: none;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            position: relative;
-            z-index: 1;
-            border-bottom: 2px solid #1a5276;
-            padding-bottom: 10px;
-        }
-
-        .logo {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 10px;
-            background-color: #f0f0f0;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: #555;
-        }
-
-        .title {
-            font-weight: bold;
-            font-size: 22px;
-            margin-bottom: 5px;
-            color: #1a5276;
-        }
-
-        .subtitle {
-            font-size: 18px;
-            margin-bottom: 5px;
-            color: #2874a6;
-        }
-
-        .exam-title {
-            font-size: 20px;
-            font-weight: bold;
-            margin: 10px 0;
-            color: #1a5276;
-            border: 2px solid #1a5276;
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 5px;
-        }
-
-        .student-info {
-            margin-bottom: 20px;
-            position: relative;
-            z-index: 1;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .info-item {
-            margin-bottom: 8px;
-        }
-
-        .info-label {
-            font-weight: bold;
-            color: #2874a6;
-        }
-
-        .grade-sheet-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .grade-sheet-table,
-        .grade-sheet-table th,
-        .grade-sheet-table td {
-            border: 1px solid #bdc3c7;
-        }
-
-        .grade-sheet-table th,
-        .grade-sheet-table td {
-            padding: 10px;
-            text-align: center;
-        }
-
-        .grade-sheet-table th {
-            background-color: #1a5276;
-            color: white;
-            font-weight: bold;
-        }
-
-        .grade-sheet-table tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
-
-        .summary {
-            margin: 20px 0;
-            position: relative;
-            z-index: 1;
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 15px;
-        }
-
-        .summary-item {
-            background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 5px;
-            padding: 10px;
-            text-align: center;
-        }
-
-        .summary-label {
-            font-weight: bold;
-            color: #2874a6;
-            margin-bottom: 5px;
-        }
-
-        .summary-value {
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        .footer {
-            margin-top: 30px;
-            position: relative;
-            z-index: 1;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        .signature {
-            text-align: center;
-            margin-top: 50px;
-        }
-
-        .signature-line {
-            width: 80%;
-            margin: 50px auto 10px;
-            border-top: 1px solid #333;
-        }
-
-        .signature-title {
-            font-weight: bold;
-        }
-
-        .grade-scale {
-            margin-top: 20px;
-            font-size: 12px;
-            border: 1px solid #bdc3c7;
-            padding: 10px;
-            background-color: #f9f9f9;
-        }
-
-        .grade-title {
-            font-weight: bold;
-            margin-bottom: 5px;
-            text-align: center;
-        }
-
-        .grade-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-        }
-
-        .grade-table th,
-        .grade-table td {
-            padding: 3px;
-            text-align: center;
-            border: 1px solid #ddd;
-        }
-
-        .qr-code {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            width: 80px;
-            height: 80px;
-            background-color: #f0f0f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            color: #555;
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        /* Print styles */
-        @media print {
-            .no-print {
-                display: none !important;
-            }
-            
-            .print-only {
-                display: block !important;
-            }
-            
-            body {
-                font-size: 12pt;
-                color: #000;
-                background-color: #fff;
-            }
-            
-            .container {
-                max-width: 100% !important;
-                width: 100% !important;
-                padding: 0 !important;
-                margin: 0 !important;
-            }
-            
-            table {
-                page-break-inside: auto;
-            }
-            
-            tr {
-                page-break-inside: avoid;
-                page-break-after: auto;
-            }
-            
-            thead {
-                display: table-header-group;
-            }
-            
-            tfoot {
-                display: table-footer-group;
-            }
-            
-            .grade-sheet-container {
-                width: 100%;
-                min-height: auto;
-                padding: 0.5cm;
-                margin: 0;
-                box-shadow: none;
-            }
+        .stat-card { transition: all 0.3s; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 400px;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
         }
+        
+        .notification.show { transform: translateX(0); }
+        .notification.success { background-color: #D1FAE5; border-left: 4px solid #10B981; color: #065F46; }
+        .notification.error { background-color: #FEE2E2; border-left: 4px solid #EF4444; color: #991B1B; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -877,24 +683,12 @@ $issue_date = date('Y-m-d');
     <div class="flex">
         <?php include 'includes/teacher_sidebar.php'; ?>
         
-        <!-- Mobile sidebar toggle -->
-        <div class="fixed bottom-4 right-4 md:hidden z-20">
-            <button id="mobile-sidebar-toggle" class="bg-blue-600 text-white p-3 rounded-full shadow-lg">
-                <i class="fas fa-bars"></i>
-            </button>
-        </div>
-
-        <script>
-            // Mobile sidebar toggle
-            document.getElementById('mobile-sidebar-toggle').addEventListener('click', function() {
-                const sidebar = document.querySelector('.sidebar');
-                sidebar.classList.toggle('-translate-x-full');
-            });
-        </script>
-        
         <div class="flex-1 p-6">
             <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Edit Results</h1>
+                <h1 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-edit text-blue-500 mr-2"></i>
+                    Edit Student Results
+                </h1>
                 <div class="flex space-x-3">
                     <?php if (!$missing_params): ?>
                     <button onclick="window.print()" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded no-print">
@@ -993,88 +787,6 @@ $issue_date = date('Y-m-d');
                         </button>
                     </div>
                 </form>
-                
-                <div class="mt-6 bg-blue-50 p-4 rounded-md">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-info-circle text-blue-500"></i>
-                        </div>
-                        <div class="ml-3">
-                            <h3 class="text-sm font-medium text-blue-800">Information</h3>
-                            <div class="mt-2 text-sm text-blue-700">
-                                <p>Select a subject, class, and exam to edit student results. If you don't see your assigned subjects, please contact the administrator.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Recent Exams Quick Access -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">
-                    <i class="fas fa-history text-blue-500 mr-2"></i> Recent Exams
-                </h2>
-                
-                <?php if (count($exams) > 0): ?>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Name</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Academic Year</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <?php 
-                            // Show only the 5 most recent exams
-                            $recent_exams = array_slice($exams, 0, 5);
-                            foreach ($recent_exams as $ex): 
-                            ?>
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?php echo $ex['exam_name']; ?></td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo $ex['exam_type'] ?? 'N/A'; ?></td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo $ex['academic_year']; ?></td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?php 
-                                    if (isset($ex['start_date'])) {
-                                        echo date('d M Y', strtotime($ex['start_date']));
-                                    } else {
-                                        echo 'N/A';
-                                    }
-                                    ?>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <a href="grade_sheet.php?exam_id=<?php echo $ex['exam_id']; ?>" class="text-blue-600 hover:text-blue-900">View Results</a>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="mt-4 text-right">
-                    <a href="grade_sheet.php" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <i class="fas fa-list mr-2"></i> View All Grade Sheets
-                    </a>
-                </div>
-                <?php else: ?>
-                <div class="bg-yellow-50 p-4 rounded-md">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
-                        </div>
-                        <div class="ml-3">
-                            <h3 class="text-sm font-medium text-yellow-800">No exams found</h3>
-                            <div class="mt-2 text-sm text-yellow-700">
-                                <p>There are no exams available in the system. Please contact the administrator to create exams.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <?php endif; ?>
             </div>
             
             <?php else: ?>
@@ -1103,50 +815,6 @@ $issue_date = date('Y-m-d');
                             <?php echo isset($exam['academic_year']) ? $exam['academic_year'] : ''; ?>
                             <?php echo isset($exam['exam_type']) ? ' - ' . $exam['exam_type'] : ''; ?>
                         </p>
-                    </div>
-                </div>
-                
-                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <h3 class="text-md font-semibold text-gray-700 mb-3">Marks Distribution</h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-sm text-gray-600">Theory Marks:</p>
-                                <p class="font-medium">
-                                    Full Marks: <?php echo isset($subject['full_marks_theory']) ? $subject['full_marks_theory'] : '0'; ?>
-                                </p>
-                                <p class="font-medium">
-                                    Pass Marks: <?php echo isset($subject['pass_marks_theory']) ? $subject['pass_marks_theory'] : '0'; ?>
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-sm text-gray-600">Practical Marks:</p>
-                                <p class="font-medium">
-                                    Full Marks: <?php echo isset($subject['full_marks_practical']) ? $subject['full_marks_practical'] : '0'; ?>
-                                </p>
-                                <p class="font-medium">
-                                    Pass Marks: <?php echo isset($subject['pass_marks_practical']) ? $subject['pass_marks_practical'] : '0'; ?>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <h3 class="text-md font-semibold text-gray-700 mb-3">Exam Period</h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-sm text-gray-600">Start Date:</p>
-                                <p class="font-medium">
-                                    <?php echo isset($exam['start_date']) ? date('d M Y', strtotime($exam['start_date'])) : 'N/A'; ?>
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-sm text-gray-600">End Date:</p>
-                                <p class="font-medium">
-                                    <?php echo isset($exam['end_date']) ? date('d M Y', strtotime($exam['end_date'])) : 'N/A'; ?>
-                                </p>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1200,192 +868,6 @@ $issue_date = date('Y-m-d');
             </div>
             <?php else: ?>
             
-            <!-- Grade Sheet View (for printing) -->
-            <div class="print-only">
-                <div class="grade-sheet-container">
-                    <div class="watermark">OFFICIAL</div>
-
-                    <div class="header">
-                        <div class="logo">LOGO</div>
-                        <div class="title"><?php echo isset($settings['school_name']) ? strtoupper($settings['school_name']) : 'GOVERNMENT OF NEPAL'; ?></div>
-                        <div class="title"><?php echo isset($settings['result_header']) ? strtoupper($settings['result_header']) : 'NATIONAL EXAMINATION BOARD'; ?></div>
-                        <div class="subtitle">SECONDARY EDUCATION EXAMINATION</div>
-                        <div class="exam-title">GRADE SHEET</div>
-                    </div>
-
-                    <?php if (count($students) > 0): ?>
-                    <div class="student-info">
-                        <div class="info-item">
-                            <span class="info-label">Student Name:</span>
-                            <span><?php echo $students[0]['full_name']; ?></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Roll No:</span>
-                            <span><?php echo $students[0]['roll_number']; ?></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Registration No:</span>
-                            <span><?php echo $students[0]['registration_number']; ?></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Class:</span>
-                            <span><?php echo $class['class_name'] . ' ' . $class['section']; ?></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Examination:</span>
-                            <span><?php echo $exam['exam_name']; ?></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Academic Year:</span>
-                            <span><?php echo $exam['academic_year']; ?></span>
-                        </div>
-                        <?php if (!empty($exam['exam_type'])): ?>
-                        <div class="info-item">
-                            <span class="info-label">Exam Type:</span>
-                            <span><?php echo $exam['exam_type']; ?></span>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-
-                    <table class="grade-sheet-table">
-    <thead>
-        <tr>
-            <th>ROLL NO.</th>
-            <th>STUDENT NAME</th>
-            <th>SUBJECT CODE</th>
-            <th>SUBJECTS</th>
-            <th>CREDIT HOUR</th>
-            <th>THEORY MARKS</th>
-            <th>PRACTICAL MARKS</th>
-            <th>TOTAL MARKS</th>
-            <th>GRADE</th>
-            <th>REMARKS</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php if (count($students) > 0): ?>
-        <tr>
-            <td><?php echo $students[0]['roll_number']; ?></td>
-            <td><?php echo $students[0]['full_name']; ?></td>
-            <td><?php echo $subject['subject_code']; ?></td>
-            <td><?php echo $subject['subject_name']; ?></td>
-            <td><?php echo $subject['credit_hours'] ?? 1; ?></td>
-            <td><?php echo isset($students[0]['theory_marks']) ? $students[0]['theory_marks'] : 'N/A'; ?></td>
-            <td><?php echo isset($students[0]['practical_marks']) ? $students[0]['practical_marks'] : 'N/A'; ?></td>
-            <td><?php echo isset($students[0]['total_marks']) ? $students[0]['total_marks'] : 'N/A'; ?></td>
-            <td><?php echo isset($students[0]['grade']) ? $students[0]['grade'] : 'N/A'; ?></td>
-            <td><?php echo isset($students[0]['remarks']) ? $students[0]['remarks'] : 'N/A'; ?></td>
-        </tr>
-        <?php else: ?>
-        <tr>
-            <td colspan="10" class="text-center">No results found</td>
-        </tr>
-        <?php endif; ?>
-    </tbody>
-</table>
-
-                    <div class="summary">
-                        <div class="summary-item">
-                            <div class="summary-label">TOTAL MARKS</div>
-                            <div class="summary-value">
-                                <?php 
-                                $total_marks = isset($students[0]['total_marks']) ? $students[0]['total_marks'] : 0;
-                                $max_marks = ($subject['full_marks_theory'] ?? 0) + ($subject['full_marks_practical'] ?? 0);
-                                echo $total_marks . ' / ' . $max_marks; 
-                                ?>
-                            </div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">PERCENTAGE</div>
-                            <div class="summary-value">
-                                <?php 
-                                $percentage = isset($students[0]['percentage']) ? $students[0]['percentage'] : 0;
-                                echo number_format($percentage, 2) . '%'; 
-                                ?>
-                            </div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">GPA</div>
-                            <div class="summary-value">
-                                <?php 
-                                $gpa = isset($students[0]['gpa']) ? $students[0]['gpa'] : 0;
-                                echo number_format($gpa, 2); 
-                                ?>
-                            </div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">RESULT</div>
-                            <div class="summary-value">
-                                <?php 
-                                $remarks = isset($students[0]['remarks']) ? $students[0]['remarks'] : '';
-                                echo $remarks; 
-                                ?>
-                            </div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
-                    <div class="grade-scale">
-                        <div class="grade-title">GRADING SCALE</div>
-                        <table class="grade-table">
-                            <tr>
-                                <th>Grade</th>
-                                <th>A+</th>
-                                <th>A</th>
-                                <th>B+</th>
-                                <th>B</th>
-                                <th>C+</th>
-                                <th>C</th>
-                                <th>D</th>
-                                <th>F</th>
-                            </tr>
-                            <tr>
-                                <th>Percentage</th>
-                                <td>90-100</td>
-                                <td>80-89</td>
-                                <td>70-79</td>
-                                <td>60-69</td>
-                                <td>50-59</td>
-                                <td>40-49</td>
-                                <td>33-39</td>
-                                <td>0-32</td>
-                            </tr>
-                            <tr>
-                                <th>Grade Point</th>
-                                <td>4.0</td>
-                                <td>3.7</td>
-                                <td>3.3</td>
-                                <td>3.0</td>
-                                <td>2.7</td>
-                                <td>2.3</td>
-                                <td>1.0</td>
-                                <td>0.0</td>
-                            </tr>
-                        </table>
-                    </div>
-
-                    <div class="footer">
-                        <div class="signature">
-                            <div class="signature-line"></div>
-                            <div class="signature-title">PREPARED BY</div>
-                            <div><?php echo $prepared_by; ?></div>
-                        </div>
-                        <div class="signature">
-                            <div class="signature-line"></div>
-                            <div class="signature-title">PRINCIPAL</div>
-                            <div>SCHOOL PRINCIPAL</div>
-                        </div>
-                    </div>
-
-                    <div class="qr-code">QR CODE</div>
-
-                    <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #777;">
-                        <p><?php echo isset($settings['result_footer']) ? $settings['result_footer'] : 'This is a computer-generated document. No signature is required.'; ?></p>
-                        <p>Issue Date: <?php echo date('d-m-Y', strtotime($issue_date)); ?></p>
-                    </div>
-                </div>
-            </div>
-            
             <!-- Results Entry Form (for editing) -->
             <form method="POST" action="" id="results-form" class="no-print">
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -1393,131 +875,131 @@ $issue_date = date('Y-m-d');
                         <h2 class="text-xl font-bold text-gray-800">
                             <i class="fas fa-edit text-blue-500 mr-2"></i> Edit Student Results
                         </h2>
-                        <p class="text-gray-600 mt-1">Enter marks for each student below. Fields will be validated automatically.</p>
-                    </div>      
-</div>
+                        <p class="text-gray-600 mt-1">Enter marks for each student below. Changes are saved automatically when you click Save Results.</p>
+                    </div>
                     
                     <div class="overflow-x-auto">
                         <table class="min-w-full bg-white">
-    <thead>
-        <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-            <th class="py-3 px-6 text-left">Roll No.</th>
-            <th class="py-3 px-6 text-left">Student Name</th>
-            <th class="py-3 px-6 text-center">SUBJECT CODE</th>
-            <th class="py-3 px-6 text-left">SUBJECTS</th>
-            <th class="py-3 px-6 text-center">CREDIT HOUR</th>
-            <th class="py-3 px-6 text-center">THEORY MARKS
-                <span class="text-xs text-gray-500 block">
-                    (Max: <?php echo isset($subject['full_marks_theory']) ? $subject['full_marks_theory'] : '100'; ?>)
-                </span>
-            </th>
-            <?php if (isset($subject['full_marks_practical']) && $subject['full_marks_practical'] > 0): ?>
-            <th class="py-3 px-6 text-center">PRACTICAL MARKS
-                <span class="text-xs text-gray-500 block">
-                    (Max: <?php echo $subject['full_marks_practical']; ?>)
-                </span>
-            </th>
-            <?php endif; ?>
-            <th class="py-3 px-6 text-center">TOTAL MARKS</th>
-            <th class="py-3 px-6 text-center">GRADE</th>
-            <th class="py-3 px-6 text-center">REMARKS</th>
-        </tr>
-    </thead>
-    <tbody class="text-gray-600 text-sm">
-        <?php if (empty($students)): ?>
-            <tr>
-                <td colspan="10" class="py-4 px-6 text-center">No students found in this class.</td>
-            </tr>
-        <?php else: ?>
-            <?php foreach ($students as $index => $student): ?>
-            <tr class="border-b border-gray-200 hover:bg-gray-100 result-row" 
-                id="student-row-<?php echo $index; ?>"
-                data-theory-full-marks="<?php echo isset($subject['full_marks_theory']) ? $subject['full_marks_theory'] : 100; ?>"
-                data-practical-full-marks="<?php echo isset($subject['full_marks_practical']) ? $subject['full_marks_practical'] : 0; ?>"
-                data-theory-pass-marks="<?php echo isset($subject['pass_marks_theory']) ? $subject['pass_marks_theory'] : 33; ?>"
-                data-practical-pass-marks="<?php echo isset($subject['pass_marks_practical']) ? $subject['pass_marks_practical'] : 0; ?>">
-                <td class="py-3 px-6 text-left whitespace-nowrap">
-                    <div class="flex items-center">
-                        <span class="font-medium"><?php echo $student['roll_number']; ?></span>
-                    </div>
-                </td>
-                <td class="py-3 px-6 text-left">
-                    <div class="flex items-center">
-                        <div class="mr-2">
-                            <i class="fas fa-user-graduate text-blue-500"></i>
-                        </div>
-                        <span><?php echo $student['full_name']; ?></span>
-                    </div>
-                    <div class="text-xs text-gray-500"><?php echo $student['registration_number'] ?? 'N/A'; ?></div>
-                </td>
-                <td class="py-3 px-6 text-center">
-                    <?php echo $subject['subject_code']; ?>
-                </td>
-                <td class="py-3 px-6 text-left">
-                    <?php echo $subject['subject_name']; ?>
-                </td>
-                <td class="py-3 px-6 text-center">
-                    <?php echo $subject['credit_hours'] ?? 1; ?>
-                </td>
-                <td class="py-3 px-6 text-center">
-                    <input type="hidden" name="student_id[<?php echo $index; ?>]" value="<?php echo $student['student_id']; ?>">
-                    <input type="hidden" name="result_id[<?php echo $index; ?>]" value="<?php echo $student['result_id'] ?? ''; ?>">
-                    <input type="number" name="theory_marks[<?php echo $index; ?>]" 
-                           value="<?php echo isset($student['theory_marks']) ? $student['theory_marks'] : ''; ?>" 
-                           min="0" max="<?php echo isset($subject['full_marks_theory']) ? $subject['full_marks_theory'] : '100'; ?>" step="0.01"
-                           class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 marks-input"
-                           data-index="<?php echo $index; ?>" data-type="theory"
-                           onchange="validateMarks(this)" onfocus="highlightRow(<?php echo $index; ?>)">
-                </td>
-                <?php if (isset($subject['full_marks_practical']) && $subject['full_marks_practical'] > 0): ?>
-                <td class="py-3 px-6 text-center">
-                    <input type="number" name="practical_marks[<?php echo $index; ?>]" 
-                           value="<?php echo isset($student['practical_marks']) ? $student['practical_marks'] : ''; ?>" 
-                           min="0" max="<?php echo $subject['full_marks_practical']; ?>" step="0.01"
-                           class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 marks-input"
-                           data-index="<?php echo $index; ?>" data-type="practical"
-                           onchange="validateMarks(this)" onfocus="highlightRow(<?php echo $index; ?>)">
-                </td>
-                <?php endif; ?>
-                <td class="py-3 px-6 text-center">
-                    <span id="total-marks-<?php echo $index; ?>" class="font-medium">
-                        <?php echo isset($student['total_marks']) ? $student['total_marks'] : '0'; ?>
-                    </span>
-                </td>
-                <td class="py-3 px-6 text-center">
-                    <span id="grade-<?php echo $index; ?>" class="grade-badge <?php 
-                        if (isset($student['grade'])) {
-                            $grade = str_replace('+', '-plus', $student['grade']);
-                            echo 'grade-' . $grade;
-                        } else {
-                            echo 'bg-gray-200 text-gray-800';
-                        }
-                    ?>">
-                        <?php echo isset($student['grade']) ? $student['grade'] : 'N/A'; ?>
-                    </span>
-                </td>
-                <td class="py-3 px-6 text-center">
-                    <span id="status-<?php echo $index; ?>" class="px-2 py-1 rounded-full text-xs <?php 
-                        if (isset($student['remarks'])) {
-                            echo ($student['remarks'] == 'Pass') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-                        } else {
-                            echo 'bg-gray-100 text-gray-800';
-                        }
-                    ?>">
-                        <?php echo isset($student['remarks']) ? $student['remarks'] : 'Not Graded'; ?>
-                    </span>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        <?php endif; ?>
-    </tbody>
-</table>
+                            <thead>
+                                <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                                    <th class="py-3 px-6 text-left">Roll No.</th>
+                                    <th class="py-3 px-6 text-left">Student Name</th>
+                                    <th class="py-3 px-6 text-center">Theory Marks
+                                        <span class="text-xs text-gray-500 block">
+                                            (Max: <?php echo isset($subject['full_marks_theory']) ? $subject['full_marks_theory'] : '100'; ?>)
+                                        </span>
+                                    </th>
+                                    <?php if (isset($subject['full_marks_practical']) && $subject['full_marks_practical'] > 0): ?>
+                                    <th class="py-3 px-6 text-center">Practical Marks
+                                        <span class="text-xs text-gray-500 block">
+                                            (Max: <?php echo $subject['full_marks_practical']; ?>)
+                                        </span>
+                                    </th>
+                                    <?php endif; ?>
+                                    <th class="py-3 px-6 text-center">Total Marks</th>
+                                    <th class="py-3 px-6 text-center">Percentage</th>
+                                    <th class="py-3 px-6 text-center">Grade</th>
+                                    <th class="py-3 px-6 text-center">Status</th>
+                                    <th class="py-3 px-6 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-gray-600 text-sm">
+                                <?php foreach ($students as $index => $student): ?>
+                                <tr class="border-b border-gray-200 hover:bg-gray-100 result-row" 
+                                    id="student-row-<?php echo $index; ?>"
+                                    data-theory-full-marks="<?php echo isset($subject['full_marks_theory']) ? $subject['full_marks_theory'] : 100; ?>"
+                                    data-practical-full-marks="<?php echo isset($subject['full_marks_practical']) ? $subject['full_marks_practical'] : 0; ?>"
+                                    data-theory-pass-marks="<?php echo isset($subject['pass_marks_theory']) ? $subject['pass_marks_theory'] : 33; ?>"
+                                    data-practical-pass-marks="<?php echo isset($subject['pass_marks_practical']) ? $subject['pass_marks_practical'] : 0; ?>">
+                                    <td class="py-3 px-6 text-left whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span class="font-medium"><?php echo $student['roll_number']; ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-6 text-left">
+                                        <div class="flex items-center">
+                                            <div class="mr-2">
+                                                <i class="fas fa-user-graduate text-blue-500"></i>
+                                            </div>
+                                            <div>
+                                                <span class="font-medium"><?php echo $student['full_name']; ?></span>
+                                                <div class="text-xs text-gray-500"><?php echo $student['registration_number'] ?? 'N/A'; ?></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-6 text-center">
+                                        <input type="hidden" name="student_id[<?php echo $index; ?>]" value="<?php echo $student['student_id']; ?>">
+                                        <input type="hidden" name="result_id[<?php echo $index; ?>]" value="<?php echo $student['result_id'] ?? ''; ?>">
+                                        <input type="number" name="theory_marks[<?php echo $index; ?>]" 
+                                               value="<?php echo isset($student['theory_marks']) ? $student['theory_marks'] : ''; ?>" 
+                                               min="0" max="<?php echo isset($subject['full_marks_theory']) ? $subject['full_marks_theory'] : '100'; ?>" step="0.01"
+                                               class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 marks-input"
+                                               data-index="<?php echo $index; ?>" data-type="theory"
+                                               onchange="validateMarks(this)" onfocus="highlightRow(<?php echo $index; ?>)">
+                                    </td>
+                                    <?php if (isset($subject['full_marks_practical']) && $subject['full_marks_practical'] > 0): ?>
+                                    <td class="py-3 px-6 text-center">
+                                        <input type="number" name="practical_marks[<?php echo $index; ?>]" 
+                                               value="<?php echo isset($student['practical_marks']) ? $student['practical_marks'] : ''; ?>" 
+                                               min="0" max="<?php echo $subject['full_marks_practical']; ?>" step="0.01"
+                                               class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 marks-input"
+                                               data-index="<?php echo $index; ?>" data-type="practical"
+                                               onchange="validateMarks(this)" onfocus="highlightRow(<?php echo $index; ?>)">
+                                    </td>
+                                    <?php endif; ?>
+                                    <td class="py-3 px-6 text-center">
+                                        <span id="total-marks-<?php echo $index; ?>" class="font-medium">
+                                            <?php echo isset($student['total_marks']) ? number_format($student['total_marks'], 2) : '0.00'; ?>
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-6 text-center">
+                                        <span id="percentage-<?php echo $index; ?>" class="font-medium">
+                                            <?php echo isset($student['percentage']) ? number_format($student['percentage'], 2) . '%' : '0.00%'; ?>
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-6 text-center">
+                                        <span id="grade-<?php echo $index; ?>" class="grade-badge <?php 
+                                            if (isset($student['grade'])) {
+                                                $grade = str_replace('+', '-plus', $student['grade']);
+                                                echo 'grade-' . $grade;
+                                            } else {
+                                                echo 'bg-gray-200 text-gray-800';
+                                            }
+                                        ?>">
+                                            <?php echo isset($student['grade']) ? $student['grade'] : 'N/A'; ?>
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-6 text-center">
+                                        <span id="status-<?php echo $index; ?>" class="px-2 py-1 rounded-full text-xs <?php 
+                                            if (isset($student['remarks'])) {
+                                                echo ($student['remarks'] == 'Pass') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                                            } else {
+                                                echo 'bg-gray-100 text-gray-800';
+                                            }
+                                        ?>">
+                                            <?php echo isset($student['remarks']) ? $student['remarks'] : 'Not Graded'; ?>
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-6 text-center">
+                                        <?php if (isset($student['result_id']) && !empty($student['result_id'])): ?>
+                                        <button type="button" onclick="editIndividualResult(<?php echo $student['result_id']; ?>, <?php echo $index; ?>)" 
+                                                class="text-blue-600 hover:text-blue-900 text-sm">
+                                            <i class="fas fa-edit mr-1"></i> Quick Edit
+                                        </button>
+                                        <?php else: ?>
+                                        <span class="text-gray-400 text-sm">No Result</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                     
                     <div class="p-6 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
                         <div class="text-sm text-gray-600">
                             <i class="fas fa-info-circle text-blue-500 mr-1"></i>
-                            Grades are calculated automatically based on the marks entered.
+                            Grades and percentages are calculated automatically. Changes will be reflected in grade sheets.
                         </div>
                         <div class="flex space-x-3">
                             <button type="button" onclick="window.location.href='grade_sheet.php'" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
@@ -1525,7 +1007,7 @@ $issue_date = date('Y-m-d');
                             </button>
                             
                             <button type="submit" name="save_results" id="save-button" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                                <i class="fas fa-save mr-2"></i> Save Results
+                                <i class="fas fa-save mr-2"></i> Save All Results
                             </button>
                         </div>
                     </div>
@@ -1536,25 +1018,69 @@ $issue_date = date('Y-m-d');
         </div>
     </div>
     
+    <!-- Quick Edit Modal -->
+    <div id="quickEditModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900" id="modalTitle">Quick Edit Marks</h3>
+                    <button onclick="closeQuickEditModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <form id="quickEditForm" onsubmit="return updateIndividualMarks(event)">
+                    <input type="hidden" id="editResultId" name="result_id">
+                    <input type="hidden" id="editIndex" name="index">
+                    
+                    <div class="mb-4">
+                        <label for="editTheoryMarks" class="block text-sm font-medium text-gray-700 mb-1">
+                            Theory Marks
+                        </label>
+                        <input type="number" id="editTheoryMarks" name="theory_marks" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                               step="0.01" min="0" required>
+                        <p class="text-xs text-gray-500 mt-1" id="theoryMaxText">Maximum marks: 100</p>
+                    </div>
+                    
+                    <div class="mb-4" id="practicalSection">
+                        <label for="editPracticalMarks" class="block text-sm font-medium text-gray-700 mb-1">
+                            Practical Marks
+                        </label>
+                        <input type="number" id="editPracticalMarks" name="practical_marks" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                               step="0.01" min="0">
+                        <p class="text-xs text-gray-500 mt-1" id="practicalMaxText">Maximum marks: 0</p>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeQuickEditModal()" 
+                                class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button type="submit" id="updateButton"
+                                class="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700">
+                            <i class="fas fa-save mr-1"></i> Update Marks
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
     <script>
         // Highlight the row being edited
         function highlightRow(index) {
-            // Remove highlighting from all rows
             document.querySelectorAll('.result-row').forEach(row => {
                 row.classList.remove('editing');
             });
-            
-            // Add highlighting to the current row
             document.getElementById('student-row-' + index).classList.add('editing');
         }
         
         // Validate marks and update total
         function validateMarks(input) {
             const index = input.dataset.index;
-            const type = input.dataset.type;
             const value = parseFloat(input.value) || 0;
-            
-            // Get max marks
             const maxMarks = parseFloat(input.max) || 100;
             
             // Validate input
@@ -1563,23 +1089,16 @@ $issue_date = date('Y-m-d');
             } else if (value > maxMarks) {
                 input.value = maxMarks;
                 input.classList.add('invalid');
-                setTimeout(() => {
-                    input.classList.remove('invalid');
-                }, 2000);
+                setTimeout(() => input.classList.remove('invalid'), 2000);
             }
             
             // Calculate total marks
-            let totalMarks = 0;
-            
-            // Get theory marks
             const theoryInput = document.querySelector(`input[name="theory_marks[${index}]"]`);
-            const theoryMarks = theoryInput ? (parseFloat(theoryInput.value) || 0) : 0;
-            
-            // Get practical marks if applicable
             const practicalInput = document.querySelector(`input[name="practical_marks[${index}]"]`);
-            const practicalMarks = practicalInput ? (parseFloat(practicalInput.value) || 0) : 0;
             
-            totalMarks = theoryMarks + practicalMarks;
+            const theoryMarks = theoryInput ? (parseFloat(theoryInput.value) || 0) : 0;
+            const practicalMarks = practicalInput ? (parseFloat(practicalInput.value) || 0) : 0;
+            const totalMarks = theoryMarks + practicalMarks;
             
             // Update total marks display
             const totalElement = document.getElementById('total-marks-' + index);
@@ -1589,11 +1108,16 @@ $issue_date = date('Y-m-d');
             
             // Calculate percentage and update grade/status
             calculateGradeAndStatus(index, theoryMarks, practicalMarks, totalMarks);
+            
+            // Mark the row as modified
+            const row = document.getElementById('student-row-' + index);
+            if (row) {
+                row.classList.add('editing');
+            }
         }
         
         // Calculate and update grade and status based on marks
         function calculateGradeAndStatus(index, theoryMarks, practicalMarks, totalMarks) {
-            // Get subject details from data attributes
             const rowElement = document.getElementById('student-row-' + index);
             const theoryFullMarks = parseFloat(rowElement.dataset.theoryFullMarks) || 100;
             const practicalFullMarks = parseFloat(rowElement.dataset.practicalFullMarks) || 0;
@@ -1610,7 +1134,7 @@ $issue_date = date('Y-m-d');
             const passed = theoryPassed && practicalPassed;
             
             // Determine grade
-            let grade = '';
+            let grade = 'F';
             if (passed) {
                 if (percentage >= 90) grade = 'A+';
                 else if (percentage >= 80) grade = 'A';
@@ -1620,8 +1144,12 @@ $issue_date = date('Y-m-d');
                 else if (percentage >= 40) grade = 'C';
                 else if (percentage >= 33) grade = 'D';
                 else grade = 'F';
-            } else {
-                grade = 'F';
+            }
+            
+            // Update percentage display
+            const percentageElement = document.getElementById('percentage-' + index);
+            if (percentageElement) {
+                percentageElement.textContent = percentage.toFixed(2) + '%';
             }
             
             // Update grade and status elements
@@ -1635,8 +1163,6 @@ $issue_date = date('Y-m-d');
                 // Add appropriate grade class
                 const gradeClass = 'grade-' + grade.replace('+', '-plus');
                 gradeElement.classList.add(gradeClass);
-                
-                // Update text
                 gradeElement.textContent = grade;
             }
             
@@ -1653,6 +1179,100 @@ $issue_date = date('Y-m-d');
                     statusElement.textContent = 'Fail';
                 }
             }
+        }
+        
+        // Quick edit individual result
+        function editIndividualResult(resultId, index) {
+            const theoryInput = document.querySelector(`input[name="theory_marks[${index}]"]`);
+            const practicalInput = document.querySelector(`input[name="practical_marks[${index}]"]`);
+            const rowElement = document.getElementById('student-row-' + index);
+            
+            const theoryMax = parseFloat(rowElement.dataset.theoryFullMarks) || 100;
+            const practicalMax = parseFloat(rowElement.dataset.practicalFullMarks) || 0;
+            
+            document.getElementById('editResultId').value = resultId;
+            document.getElementById('editIndex').value = index;
+            document.getElementById('editTheoryMarks').value = theoryInput.value;
+            document.getElementById('editPracticalMarks').value = practicalInput ? practicalInput.value : '';
+            document.getElementById('editTheoryMarks').max = theoryMax;
+            document.getElementById('editPracticalMarks').max = practicalMax;
+            
+            document.getElementById('theoryMaxText').textContent = 'Maximum marks: ' + theoryMax;
+            document.getElementById('practicalMaxText').textContent = 'Maximum marks: ' + practicalMax;
+            
+            // Show/hide practical section
+            const practicalSection = document.getElementById('practicalSection');
+            if (practicalMax > 0) {
+                practicalSection.style.display = 'block';
+                document.getElementById('editPracticalMarks').disabled = false;
+            } else {
+                practicalSection.style.display = 'none';
+                document.getElementById('editPracticalMarks').disabled = true;
+            }
+            
+            document.getElementById('quickEditModal').classList.remove('hidden');
+        }
+        
+        function closeQuickEditModal() {
+            document.getElementById('quickEditModal').classList.add('hidden');
+        }
+        
+        function updateIndividualMarks(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(document.getElementById('quickEditForm'));
+            formData.append('action', 'update_individual_marks');
+            
+            const updateButton = document.getElementById('updateButton');
+            const originalText = updateButton.innerHTML;
+            updateButton.innerHTML = '<div class="spinner"></div> Updating...';
+            updateButton.disabled = true;
+            
+            fetch('edit_results.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const index = formData.get('index');
+                    
+                    // Update the form inputs
+                    const theoryInput = document.querySelector(`input[name="theory_marks[${index}]"]`);
+                    const practicalInput = document.querySelector(`input[name="practical_marks[${index}]"]`);
+                    
+                    if (theoryInput) theoryInput.value = formData.get('theory_marks');
+                    if (practicalInput) practicalInput.value = formData.get('practical_marks') || '';
+                    
+                    // Update displays
+                    document.getElementById('total-marks-' + index).textContent = data.data.total_marks;
+                    document.getElementById('percentage-' + index).textContent = data.data.percentage + '%';
+                    
+                    const gradeElement = document.getElementById('grade-' + index);
+                    gradeElement.className = 'grade-badge grade-' + data.data.grade.toLowerCase().replace('+', '-plus');
+                    gradeElement.textContent = data.data.grade;
+                    
+                    const statusElement = document.getElementById('status-' + index);
+                    statusElement.className = 'px-2 py-1 rounded-full text-xs ' + 
+                        (data.data.remarks === 'Pass' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800');
+                    statusElement.textContent = data.data.remarks;
+                    
+                    showNotification('Marks updated successfully!', 'success');
+                    closeQuickEditModal();
+                } else {
+                    showNotification(data.message || 'Failed to update marks', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred while updating marks', 'error');
+            })
+            .finally(() => {
+                updateButton.innerHTML = originalText;
+                updateButton.disabled = false;
+            });
+            
+            return false;
         }
         
         // Show loading indicator when saving
@@ -1672,13 +1292,8 @@ $issue_date = date('Y-m-d');
             const successAlert = document.getElementById('success-alert');
             const errorAlert = document.getElementById('error-alert');
             
-            if (successAlert) {
-                successAlert.style.display = 'none';
-            }
-            
-            if (errorAlert) {
-                errorAlert.style.display = 'none';
-            }
+            if (successAlert) successAlert.style.display = 'none';
+            if (errorAlert) errorAlert.style.display = 'none';
         }, 5000);
         
         // Add keyboard navigation for faster data entry
@@ -1688,11 +1303,9 @@ $issue_date = date('Y-m-d');
                 if (activeElement.tagName === 'INPUT' && activeElement.type === 'number') {
                     e.preventDefault();
                     
-                    // Get all mark inputs
                     const inputs = Array.from(document.querySelectorAll('input[type="number"].marks-input'));
                     const currentIndex = inputs.indexOf(activeElement);
                     
-                    // Move to next input
                     if (currentIndex < inputs.length - 1) {
                         inputs[currentIndex + 1].focus();
                     }
@@ -1709,7 +1322,6 @@ $issue_date = date('Y-m-d');
                 const selectedOption = subjectSelect.options[subjectSelect.selectedIndex];
                 const classId = selectedOption.getAttribute('data-class-id');
                 
-                // Set the class dropdown to match the subject's class
                 for (let i = 0; i < classSelect.options.length; i++) {
                     if (classSelect.options[i].value === classId) {
                         classSelect.selectedIndex = i;
@@ -1723,6 +1335,39 @@ $issue_date = date('Y-m-d');
         document.addEventListener('DOMContentLoaded', function() {
             updateClassSelection();
         });
+
+        function showNotification(message, type) {
+            // Remove existing notifications
+            const existingNotifications = document.querySelectorAll('.notification');
+            existingNotifications.forEach(notification => notification.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} mr-2"></i>
+                        <span>${message}</span>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-current opacity-70 hover:opacity-100">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Show notification
+            setTimeout(() => notification.classList.add('show'), 100);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.classList.remove('show');
+                    setTimeout(() => notification.remove(), 300);
+                }
+            }, 5000);
+        }
     </script>
 </body>
 </html>
