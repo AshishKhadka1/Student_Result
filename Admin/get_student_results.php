@@ -1,6 +1,11 @@
-
 <?php
 session_start();
+
+// Set headers to prevent caching
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     echo "Unauthorized access";
     exit();
@@ -86,7 +91,8 @@ $selected_exam_id = isset($_GET['exam_id']) ? $_GET['exam_id'] : $exams[0]['exam
 
 // Get results for the selected exam
 $results_query = "
-    SELECT r.*, s.subject_name, s.subject_code, s.credit_hours
+    SELECT r.result_id, r.student_id, r.exam_id, r.subject_id, r.theory_marks, r.practical_marks, 
+           r.grade, r.gpa, r.remarks, s.subject_name, s.subject_code, s.credit_hours
     FROM results r
     JOIN subjects s ON r.subject_id = s.subject_id
     WHERE r.student_id = ? AND r.exam_id = ?
@@ -185,7 +191,7 @@ $conn->close();
             
             <div class="mt-2 md:mt-0">
                 <label for="exam_selector" class="block text-sm font-medium text-gray-700 mb-1">Select Exam:</label>
-                <select id="exam_selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md" onchange="changeExam(this.value)">
+                <select id="exam_selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md" onchange="changeExam(this.value)" data-student-id="<?php echo $student_id; ?>">
                     <?php foreach ($exams as $exam): ?>
                         <option value="<?php echo $exam['exam_id']; ?>" <?php echo ($exam['exam_id'] == $selected_exam_id) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($exam['exam_name'] . ' (' . ucfirst($exam['exam_type']) . ')'); ?>
@@ -227,11 +233,11 @@ $conn->close();
                                     <?php echo number_format($result['theory_marks'], 2); ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?php echo isset($result['practical_marks']) ? number_format($result['practical_marks'], 2) : 'N/A'; ?>
+                                    <?php echo isset($result['practical_marks']) && $result['practical_marks'] > 0 ? number_format($result['practical_marks'], 2) : 'N/A'; ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     <?php 
-                                    $total = $result['theory_marks'] + ($result['practical_marks'] ?? 0);
+                                    $total = $result['theory_marks'] + (isset($result['practical_marks']) ? $result['practical_marks'] : 0);
                                     echo number_format($total, 2); 
                                     ?>
                                 </td>
@@ -331,24 +337,3 @@ $conn->close();
         </button>
     </div>
 </div>
-
-<script>
-    function changeExam(examId) {
-        // Reload the results for the selected exam
-        document.getElementById('resultsContent').innerHTML = '<div class="flex justify-center"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
-        
-        fetch(`get_student_results.php?id=<?php echo $student_id; ?>&exam_id=${examId}`)
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById('resultsContent').innerHTML = data;
-            })
-            .catch(error => {
-                document.getElementById('resultsContent').innerHTML = `<div class="text-red-500">Error loading results: ${error.message}</div>`;
-            });
-    }
-    
-    function printStudentResult(studentId, examId) {
-        // Open a new window for printing
-        const printWindow = window.open(`print_result.php?student_id=${studentId}&exam_id=${examId}`, '_blank');
-    }
-</script>

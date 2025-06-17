@@ -206,7 +206,7 @@ try {
         throw new Exception('Error inserting user: ' . $stmt->error);
     }
     $user_id = $conn->insert_id;
-    error_log("User inserted with ID: $user_id");
+    error_log("User inserted with ID: $user_id, username: $username, role: teacher");
     $stmt->close();
     
     // Check if gender column exists in teachers table

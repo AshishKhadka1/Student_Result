@@ -865,7 +865,17 @@ $conn->close();
         printWindow.document.write(printContent);
         printWindow.document.close();
     }
+
+    // Function to handle password change
+    
+
+    // Show password change modal
+    
+
+    // Close password modal
+    
 </script>
+
 </body>
 
 </html>

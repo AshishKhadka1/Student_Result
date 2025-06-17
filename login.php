@@ -117,7 +117,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_
         <!-- Login Form -->
         <form action="php/login_process.php" method="POST" class="space-y-5">
             <div>
-                <label for="username" class="block text-sm font-medium text-slate-700 mb-1">Username</label>
+                <label for="username" class="block text-sm font-medium text-slate-700 mb-1">Username or Email</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i class="fas fa-user text-slate-400"></i>

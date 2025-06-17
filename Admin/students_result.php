@@ -602,38 +602,7 @@ $conn->close();
     <div class="flex h-screen overflow-hidden">
         <?php include 'sidebar.php'; ?>
 
-        <!-- Mobile sidebar -->
-        <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
-            <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
-            <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
-                <div class="absolute top-0 right-0 -mr-12 pt-2">
-                    <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
-                        <span class="sr-only">Close sidebar</span>
-                        <i class="fas fa-times text-white"></i>
-                    </button>
-                </div>
-                <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                    <div class="flex-shrink-0 flex items-center px-4">
-                        <span class="text-white text-lg font-semibold">Result Management</span>
-                    </div>
-                    <nav class="mt-5 px-2 space-y-1">
-                        <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-tachometer-alt mr-3"></i>
-                            Dashboard
-                        </a>
-                        <a href="student_result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-white bg-gray-700 rounded-md">
-                            <i class="fas fa-user-graduate mr-3"></i>
-                            Student Results
-                        </a>
-                        <!-- Add more mobile navigation items as needed -->
-                        <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                            <i class="fas fa-sign-out-alt mr-3"></i>
-                            Logout
-                        </a>
-                    </nav>
-                </div>
-            </div>
-        </div>
+       
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
@@ -641,6 +610,10 @@ $conn->close();
             <?php
         // Include the file that processes form data
         include 'topBar.php';
+        ?>
+
+         <?php include 'mobile_sidebar.php'; 
+        
         ?>
 
             <!-- Main Content Area -->
@@ -747,42 +720,93 @@ $conn->close();
                                             <?php echo $exams[array_search($selected_exam, array_column($exams, 'exam_id'))]['exam_name']; ?> Results
                                         </h3>
                                         
-                                        <div class="overflow-x-auto">
-                                            <table class="result-table min-w-full">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Subject Code</th>
-                                                        <th>Subject</th>
-                                                        <th>Credit Hours</th>
-                                                        <th>Theory</th>
-                                                        <th>Practical</th>
-                                                        <th>Total</th>
-                                                        <th>Grade</th>
-                                                        <th>GPA</th>
-                                                        <th>Remarks</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php foreach ($results as $result): ?>
-                                                        <tr>
-                                                            <td><?php echo $result['subject_code']; ?></td>
-                                                            <td><?php echo $result['subject_name']; ?></td>
-                                                            <td><?php echo $result['credit_hours']; ?></td>
-                                                            <td><?php echo $result['theory_marks']; ?></td>
-                                                            <td><?php echo $result['practical_marks']; ?></td>
-                                                            <td><?php echo $result['total_marks']; ?></td>
-                                                            <td>
-                                                                <span class="grade-badge grade-<?php echo strtolower(str_replace('+', '-plus', $result['grade'])); ?>">
-                                                                    <?php echo $result['grade']; ?>
-                                                                </span>
-                                                            </td>
-                                                            <td><?php echo number_format($result['gpa'], 2); ?></td>
-                                                            <td><?php echo $result['remarks']; ?></td>
-                                                        </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <table class="result-table min-w-full">
+    <thead>
+        <tr>
+            <th>SUBJECT CODE</th>
+            <th>SUBJECTS</th>
+            <th>CREDIT HOUR</th>
+            <th>THEORY GRADE</th>
+            <th>PRACTICAL GRADE</th>
+            <th>FINAL GRADE</th>
+            <th>GRADE POINT</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php foreach ($results as $result): ?>
+            <tr>
+                <td><?php echo $result['subject_code']; ?></td>
+                <td><?php echo $result['subject_name']; ?></td>
+                <td><?php echo $result['credit_hours']; ?></td>
+                <td>
+                    <?php 
+                    // Convert theory marks to grade format
+                    $theory_marks = $result['theory_marks'];
+                    $theory_full_marks = $result['full_marks_theory'] ?? 100;
+                    if ($theory_marks > 0 && $theory_full_marks > 0) {
+                        $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
+                        if ($theory_percentage >= 91) echo 'A+';
+                        elseif ($theory_percentage >= 81) echo 'A';
+                        elseif ($theory_percentage >= 71) echo 'B+';
+                        elseif ($theory_percentage >= 61) echo 'B';
+                        elseif ($theory_percentage >= 51) echo 'C+';
+                        elseif ($theory_percentage >= 41) echo 'C';
+                        elseif ($theory_percentage >= 35) echo 'D+';
+                        else echo 'NG';
+                    } else {
+                        echo 'N/A';
+                    }
+                    ?>
+                </td>
+                <td>
+                    <?php 
+                    // Convert practical marks to grade format
+                    $practical_marks = $result['practical_marks'];
+                    $practical_full_marks = $result['full_marks_practical'] ?? 0;
+                    if ($practical_full_marks > 0) {
+                        if ($practical_marks > 0) {
+                            $practical_percentage = ($practical_marks / $practical_full_marks) * 100;
+                            if ($practical_percentage >= 91) echo 'A+';
+                            elseif ($practical_percentage >= 81) echo 'A';
+                            elseif ($practical_percentage >= 71) echo 'B+';
+                            elseif ($practical_percentage >= 61) echo 'B';
+                            elseif ($practical_percentage >= 51) echo 'C+';
+                            elseif ($practical_percentage >= 41) echo 'C';
+                            elseif ($practical_percentage >= 35) echo 'D+';
+                            else echo 'NG';
+                        } else {
+                            echo 'N/A';
+                        }
+                    } else {
+                        echo 'N/A';
+                    }
+                    ?>
+                </td>
+                <td><?php echo $result['grade']; ?></td>
+                <td>
+                    <?php 
+                    // Calculate grade point based on total marks percentage
+                    $total_marks = $result['total_marks'];
+                    $total_full_marks = ($result['full_marks_theory'] ?? 100) + ($result['full_marks_practical'] ?? 0);
+                    if ($total_marks > 0 && $total_full_marks > 0) {
+                        $total_percentage = ($total_marks / $total_full_marks) * 100;
+                        if ($total_percentage >= 91) echo '3.8';
+                        elseif ($total_percentage >= 81) echo '3.4';
+                        elseif ($total_percentage >= 71) echo '3.0';
+                        elseif ($total_percentage >= 61) echo '2.7';
+                        elseif ($total_percentage >= 51) echo '2.4';
+                        elseif ($total_percentage >= 41) echo '1.9';
+                        elseif ($total_percentage >= 35) echo '1.6';
+                        else echo '0.0';
+                    } else {
+                        echo '0.0';
+                    }
+                    ?>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+    </tbody>
+</table>
 
                                         <!-- Result Summary -->
                                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
@@ -831,19 +855,55 @@ $conn->close();
                                         </div>
 
                                         <!-- Grade Scale Reference -->
-                                        <div class="mt-6 bg-gray-50 p-4 rounded-lg text-sm">
-                                            <h4 class="font-medium text-gray-700 mb-2">Grade Scale Reference</h4>
-                                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                                <div>A+ (4.0): 90-100%</div>
-                                                <div>A (3.6): 80-89%</div>
-                                                <div>B+ (3.2): 70-79%</div>
-                                                <div>B (2.8): 60-69%</div>
-                                                <div>C+ (2.4): 50-59%</div>
-                                                <div>C (2.0): 40-49%</div>
-                                                <div>D (1.6): 30-39%</div>
-                                                <div>F (0.0): Below 30%</div>
-                                            </div>
-                                        </div>
+                                        <div class="grade-scale mt-6 bg-gray-50 p-4 rounded-lg text-sm">
+    <div class="grade-title font-medium text-gray-700 mb-2 text-center">GRADING SCALE</div>
+    <table class="grade-table min-w-full border-collapse text-xs">
+        <tr>
+            <th class="border border-gray-300 p-2 bg-gray-100">Grade</th>
+            <th class="border border-gray-300 p-2 bg-gray-100">A+</th>
+            <th class="border border-gray-300 p-2 bg-gray-100">A</th>
+            <th class="border border-gray-300 p-2 bg-gray-100">B+</th>
+            <th class="border border-gray-300 p-2 bg-gray-100">B</th>
+            <th class="border border-gray-300 p-2 bg-gray-100">C+</th>
+            <th class="border border-gray-300 p-2 bg-gray-100">C</th>
+            <th class="border border-gray-300 p-2 bg-gray-100">D+</th>
+            <th class="border border-gray-300 p-2 bg-gray-100">NG</th>
+        </tr>
+        <tr>
+            <th class="border border-gray-300 p-2 bg-gray-100">Marks Range</th>
+            <td class="border border-gray-300 p-2 text-center">91-100</td>
+            <td class="border border-gray-300 p-2 text-center">81-90</td>
+            <td class="border border-gray-300 p-2 text-center">71-80</td>
+            <td class="border border-gray-300 p-2 text-center">61-70</td>
+            <td class="border border-gray-300 p-2 text-center">51-60</td>
+            <td class="border border-gray-300 p-2 text-center">41-50</td>
+            <td class="border border-gray-300 p-2 text-center">35-40</td>
+            <td class="border border-gray-300 p-2 text-center">Below 35</td>
+        </tr>
+        <tr>
+            <th class="border border-gray-300 p-2 bg-gray-100">Grade Point</th>
+            <td class="border border-gray-300 p-2 text-center">3.6-4.0</td>
+            <td class="border border-gray-300 p-2 text-center">3.2-3.6</td>
+            <td class="border border-gray-300 p-2 text-center">2.8-3.2</td>
+            <td class="border border-gray-300 p-2 text-center">2.6-2.8</td>
+            <td class="border border-gray-300 p-2 text-center">2.2-2.6</td>
+            <td class="border border-gray-300 p-2 text-center">1.6-2.2</td>
+            <td class="border border-gray-300 p-2 text-center">1.6</td>
+            <td class="border border-gray-300 p-2 text-center">0.0</td>
+        </tr>
+        <tr>
+            <th class="border border-gray-300 p-2 bg-gray-100">Description</th>
+            <td class="border border-gray-300 p-2 text-center">Excellent</td>
+            <td class="border border-gray-300 p-2 text-center">Very Good</td>
+            <td class="border border-gray-300 p-2 text-center">Good</td>
+            <td class="border border-gray-300 p-2 text-center">Satisfactory</td>
+            <td class="border border-gray-300 p-2 text-center">Acceptable</td>
+            <td class="border border-gray-300 p-2 text-center">Partially Acceptable</td>
+            <td class="border border-gray-300 p-2 text-center">Borderline</td>
+            <td class="border border-gray-300 p-2 text-center">Not Graded</td>
+        </tr>
+    </table>
+</div>
                                     <?php else: ?>
                                         <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
                                             <div class="flex">
@@ -1162,26 +1222,79 @@ $conn->close();
                 
                 // Add results table
                 doc.autoTable({
-                    startY: 70,
-                    head: [['Subject', 'Theory', 'Practical', 'Total', 'Grade', 'GPA']],
-                    body: [
-                        <?php foreach ($results as $result): ?>
-                        ['<?php echo $result['subject_name']; ?>', 
-                         '<?php echo $result['theory_marks']; ?>', 
-                         '<?php echo $result['practical_marks']; ?>', 
-                         '<?php echo $result['total_marks']; ?>', 
-                         '<?php echo $result['grade']; ?>', 
-                         '<?php echo number_format($result['gpa'], 2); ?>'],
-                        <?php endforeach; ?>
-                    ],
-                    theme: 'grid',
-                    styles: {
-                        fontSize: 10
-                    },
-                    headStyles: {
-                        fillColor: [26, 82, 118]
-                    }
-                });
+    startY: 70,
+    head: [['Subject Code', 'Subject', 'Credit Hr', 'Theory Grade', 'Practical Grade', 'Final Grade', 'Grade Point']],
+    body: [
+        <?php foreach ($results as $result): ?>
+        ['<?php echo $result['subject_code']; ?>', 
+         '<?php echo $result['subject_name']; ?>', 
+         '<?php echo $result['credit_hours']; ?>',
+         '<?php 
+         $theory_marks = $result['theory_marks'];
+         $theory_full_marks = $result['full_marks_theory'] ?? 100;
+         if ($theory_marks > 0 && $theory_full_marks > 0) {
+             $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
+             if ($theory_percentage >= 91) echo 'A+';
+             elseif ($theory_percentage >= 81) echo 'A';
+             elseif ($theory_percentage >= 71) echo 'B+';
+             elseif ($theory_percentage >= 61) echo 'B';
+             elseif ($theory_percentage >= 51) echo 'C+';
+             elseif ($theory_percentage >= 41) echo 'C';
+             elseif ($theory_percentage >= 35) echo 'D+';
+             else echo 'NG';
+         } else {
+             echo 'N/A';
+         }
+         ?>', 
+         '<?php 
+         $practical_marks = $result['practical_marks'];
+         $practical_full_marks = $result['full_marks_practical'] ?? 0;
+         if ($practical_full_marks > 0) {
+             if ($practical_marks > 0) {
+                 $practical_percentage = ($practical_marks / $practical_full_marks) * 100;
+                 if ($practical_percentage >= 91) echo 'A+';
+                 elseif ($practical_percentage >= 81) echo 'A';
+                 elseif ($practical_percentage >= 71) echo 'B+';
+                 elseif ($practical_percentage >= 61) echo 'B';
+                 elseif ($practical_percentage >= 51) echo 'C+';
+                 elseif ($practical_percentage >= 41) echo 'C';
+                 elseif ($practical_percentage >= 35) echo 'D+';
+                 else echo 'NG';
+             } else {
+                 echo 'N/A';
+             }
+         } else {
+             echo 'N/A';
+         }
+         ?>', 
+         '<?php echo $result['grade']; ?>', 
+         '<?php 
+         $total_marks = $result['total_marks'];
+         $total_full_marks = ($result['full_marks_theory'] ?? 100) + ($result['full_marks_practical'] ?? 0);
+         if ($total_marks > 0 && $total_full_marks > 0) {
+             $total_percentage = ($total_marks / $total_full_marks) * 100;
+             if ($total_percentage >= 91) echo '3.8';
+             elseif ($total_percentage >= 81) echo '3.4';
+             elseif ($total_percentage >= 71) echo '3.0';
+             elseif ($total_percentage >= 61) echo '2.7';
+             elseif ($total_percentage >= 51) echo '2.4';
+             elseif ($total_percentage >= 41) echo '1.9';
+             elseif ($total_percentage >= 35) echo '1.6';
+             else echo '0.0';
+         } else {
+             echo '0.0';
+         }
+         ?>'],
+        <?php endforeach; ?>
+    ],
+    theme: 'grid',
+    styles: {
+        fontSize: 9
+    },
+    headStyles: {
+        fillColor: [26, 82, 118]
+    }
+});
                 
                 // Add summary
                 const finalY = doc.lastAutoTable.finalY;
