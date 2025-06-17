@@ -84,6 +84,25 @@ try {
     $date_of_birth = !empty(getPostValue('date_of_birth')) ? getPostValue('date_of_birth') : null;
     $address = getPostValue('address');
 
+    // Get password data
+    $password = getPostValue('password');
+    $confirm_password = getPostValue('confirm_password');
+    
+    // Validate password if provided
+    if (!empty($password)) {
+        // Check if passwords match
+        if ($password !== $confirm_password) {
+            error_log("Passwords do not match");
+            throw new Exception('New password and confirm password do not match');
+        }
+        
+        // Check password length
+        if (strlen($password) < 6) {
+            error_log("Password too short");
+            throw new Exception('Password must be at least 6 characters long');
+        }
+    }
+
     error_log("Form data received: " . json_encode([
         'teacher_id' => $teacher_id,
         'user_id' => $user_id,
@@ -151,6 +170,27 @@ try {
         throw new Exception('Error updating user: ' . $stmt->error);
     }
     $stmt->close();
+
+    // Update password if provided
+    if (!empty($password)) {
+        error_log("Updating password for user: $user_id");
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $pwd_stmt = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ?");
+        if (!$pwd_stmt) {
+            error_log("Prepare statement failed for password update: " . $conn->error);
+            throw new Exception('Database error: ' . $conn->error);
+        }
+        
+        $pwd_stmt->bind_param("si", $hashed_password, $user_id);
+        if (!$pwd_stmt->execute()) {
+            error_log("Execute failed for password update: " . $pwd_stmt->error);
+            throw new Exception('Error updating password: ' . $pwd_stmt->error);
+        }
+        $pwd_stmt->close();
+        
+        // Update activity description to include password change
+        $description .= " and updated password";
+    }
     
     // Check if gender column exists in teachers table
     error_log("Checking for gender column");

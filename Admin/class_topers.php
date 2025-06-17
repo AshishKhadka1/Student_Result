@@ -171,6 +171,7 @@ $conn->close();
         <?php
         // Include the file that processes form data
         include 'sidebar.php';
+
         ?>
         
         <!-- Main Content -->

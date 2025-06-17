@@ -53,27 +53,51 @@ if (isset($_GET['delete']) && isset($_GET['user_id'])) {
         try {
             // If student, delete student records first
             if ($user['role'] == 'student') {
-                $stmt = $conn->prepare("DELETE FROM students WHERE user_id = ?");
+                // First get the student_id
+                $stmt = $conn->prepare("SELECT student_id FROM students WHERE user_id = ?");
+                if ($stmt === false) {
+                    throw new Exception("Error preparing statement: " . $conn->error);
+                }
                 $stmt->bind_param("i", $user_id);
                 $stmt->execute();
+                $result = $stmt->get_result();
+                $student = $result->fetch_assoc();
                 $stmt->close();
                 
-                // Delete student results if any
-                $stmt = $conn->prepare("DELETE FROM results WHERE student_id IN (SELECT student_id FROM students WHERE user_id = ?)");
+                // If student_id exists, delete related results first
+                if ($student && isset($student['student_id'])) {
+                    $student_id = $student['student_id'];
+                    
+                    // Check if results table exists
+                    $result = $conn->query("SHOW TABLES LIKE 'results'");
+                    if ($result->num_rows > 0) {
+                        $stmt = $conn->prepare("DELETE FROM results WHERE student_id = ?");
+                        if ($stmt === false) {
+                            throw new Exception("Error preparing results deletion statement: " . $conn->error);
+                        }
+                        $stmt->bind_param("s", $student_id);
+                        $stmt->execute();
+                        $stmt->close();
+                    }
+                }
+                
+                // Now delete the student record
+                $stmt = $conn->prepare("DELETE FROM students WHERE user_id = ?");
+                if ($stmt === false) {
+                    throw new Exception("Error preparing statement: " . $conn->error);
+                }
                 $stmt->bind_param("i", $user_id);
                 $stmt->execute();
                 $stmt->close();
             }
-            
-            // If teacher, delete teacher records first
+
+            // If teacher, delete teacher records
             if ($user['role'] == 'teacher') {
+                // Delete the teacher record directly
                 $stmt = $conn->prepare("DELETE FROM teachers WHERE user_id = ?");
-                $stmt->bind_param("i", $user_id);
-                $stmt->execute();
-                $stmt->close();
-                
-                // Delete teacher subject assignments if any
-                $stmt = $conn->prepare("DELETE FROM teacher_subjects WHERE teacher_id IN (SELECT teacher_id FROM teachers WHERE user_id = ?)");
+                if ($stmt === false) {
+                    throw new Exception("Error preparing statement: " . $conn->error);
+                }
                 $stmt->bind_param("i", $user_id);
                 $stmt->execute();
                 $stmt->close();
@@ -81,6 +105,9 @@ if (isset($_GET['delete']) && isset($_GET['user_id'])) {
             
             // Delete user
             $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
+            if ($stmt === false) {
+                throw new Exception("Error preparing statement: " . $conn->error);
+            }
             $stmt->bind_param("i", $user_id);
             $stmt->execute();
             $stmt->close();
@@ -276,26 +303,9 @@ $conn->close();
         <!-- Sidebar -->
         <?php include 'sidebar.php'; ?>
 
-        <!-- Mobile sidebar -->
-        <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
-            <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
-            <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
-                <div class="absolute top-0 right-0 -mr-12 pt-2">
-                    <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
-                        <span class="sr-only">Close sidebar</span>
-                        <i class="fas fa-times text-white"></i>
-                    </button>
-                </div>
-                <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                    <div class="flex-shrink-0 flex items-center px-4">
-                        <span class="text-white text-lg font-semibold">Result Management</span>
-                    </div>
-                    <nav class="mt-5 px-2 space-y-1">
-                        <!-- Mobile sidebar navigation items -->
-                    </nav>
-                </div>
-            </div>
-        </div>
+        <?php include 'mobile_sidebar.php'; 
+        
+        ?>
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">

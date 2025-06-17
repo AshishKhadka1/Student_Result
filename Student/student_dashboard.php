@@ -157,45 +157,6 @@ function getNotifications($conn, $user_id) {
     return $notifications;
 }
 
-// Get attendance data with error handling
-function getAttendanceData($conn, $student_id) {
-    $attendance = [
-        'present' => 0,
-        'absent' => 0,
-        'leave' => 0,
-        'total_days' => 0,
-        'percentage' => 0
-    ];
-    
-    try {
-        $stmt = $conn->prepare("SELECT 
-                                SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
-                                SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
-                                SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_count,
-                                COUNT(*) as total_days
-                              FROM attendance 
-                              WHERE student_id = ?");
-        $stmt->bind_param("s", $student_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($row = $result->fetch_assoc()) {
-            $attendance['present'] = $row['present'] ?? 0;
-            $attendance['absent'] = $row['absent'] ?? 0;
-            $attendance['leave'] = $row['leave_count'] ?? 0;
-            $attendance['total_days'] = $row['total_days'] ?? 0;
-            
-            if ($attendance['total_days'] > 0) {
-                $attendance['percentage'] = round(($attendance['present'] / $attendance['total_days']) * 100, 2);
-            }
-        }
-        $stmt->close();
-    } catch (Exception $e) {
-        error_log("Error fetching attendance data: " . $e->getMessage());
-    }
-    
-    return $attendance;
-}
-
 // Get subject performance data with error handling
 function getSubjectPerformance($conn, $student_id) {
     $subject_performance = [];
@@ -268,30 +229,6 @@ function getGPATrend($conn, $student_id) {
     return ['gpa_trend' => $gpa_trend, 'time_periods' => $time_periods];
 }
 
-// Get assignments with error handling
-function getAssignments($conn, $class_id) {
-    $assignments = [];
-    try {
-        $stmt = $conn->prepare("SELECT a.*, s.subject_name, u.full_name as teacher_name
-                              FROM assignments a
-                              JOIN subjects s ON a.subject_id = s.subject_id
-                              JOIN users u ON a.teacher_id = u.user_id
-                              WHERE a.class_id = ? AND a.due_date >= CURDATE()
-                              ORDER BY a.due_date ASC
-                              LIMIT 5");
-        $stmt->bind_param("i", $class_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $assignments[] = $row;
-        }
-        $stmt->close();
-    } catch (Exception $e) {
-        error_log("Error fetching assignments: " . $e->getMessage());
-    }
-    return $assignments;
-}
-
 // Calculate overall performance
 function calculateOverallPerformance($recent_results) {
     $overall_performance = [
@@ -360,10 +297,8 @@ $subjects = getSubjects($conn, $student['academic_year']);
 $upcoming_exams = getUpcomingExams($conn, $student['class_id']);
 $recent_results = getRecentResults($conn, $student['student_id']);
 $notifications = getNotifications($conn, $user_id);
-$attendance_data = getAttendanceData($conn, $student['student_id']);
 $subject_performance = getSubjectPerformance($conn, $student['student_id']);
 $gpa_data = getGPATrend($conn, $student['student_id']);
-$assignments = getAssignments($conn, $student['class_id']);
 $overall_performance = calculateOverallPerformance($recent_results);
 
 // Prepare data for charts
@@ -733,7 +668,7 @@ $conn->close();
                         </div>
 
                         <!-- Performance Overview -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stats-grid">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 mb-6 stats-grid">
                             <div class="bg-white overflow-hidden shadow rounded-lg hover-scale card-hover">
                                 <div class="p-5">
                                     <div class="flex items-center">
@@ -780,52 +715,6 @@ $conn->close();
                                 <div class="bg-gray-50 px-5 py-3">
                                     <div class="text-sm">
                                         <span class="font-medium text-green-600"><?php echo $overall_performance['pass_count']; ?> subjects passed</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-white overflow-hidden shadow rounded-lg hover-scale card-hover">
-                                <div class="p-5">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0 bg-indigo-500 rounded-md p-3">
-                                            <i class="fas fa-calendar-check text-white text-xl"></i>
-                                        </div>
-                                        <div class="ml-5 w-0 flex-1">
-                                            <dl>
-                                                <dt class="text-sm font-medium text-gray-500 truncate">Attendance</dt>
-                                                <dd class="flex items-baseline">
-                                                    <div class="text-2xl font-semibold text-gray-900"><?php echo $attendance_data['percentage']; ?>%</div>
-                                                </dd>
-                                            </dl>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="bg-gray-50 px-5 py-3">
-                                    <div class="text-sm">
-                                        <span class="font-medium text-indigo-600"><?php echo $attendance_data['present']; ?> days present</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-white overflow-hidden shadow rounded-lg hover-scale card-hover">
-                                <div class="p-5">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0 bg-red-500 rounded-md p-3">
-                                            <i class="fas fa-tasks text-white text-xl"></i>
-                                        </div>
-                                        <div class="ml-5 w-0 flex-1">
-                                            <dl>
-                                                <dt class="text-sm font-medium text-gray-500 truncate">Pending Assignments</dt>
-                                                <dd class="flex items-baseline">
-                                                    <div class="text-2xl font-semibold text-gray-900"><?php echo count($assignments); ?></div>
-                                                </dd>
-                                            </dl>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="bg-gray-50 px-5 py-3">
-                                    <div class="text-sm">
-                                        <a href="#assignments" class="font-medium text-blue-600 hover:text-blue-500">View details</a>
                                     </div>
                                 </div>
                             </div>
@@ -956,167 +845,7 @@ $conn->close();
                             </div>
                         </div>
 
-                        <!-- Assignments and Notifications -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <!-- Assignments -->
-                            <div id="assignments" class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Pending Assignments</h3>
-                                    <p class="mt-1 text-sm text-gray-500">Tasks that need to be completed</p>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <?php if (empty($assignments)): ?>
-                                        <div class="text-center py-4">
-                                            <i class="fas fa-check-circle text-green-500 text-2xl mb-2"></i>
-                                            <p class="text-gray-500">No pending assignments. You're all caught up!</p>
-                                        </div>
-                                    <?php else: ?>
-                                        <ul class="divide-y divide-gray-200">
-                                            <?php foreach ($assignments as $assignment): ?>
-                                                <li class="py-4">
-                                                    <div class="flex space-x-3">
-                                                        <div class="flex-shrink-0">
-                                                            <div class="h-10 w-10 rounded-md bg-yellow-500 flex items-center justify-center">
-                                                                <i class="fas fa-book text-white"></i>
-                                                            </div>
-                                                        </div>
-                                                        <div class="flex-1 space-y-1">
-                                                            <div class="flex items-center justify-between">
-                                                                <h3 class="text-sm font-medium"><?php echo htmlspecialchars($assignment['title']); ?></h3>
-                                                                <?php 
-                                                                $days_left = ceil((strtotime($assignment['due_date']) - time()) / (60 * 60 * 24));
-                                                                $badge_color = $days_left <= 2 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800';
-                                                                ?>
-                                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?php echo $badge_color; ?>">
-                                                                    Due in <?php echo $days_left; ?> days
-                                                                </span>
-                                                            </div>
-                                                            <p class="text-sm text-gray-500">
-                                                                Subject: <?php echo htmlspecialchars($assignment['subject_name']); ?> | 
-                                                                Teacher: <?php echo htmlspecialchars($assignment['teacher_name']); ?>
-                                                            </p>
-                                                            <p class="text-sm text-gray-500">
-                                                                <?php echo !empty($assignment['description']) ? htmlspecialchars(substr($assignment['description'], 0, 100)) . (strlen($assignment['description']) > 100 ? '...' : '') : 'No description available.'; ?>
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-
-                            <!-- Notifications -->
-                            <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Notifications</h3>
-                                    <p class="mt-1 text-sm text-gray-500">Latest updates and announcements</p>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <?php if (empty($notifications)): ?>
-                                        <div class="text-center py-4">
-                                            <i class="fas fa-bell-slash text-gray-400 text-2xl mb-2"></i>
-                                            <p class="text-gray-500">No new notifications.</p>
-                                        </div>
-                                    <?php else: ?>
-                                        <ul class="divide-y divide-gray-200">
-                                            <?php foreach ($notifications as $notification): ?>
-                                                <li class="py-4">
-                                                    <div class="flex space-x-3">
-                                                        <div class="flex-shrink-0">
-                                                            <?php 
-                                                            $icon_class = 'bg-blue-500';
-                                                            $icon = '<i class="fas fa-bell text-white"></i>';
-                                                            
-                                                            if (strpos(strtolower($notification['message']), 'result') !== false) {
-                                                                $icon_class = 'bg-green-500';
-                                                                $icon = '<i class="fas fa-clipboard-check text-white"></i>';
-                                                            } elseif (strpos(strtolower($notification['message']), 'exam') !== false) {
-                                                                $icon_class = 'bg-purple-500';
-                                                                $icon = '<i class="fas fa-calendar-alt text-white"></i>';
-                                                            } elseif (strpos(strtolower($notification['message']), 'assignment') !== false) {
-                                                                $icon_class = 'bg-yellow-500';
-                                                                $icon = '<i class="fas fa-tasks text-white"></i>';
-                                                            }
-                                                            ?>
-                                                            <div class="h-10 w-10 rounded-full <?php echo $icon_class; ?> flex items-center justify-center">
-                                                                <?php echo $icon; ?>
-                                                            </div>
-                                                        </div>
-                                                        <div class="flex-1 space-y-1">
-                                                            <div class="flex items-center justify-between">
-                                                                <h3 class="text-sm font-medium"><?php echo htmlspecialchars($notification['title']); ?></h3>
-                                                                <p class="text-sm text-gray-500"><?php echo date('M d, h:i A', strtotime($notification['created_at'])); ?></p>
-                                                            </div>
-                                                            <p class="text-sm text-gray-500">
-                                                                <?php echo htmlspecialchars($notification['message']); ?>
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Attendance Overview -->
-                        <div class="bg-white shadow rounded-lg overflow-hidden mb-6 hover-scale card-hover">
-                            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                <h3 class="text-lg font-medium text-gray-900">Attendance Overview</h3>
-                                <p class="mt-1 text-sm text-gray-500">Your attendance record for this academic year</p>
-                            </div>
-                            <div class="p-6">
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                    <div class="bg-blue-50 rounded-lg p-4 text-center">
-                                        <div class="text-3xl font-bold text-blue-600"><?php echo $attendance_data['present']; ?></div>
-                                        <div class="text-sm font-medium text-blue-800">Days Present</div>
-                                    </div>
-                                    <div class="bg-red-50 rounded-lg p-4 text-center">
-                                        <div class="text-3xl font-bold text-red-600"><?php echo $attendance_data['absent']; ?></div>
-                                        <div class="text-sm font-medium text-red-800">Days Absent</div>
-                                    </div>
-                                    <div class="bg-yellow-50 rounded-lg p-4 text-center">
-                                        <div class="text-3xl font-bold text-yellow-600"><?php echo $attendance_data['leave']; ?></div>
-                                        <div class="text-sm font-medium text-yellow-800">Days on Leave</div>
-                                    </div>
-                                </div>
-                                
-                                <div class="mt-4">
-                                    <h4 class="text-md font-medium text-gray-700 mb-2">Attendance Percentage: <?php echo $attendance_data['percentage']; ?>%</h4>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <?php 
-                                        $color_class = 'bg-red-600';
-                                        if ($attendance_data['percentage'] >= 90) {
-                                            $color_class = 'bg-green-600';
-                                        } elseif ($attendance_data['percentage'] >= 75) {
-                                            $color_class = 'bg-blue-600';
-                                        } elseif ($attendance_data['percentage'] >= 60) {
-                                            $color_class = 'bg-yellow-600';
-                                        }
-                                        ?>
-                                        <div class="<?php echo $color_class; ?> h-2.5 rounded-full" style="width: <?php echo $attendance_data['percentage']; ?>%"></div>
-                                    </div>
-                                    
-                                    <?php if ($attendance_data['percentage'] < 75): ?>
-                                        <div class="mt-2 bg-red-50 border-l-4 border-red-400 p-4">
-                                            <div class="flex">
-                                                <div class="flex-shrink-0">
-                                                    <i class="fas fa-exclamation-circle text-red-400"></i>
-                                                </div>
-                                                <div class="ml-3">
-                                                    <p class="text-sm text-red-700">
-                                                        Your attendance is below the required 75%. Please improve your attendance to avoid academic penalties.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
+                      
 
                     </div>
                 </div>
