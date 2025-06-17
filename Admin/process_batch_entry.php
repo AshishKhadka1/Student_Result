@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 // Get credit hours for the subject
                 $creditQuery = $conn->query("SELECT credit_hours FROM subjects WHERE subject_id = '$subject_id'");
-                $credit_hours = 1.0; // Default value
+                $credit_hours = 4.0; // Default value
                 if ($creditQuery && $creditQuery->num_rows > 0) {
                     $creditRow = $creditQuery->fetch_assoc();
                     $credit_hours = $creditRow['credit_hours'];

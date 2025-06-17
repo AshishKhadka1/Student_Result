@@ -303,26 +303,9 @@ $conn->close();
         <!-- Sidebar -->
         <?php include 'sidebar.php'; ?>
 
-        <!-- Mobile sidebar -->
-        <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
-            <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
-            <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
-                <div class="absolute top-0 right-0 -mr-12 pt-2">
-                    <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
-                        <span class="sr-only">Close sidebar</span>
-                        <i class="fas fa-times text-white"></i>
-                    </button>
-                </div>
-                <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                    <div class="flex-shrink-0 flex items-center px-4">
-                        <span class="text-white text-lg font-semibold">Result Management</span>
-                    </div>
-                    <nav class="mt-5 px-2 space-y-1">
-                        <!-- Mobile sidebar navigation items -->
-                    </nav>
-                </div>
-            </div>
-        </div>
+        <?php include 'mobile_sidebar.php'; 
+        
+        ?>
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">

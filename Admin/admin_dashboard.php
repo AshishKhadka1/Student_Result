@@ -594,63 +594,11 @@ $conn->close();
             <?php
         // Include the file that processes form data
         include 'topBar.php';
+        
+           ?>
+            <?php include 'mobile_sidebar.php'; 
+        
         ?>
-
-            <!-- Mobile sidebar -->
-            <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
-                <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
-                <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
-                    <div class="absolute top-0 right-0 -mr-12 pt-2">
-                        <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
-                            <span class="sr-only">Close sidebar</span>
-                            <i class="fas fa-times text-white"></i>
-                        </button>
-                    </div>
-                    <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                        <div class="flex-shrink-0 flex items-center px-4">
-                            <span class="text-white text-lg font-semibold">Result Management</span>
-                        </div>
-                        <nav class="mt-5 px-2 space-y-1">
-                            <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-white bg-gray-700 rounded-md">
-                                <i class="fas fa-tachometer-alt mr-3"></i>
-                                Dashboard
-                            </a>
-                            <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-clipboard-list mr-3"></i>
-                                Results
-                            </a>
-                            <a href="bulk_upload.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-upload mr-3"></i>
-                                Bulk Upload
-                            </a>
-                            <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-users mr-3"></i>
-                                Users
-                            </a>
-                            <a href="subject.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-book mr-3"></i>
-                                Subjects
-                            </a>
-                            <a href="classes.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-chalkboard mr-3"></i>
-                                Classes
-                            </a>
-                            <a href="exams.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-calendar-alt mr-3"></i>
-                                Exams
-                            </a>
-                            <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-cog mr-3"></i>
-                                Settings
-                            </a>
-                            <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-sign-out-alt mr-3"></i>
-                                Logout
-                            </a>
-                        </nav>
-                    </div>
-                </div>
-            </div>
 
             <!-- Main Content -->
             <main class="flex-1 relative overflow-y-auto focus:outline-none">
@@ -688,30 +636,6 @@ $conn->close();
                             </div>
                         </div>
 
-                        <!-- Quick Actions -->
-                        <div class="mb-6">
-                            <h2 class="text-lg font-medium text-gray-900 mb-3">Quick Actions</h2>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                <a href="manual_entry.php" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
-                                    <i class="fas fa-upload text-2xl mb-2"></i>
-                                    <p class="text-sm">Upload</p>
-                                </a>
-                                <a href="add_user.php" class="bg-green-600 hover:bg-green-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
-                                    <i class="fas fa-user-plus text-2xl mb-2"></i>
-                                    <p class="text-sm">Add User</p>
-                                </a>
-                                <a href="exams.php" class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
-                                    <i class="fas fa-calendar-plus text-2xl mb-2"></i>
-                                    <p class="text-sm">Add Exam</p>
-                                </a>
-
-                                </a>
-                                <a href="settings.php" class="bg-gray-600 hover:bg-gray-700 text-white rounded-lg p-4 text-center hover-scale card-hover">
-                                    <i class="fas fa-cog text-2xl mb-2"></i>
-                                    <p class="text-sm">Settings</p>
-                                </a>
-                            </div>
-                        </div>
 
                         <!-- Stats Cards -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stats-grid">
@@ -949,118 +873,7 @@ $conn->close();
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Recent Activities and Upcoming Exams -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <!-- Recent Activities -->
-                            <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Recent Activities</h3>
-                                    <p class="mt-1 text-sm text-gray-500">Latest actions in the system</p>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <div class="flow-root">
-                                        <ul role="list" class="-mb-8">
-                                            <?php if (empty($recent_activities)): ?>
-                                                <li class="py-4">
-                                                    <div class="text-center text-sm text-gray-500">No recent activities.</div>
-                                                </li>
-                                            <?php else: ?>
-                                                <?php foreach ($recent_activities as $index => $activity): ?>
-                                                    <li>
-                                                        <div class="relative pb-8">
-                                                            <?php if ($index !== count($recent_activities) - 1): ?>
-                                                                <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
-                                                            <?php endif; ?>
-                                                            <div class="relative flex space-x-3">
-                                                                <div>
-                                                                    <?php
-                                                                    $icon_class = 'bg-gray-400';
-                                                                    $icon = '<i class="fas fa-info text-white"></i>';
-
-                                                                    if ($activity['type'] === 'result') {
-                                                                        $icon_class = 'bg-green-500';
-                                                                        $icon = '<i class="fas fa-clipboard-check text-white"></i>';
-                                                                    } elseif ($activity['type'] === 'user') {
-                                                                        $icon_class = 'bg-blue-500';
-                                                                        $icon = '<i class="fas fa-user-plus text-white"></i>';
-                                                                    } elseif ($activity['type'] === 'exam') {
-                                                                        $icon_class = 'bg-purple-500';
-                                                                        $icon = '<i class="fas fa-calendar-plus text-white"></i>';
-                                                                    }
-                                                                    ?>
-                                                                    <span class="h-8 w-8 rounded-full <?php echo $icon_class; ?> flex items-center justify-center ring-8 ring-white">
-                                                                        <?php echo $icon; ?>
-                                                                    </span>
-                                                                </div>
-                                                                <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                                                                    <div>
-                                                                        <p class="text-sm text-gray-500"><?php echo htmlspecialchars($activity['description']); ?></p>
-                                                                    </div>
-                                                                    <div class="text-right text-sm whitespace-nowrap text-gray-500">
-                                                                        <time datetime="<?php echo $activity['timestamp']; ?>"><?php echo date('M d, H:i', strtotime($activity['timestamp'])); ?></time>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </li>
-                                                <?php endforeach; ?>
-                                            <?php endif; ?>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Upcoming Exams -->
-                            <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Upcoming Exams</h3>
-                                    <p class="mt-1 text-sm text-gray-500">Scheduled examinations</p>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <div class="overflow-x-auto">
-                                        <?php if (empty($upcoming_exams)): ?>
-                                            <p class="text-center text-sm text-gray-500">No upcoming exams scheduled.</p>
-                                        <?php else: ?>
-                                            <table class="min-w-full divide-y divide-gray-200">
-                                                <thead class="bg-gray-50">
-                                                    <tr>
-                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Name</th>
-                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
-                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody class="bg-white divide-y divide-gray-200">
-                                                    <?php foreach ($upcoming_exams as $exam): ?>
-                                                        <tr class="hover:bg-gray-50">
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                                <a href="exam_details.php?id=<?php echo $exam['exam_id']; ?>" class="text-blue-600 hover:text-blue-900">
-                                                                    <?php echo htmlspecialchars($exam['exam_name']); ?>
-                                                                </a>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                <?php echo htmlspecialchars($exam['class_name'] . ' ' . $exam['section']); ?>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                <?php echo date('M d, Y', strtotime($exam['start_date'])); ?>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                                                    Upcoming
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
+                        </div>                       
                     </div>
                 </div>
             </main>
