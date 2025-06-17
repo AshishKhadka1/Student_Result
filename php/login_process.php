@@ -10,6 +10,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $role = $_POST['role'] ?? '';
     $remember = isset($_POST['remember-me']);
 
+    // Log the login attempt
+    error_log("Login attempt - Username: $username, Role: $role");
+
     // Validate input
     if (empty($username) || empty($password) || empty($role)) {
         $_SESSION['error'] = "All fields are required";
@@ -68,13 +71,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     // Prepare SQL statement to prevent SQL injection
-    $stmt = $conn->prepare("SELECT * FROM Users WHERE username=? AND role=?");
-    $stmt->bind_param("ss", $username, $role);
+    $stmt = $conn->prepare("SELECT * FROM Users WHERE (username=? OR email=?) AND role=?");
+    $stmt->bind_param("sss", $username, $username, $role);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows > 0) {
         $user = $result->fetch_assoc();
+        error_log("User found: " . json_encode($user));
         
         // Verify password
         if (password_verify($password, $user['password'])) {
