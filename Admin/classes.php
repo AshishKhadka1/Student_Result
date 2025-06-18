@@ -1091,36 +1091,151 @@ $conn->close();
 
                                 <!-- Student Assignment -->
                                 <div class="px-6 py-4 border-t border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Assign Students to Section</h3>
-                                    <form action="" method="POST">
-                                        <input type="hidden" name="action" value="assign_students">
-                                        <input type="hidden" name="section_id" value="<?php echo $edit_section['section_id']; ?>">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Assign Students to Section</h3>
+    
+    <!-- Current Students in Section -->
+    <?php if (!empty($edit_section['students'])): ?>
+        <div class="mb-6">
+            <h4 class="text-md font-medium text-gray-700 mb-2">Currently Assigned Students (<?php echo count($edit_section['students']); ?>)</h4>
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <?php foreach ($edit_section['students'] as $student): ?>
+                        <div class="flex items-center text-sm text-blue-800">
+                            <i class="fas fa-user-check mr-2"></i>
+                            <?php echo htmlspecialchars($student['roll_number'] . ' - ' . $student['full_name']); ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
-                                        <div class="mb-4">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Select Students</label>
-                                            <div class="max-h-60 overflow-y-auto border border-gray-300 rounded-md p-2">
-                                                <?php if (empty($edit_section['all_students'])): ?>
-                                                    <p class="text-sm text-gray-500">No students found in this class.</p>
-                                                <?php else: ?>
-                                                    <?php foreach ($edit_section['all_students'] as $student): ?>
-                                                        <div class="flex items-center mb-2">
-                                                            <input type="checkbox" id="student_<?php echo $student['student_id']; ?>" name="student_ids[]" value="<?php echo $student['student_id']; ?>" <?php echo ($student['section_id'] == $edit_section['section_id']) ? 'checked' : ''; ?> class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                                            <label for="student_<?php echo $student['student_id']; ?>" class="ml-2 block text-sm text-gray-900">
-                                                                <?php echo htmlspecialchars($student['roll_number'] . ' - ' . $student['full_name']); ?>
-                                                            </label>
-                                                        </div>
-                                                    <?php endforeach; ?>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
+    <form action="" method="POST" id="assignStudentsForm">
+        <input type="hidden" name="action" value="assign_students">
+        <input type="hidden" name="section_id" value="<?php echo $edit_section['section_id']; ?>">
 
-                                        <div class="flex justify-end">
-                                            <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                                Save Student Assignments
-                                            </button>
+        <div class="mb-4">
+            <div class="flex justify-between items-center mb-2">
+                <label class="block text-sm font-medium text-gray-700">Select Students for This Section</label>
+                <div class="flex space-x-2">
+                    <button type="button" onclick="selectAllStudents()" class="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                        Select All
+                    </button>
+                    <button type="button" onclick="deselectAllStudents()" class="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                        Deselect All
+                    </button>
+                    <button type="button" onclick="selectUnassignedOnly()" class="text-xs px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">
+                        Unassigned Only
+                    </button>
+                </div>
+            </div>
+            
+            <div class="max-h-80 overflow-y-auto border border-gray-300 rounded-md p-4 bg-gray-50">
+                <?php if (empty($edit_section['all_students'])): ?>
+                    <div class="text-center py-8">
+                        <i class="fas fa-users text-gray-400 text-3xl mb-2"></i>
+                        <p class="text-sm text-gray-500">No students found in this class.</p>
+                        <p class="text-xs text-gray-400 mt-1">Students need to be added to the class first.</p>
+                        <a href="students.php" class="inline-flex items-center mt-3 px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-plus mr-1"></i> Add Students to Class
+                        </a>
+                    </div>
+                <?php else: ?>
+                    <div class="grid grid-cols-1 gap-3">
+                        <?php 
+                        $assigned_count = 0;
+                        $unassigned_count = 0;
+                        foreach ($edit_section['all_students'] as $student): 
+                            $is_assigned = ($student['section_id'] == $edit_section['section_id']);
+                            $is_in_other_section = (!empty($student['section_id']) && $student['section_id'] != $edit_section['section_id']);
+                            
+                            if ($is_assigned) $assigned_count++;
+                            if (empty($student['section_id'])) $unassigned_count++;
+                        ?>
+                            <div class="flex items-center p-3 rounded-lg border <?php echo $is_assigned ? 'bg-blue-50 border-blue-200' : ($is_in_other_section ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-200'); ?>">
+                                <input type="checkbox" 
+                                       id="student_<?php echo $student['student_id']; ?>" 
+                                       name="student_ids[]" 
+                                       value="<?php echo $student['student_id']; ?>" 
+                                       <?php echo $is_assigned ? 'checked' : ''; ?>
+                                       data-assigned="<?php echo $is_assigned ? '1' : '0'; ?>"
+                                       data-unassigned="<?php echo empty($student['section_id']) ? '1' : '0'; ?>"
+                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                
+                                <label for="student_<?php echo $student['student_id']; ?>" class="ml-3 flex-1 cursor-pointer">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <span class="text-sm font-medium text-gray-900">
+                                                <?php echo htmlspecialchars($student['roll_number']); ?>
+                                            </span>
+                                            <span class="text-sm text-gray-700 ml-2">
+                                                <?php echo htmlspecialchars($student['full_name']); ?>
+                                            </span>
                                         </div>
-                                    </form>
-                                </div>
+                                        <div class="flex items-center space-x-2">
+                                            <?php if ($is_assigned): ?>
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    <i class="fas fa-check mr-1"></i> Current Section
+                                                </span>
+                                            <?php elseif ($is_in_other_section): ?>
+                                                <?php
+                                                // Get the section name for this student
+                                                $other_section_query = $conn->prepare("SELECT section_name FROM Sections WHERE section_id = ?");
+                                                $other_section_query->bind_param("i", $student['section_id']);
+                                                $other_section_query->execute();
+                                                $other_section_result = $other_section_query->get_result();
+                                                $other_section = $other_section_result->fetch_assoc();
+                                                $other_section_query->close();
+                                                ?>
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                    <i class="fas fa-users mr-1"></i> Section <?php echo htmlspecialchars($other_section['section_name'] ?? 'Unknown'); ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                    <i class="fas fa-user-slash mr-1"></i> Unassigned
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    
+                    <!-- Summary Statistics -->
+                    <div class="mt-4 p-3 bg-white rounded-lg border border-gray-200">
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                                <div class="text-lg font-semibold text-blue-600"><?php echo $assigned_count; ?></div>
+                                <div class="text-xs text-gray-500">Currently Assigned</div>
+                            </div>
+                            <div>
+                                <div class="text-lg font-semibold text-gray-600"><?php echo $unassigned_count; ?></div>
+                                <div class="text-xs text-gray-500">Unassigned</div>
+                            </div>
+                            <div>
+                                <div class="text-lg font-semibold text-green-600"><?php echo count($edit_section['all_students']); ?></div>
+                                <div class="text-xs text-gray-500">Total Students</div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if (!empty($edit_section['all_students'])): ?>
+            <div class="flex justify-between items-center">
+                <div class="text-sm text-gray-600">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Students will be moved from their current sections to this section.
+                </div>
+                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-save mr-2"></i> Save Student Assignments
+                </button>
+            </div>
+        <?php endif; ?>
+    </form>
+</div>
                             </div>
                         <?php endif; ?>
 
@@ -1524,6 +1639,74 @@ $conn->close();
                 });
             }
         });
+
+// Student selection functions
+function selectAllStudents() {
+    const checkboxes = document.querySelectorAll('input[name="student_ids[]"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+}
+
+function deselectAllStudents() {
+    const checkboxes = document.querySelectorAll('input[name="student_ids[]"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+function selectUnassignedOnly() {
+    const checkboxes = document.querySelectorAll('input[name="student_ids[]"]');
+    checkboxes.forEach(checkbox => {
+        // Only check students who are unassigned (data-unassigned="1")
+        if (checkbox.getAttribute('data-unassigned') === '1') {
+            checkbox.checked = true;
+        } else {
+            checkbox.checked = false;
+        }
+    });
+}
+
+// Form validation
+document.getElementById('assignStudentsForm').addEventListener('submit', function(e) {
+    const checkedBoxes = document.querySelectorAll('input[name="student_ids[]"]:checked');
+    const currentlyAssigned = document.querySelectorAll('input[name="student_ids[]"][data-assigned="1"]:checked');
+    
+    if (checkedBoxes.length === 0) {
+        e.preventDefault();
+        Swal.fire({
+            title: 'No Students Selected',
+            text: 'Please select at least one student to assign to this section, or leave all unchecked to remove all students from this section.',
+            icon: 'warning',
+            confirmButtonText: 'OK'
+        });
+        return false;
+    }
+    
+    // Show confirmation if moving students from other sections
+    const movingStudents = checkedBoxes.length - currentlyAssigned.length;
+    if (movingStudents > 0) {
+        e.preventDefault();
+        Swal.fire({
+            title: 'Confirm Student Assignment',
+            html: `You are about to assign <strong>${checkedBoxes.length}</strong> students to this section.<br><br>` +
+                  `<strong>${movingStudents}</strong> students will be moved from their current sections.`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, assign students',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Remove the event listener temporarily and submit
+                this.removeEventListener('submit', arguments.callee);
+                this.submit();
+            }
+        });
+        return false;
+    }
+});
     </script>
 </body>
 

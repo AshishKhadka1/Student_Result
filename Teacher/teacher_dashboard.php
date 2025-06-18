@@ -235,26 +235,13 @@ $conn->close();
                                     </p>
                                 </div>
                                 <div class="mt-4 md:mt-0 flex space-x-3">
-                                    <a href="manage_results.php" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400">
-                                        <i class="fas fa-edit mr-2"></i> Manage Results
-                                    </a>
+                                  
                                     <a href="view_students.php" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                                         <i class="fas fa-users mr-2"></i> View Students
                                     </a>
                                 </div>
                             </div>
-                            <div class="bg-indigo-800 bg-opacity-50 px-6 py-2">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center">
-                                        <i class="fas fa-calendar-day text-blue-200 mr-2"></i>
-                                        <span class="text-sm text-blue-100"><?php echo date('l, F j, Y'); ?></span>
-                                    </div>
-                                    <div class="flex items-center">
-                                        <i class="fas fa-clock text-blue-200 mr-2"></i>
-                                        <span class="text-sm text-blue-100" id="live-clock"></span>
-                                    </div>
-                                </div>
-                            </div>
+                       
                         </div>
 
                         <!-- Stats Cards -->
@@ -352,32 +339,7 @@ $conn->close();
                             </div>
                         </div>
 
-                        <!-- Quick Actions -->
-                        <div class="mb-6">
-                            <h2 class="text-lg font-medium text-gray-900 mb-3">Quick Actions</h2>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                <a href="manage_results.php" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 text-center card-hover">
-                                    <i class="fas fa-edit text-2xl mb-2"></i>
-                                    <p class="text-sm">Manage Results</p>
-                                </a>
-                                <a href="view_students.php" class="bg-green-600 hover:bg-green-700 text-white rounded-lg p-4 text-center card-hover">
-                                    <i class="fas fa-users text-2xl mb-2"></i>
-                                    <p class="text-sm">View Students</p>
-                                </a>
-                                <a href="grade_sheet.php" class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-4 text-center card-hover">
-                                    <i class="fas fa-file-alt text-2xl mb-2"></i>
-                                    <p class="text-sm">Grade Sheets</p>
-                                </a>
-                                <a href="profile.php" class="bg-gray-600 hover:bg-gray-700 text-white rounded-lg p-4 text-center card-hover">
-                                    <i class="fas fa-user-cog text-2xl mb-2"></i>
-                                    <p class="text-sm">My Profile</p>
-                                </a>
-                                <a href="#upcoming-exams" class="bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg p-4 text-center card-hover">
-                                    <i class="fas fa-calendar-alt text-2xl mb-2"></i>
-                                    <p class="text-sm">Upcoming Exams</p>
-                                </a>
-                            </div>
-                        </div>
+              
 
                         <!-- Assigned Subjects Section -->
                         <div id="assigned-subjects" class="bg-white shadow rounded-lg mb-6">
@@ -481,181 +443,11 @@ $conn->close();
                             </div>
                         </div>
 
-                        <!-- Two Column Layout for Recent Results and Upcoming Exams -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <!-- Recent Results -->
-                            <div class="bg-white shadow rounded-lg">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Recent Results</h3>
-                                    <p class="mt-1 text-sm text-gray-500">Latest results you've entered</p>
-                                </div>
-                                <div class="p-6">
-                                    <?php if (empty($recent_results)): ?>
-                                        <p class="text-center text-gray-500">No recent results found.</p>
-                                    <?php else: ?>
-                                        <div class="space-y-4">
-                                            <?php foreach ($recent_results as $result): ?>
-                                                <div class="border-b pb-3">
-                                                    <div class="flex justify-between">
-                                                        <div>
-                                                            <h4 class="font-medium text-gray-900"><?php echo htmlspecialchars($result['student_name']); ?></h4>
-                                                            <p class="text-sm text-gray-500">
-                                                                <?php echo htmlspecialchars($result['subject_name']); ?> | 
-                                                                <?php echo htmlspecialchars($result['class_name'] . ' ' . $result['section']); ?> | 
-                                                                <?php echo htmlspecialchars($result['exam_name']); ?>
-                                                            </p>
-                                                        </div>
-                                                        <div class="text-right">
-                                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                                                <?php echo (isset($result['status']) && $result['status'] == 'pass') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
-                                                                <?php echo isset($result['status']) ? ucfirst($result['status']) : 'N/A'; ?>
-                                                            </span>
-                                                            <p class="text-sm font-medium text-gray-900 mt-1">
-                                                                <?php echo isset($result['marks']) ? $result['marks'] : '0'; ?> / 
-                                                                <?php echo isset($result['total_marks']) ? $result['total_marks'] : '100'; ?>
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div class="mt-2 flex justify-end">
-                                                        <a href="edit_result.php?result_id=<?php echo $result['result_id']; ?>" class="text-sm text-blue-600 hover:text-blue-900">
-                                                            Edit Result
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                        <div class="mt-4 text-center">
-                                            <a href="manage_results.php" class="text-sm font-medium text-blue-600 hover:text-blue-500">
-                                                View All Results
-                                            </a>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-
-                            <!-- Upcoming Exams -->
-                            <div id="upcoming-exams" class="bg-white shadow rounded-lg">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Upcoming Exams</h3>
-                                    <p class="mt-1 text-sm text-gray-500">Scheduled exams for your classes</p>
-                                </div>
-                                <div class="p-6">
-                                    <?php if (empty($upcoming_exams)): ?>
-                                        <p class="text-center text-gray-500">No upcoming exams found.</p>
-                                    <?php else: ?>
-                                        <div class="space-y-4">
-                                            <?php foreach ($upcoming_exams as $exam): ?>
-                                                <div class="border-b pb-3">
-                                                    <h4 class="font-medium text-gray-900"><?php echo htmlspecialchars($exam['exam_name']); ?></h4>
-                                                    <p class="text-sm text-gray-500">
-                                                        <?php echo htmlspecialchars($exam['class_name'] . ' ' . $exam['section']); ?> | 
-                                                        <?php 
-                                                        $date_field = isset($exam['start_date']) ? 'start_date' : (isset($exam['exam_date']) ? 'exam_date' : '');
-                                                        $end_date_field = isset($exam['end_date']) ? 'end_date' : '';
-                                                        
-                                                        if (!empty($date_field)) {
-                                                            echo date('M d, Y', strtotime($exam[$date_field]));
-                                                            if (!empty($end_date_field) && !empty($exam[$end_date_field])) {
-                                                                echo ' to ' . date('M d, Y', strtotime($exam[$end_date_field]));
-                                                            }
-                                                        } else {
-                                                            echo 'Date not available';
-                                                        }
-                                                        ?>
-                                                    </p>
-                                                    <div class="mt-2">
-                                                        <?php 
-                                                        if (!empty($date_field)) {
-                                                            $days_until = floor((strtotime($exam[$date_field]) - time()) / (60 * 60 * 24));
-                                                            $badge_color = $days_until <= 3 ? 'bg-red-100 text-red-800' : ($days_until <= 7 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800');
-                                                            ?>
-                                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?php echo $badge_color; ?>">
-                                                                <?php echo $days_until; ?> days remaining
-                                                            </span>
-                                                        <?php } ?>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Pending Tasks Section -->
-                        <div id="pending-tasks" class="bg-white shadow rounded-lg mb-6">
-                            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                <h3 class="text-lg font-medium text-gray-900">Pending Tasks</h3>
-                                <p class="mt-1 text-sm text-gray-500">Results that need to be entered</p>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <?php if (empty($pending_tasks)): ?>
-                                            <tr>
-                                                <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No pending tasks found.</td>
-                                            </tr>
-                                        <?php else: ?>
-                                            <?php foreach ($pending_tasks as $task): ?>
-                                                <tr>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                        <?php echo htmlspecialchars($task['exam_name']); ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo htmlspecialchars($task['class_name'] . ' ' . $task['section']); ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo htmlspecialchars($task['subject_name']); ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="flex items-center">
-                                                            <?php 
-                                                            $progress = ($task['total_students'] > 0) ? ($task['entered_results'] / $task['total_students']) * 100 : 0;
-                                                            ?>
-                                                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: <?php echo $progress; ?>%"></div>
-                                                            </div>
-                                                            <span class="ml-2 text-xs text-gray-500">
-                                                                <?php echo $task['entered_results']; ?>/<?php echo $task['total_students']; ?>
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <a href="manage_results.php?exam_id=<?php echo $task['exam_id']; ?>&class_id=<?php echo $task['class_id']; ?>&subject_id=<?php echo $task['subject_id']; ?>" class="text-blue-600 hover:text-blue-900">
-                                                            <i class="fas fa-edit"></i> Enter Results
-                                                        </a>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </main>
         </div>
     </div>
 
-    <script>
-        // Live clock
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('live-clock').textContent = now.toLocaleTimeString();
-        }
-        
-        updateClock();
-        setInterval(updateClock, 1000);
-    </script>
 </body>
 </html>

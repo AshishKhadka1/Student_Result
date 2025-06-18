@@ -26,26 +26,25 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <i class="fas fa-tachometer-alt mr-3 text-gray-400 group-hover:text-gray-300"></i>
                         Dashboard
                     </a>
-                    <a href="grade_sheet.php" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md <?php echo basename($_SERVER['PHP_SELF']) == 'manage_results.php' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'; ?>">
+                    <a href="result_sheet.php" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md <?php echo basename($_SERVER['PHP_SELF']) == 'manage_results.php' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'; ?>">
                         <i class="fas fa-graduation-cap mr-3 text-gray-400 group-hover:text-gray-300"></i>
-                        Grade Sheet
+                        Result Sheet
                     </a>
                     <a href="edit_results.php" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md <?php echo basename($_SERVER['PHP_SELF']) == 'edit_marks.php' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'; ?>">
                         <i class="fas fa-edit mr-3 text-gray-400 group-hover:text-gray-300"></i>
                         Edit Results
                     </a>
-                    <!-- <a href="class_performance.php" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md <?php echo basename($_SERVER['PHP_SELF']) == 'class_performance.php' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'; ?>">
-                        <i class="fas fa-chart-bar mr-3 text-gray-400 group-hover:text-gray-300"></i>
-                        Class Performance
-                    </a> -->
+
+                     <a href="grade_sheet.php" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md <?php echo basename($_SERVER['PHP_SELF']) == 'edit_marks.php' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'; ?>">
+                        <i class="fas fa-edit mr-3 text-gray-400 group-hover:text-gray-300"></i>
+                        Grade Sheet
+                    </a>
+               
                     <a href="view_students.php" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md <?php echo basename($_SERVER['PHP_SELF']) == 'view_students.php' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'; ?>">
                         <i class="fas fa-users mr-3 text-gray-400 group-hover:text-gray-300"></i>
                         View Students
                     </a>
-                    <!-- <a href="student_details.php" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md <?php echo basename($_SERVER['PHP_SELF']) == 'student_details.php' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'; ?>">
-                        <i class="fas fa-user-graduate mr-3 text-gray-400 group-hover:text-gray-300"></i>
-                        Student Details
-                    </a> -->
+                  
                    
                     <a href="../includes/logout.php" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white mt-10">
                         <i class="fas fa-sign-out-alt mr-3 text-gray-400 group-hover:text-gray-300"></i>

@@ -554,50 +554,10 @@ $conn->close();
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
             <!-- Top Navigation -->
             <?php include('./includes/top_navigation.php'); ?>
-            <!-- Mobile sidebar -->
-            <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
-                <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
-                <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
-                    <div class="absolute top-0 right-0 -mr-12 pt-2">
-                        <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
-                            <span class="sr-only">Close sidebar</span>
-                            <i class="fas fa-times text-white"></i>
-                        </button>
-                    </div>
-                    <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                        <div class="flex-shrink-0 flex items-center px-4">
-                            <span class="text-white text-lg font-semibold">Result Management</span>
-                        </div>
-                        <nav class="mt-5 px-2 space-y-1">
-                            <a href="student_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-white bg-gray-700 rounded-md">
-                                <i class="fas fa-tachometer-alt mr-3"></i>
-                                Dashboard
-                            </a>
-                            <a href="view_result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-clipboard-list mr-3"></i>
-                                My Results
-                            </a>
-                            <a href="#" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-book mr-3"></i>
-                                Subjects
-                            </a>
-                            <a href="#" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-calendar-alt mr-3"></i>
-                                Exam Schedule
-                            </a>
-                            <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-cog mr-3"></i>
-                                Settings
-                            </a>
-                            <a href="../includes/logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
-                                <i class="fas fa-sign-out-alt mr-3"></i>
-                                Logout
-                            </a>
-                        </nav>
-                    </div>
-                </div>
-            </div>
+            
+                        <?php include('./includes./mobile_sidebar.php'); ?>
 
+            
             <!-- Main Content -->
             <main class="flex-1 relative overflow-y-auto focus:outline-none">
                 <div class="py-6">
@@ -613,24 +573,9 @@ $conn->close();
                                         Here's your academic performance dashboard. Stay updated with your results and upcoming exams.
                                     </p>
                                 </div>
-                                <div class="mt-4 md:mt-0 flex space-x-3">
-                                    <a href="view_result.php" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400">
-                                        <i class="fas fa-eye mr-2"></i> View Results
-                                    </a>
-                                </div>
+                             
                             </div>
-                            <div class="bg-indigo-800 bg-opacity-50 px-6 py-2">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center">
-                                        <i class="fas fa-calendar-day text-blue-200 mr-2"></i>
-                                        <span class="text-sm text-blue-100"><?php echo date('l, F j, Y'); ?></span>
-                                    </div>
-                                    <div class="flex items-center">
-                                        <i class="fas fa-clock text-blue-200 mr-2"></i>
-                                        <span class="text-sm text-blue-100" id="live-clock"></span>
-                                    </div>
-                                </div>
-                            </div>
+                            
                         </div>
 
                         <!-- Student Profile Card -->
@@ -749,101 +694,7 @@ $conn->close();
                             </div>
                         </div>
 
-                        <!-- Recent Results and Upcoming Exams -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <!-- Recent Results -->
-                            <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
-                                    <div>
-                                        <h3 class="text-lg font-medium text-gray-900">Recent Results</h3>
-                                        <p class="mt-1 text-sm text-gray-500">Your latest examination results</p>
-                                    </div>
-                                    <a href="view_result.php" class="text-sm text-blue-600 hover:text-blue-500">View all</a>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <?php if (empty($recent_results)): ?>
-                                        <div class="text-center py-4">
-                                            <i class="fas fa-info-circle text-blue-500 text-2xl mb-2"></i>
-                                            <p class="text-gray-500">No results available yet.</p>
-                                        </div>
-                                    <?php else: ?>
-                                        <ul class="divide-y divide-gray-200">
-                                            <?php foreach (array_slice($recent_results, 0, 5) as $result): ?>
-                                                <li class="py-4">
-                                                    <div class="flex space-x-3">
-                                                        <div class="flex-1 space-y-1">
-                                                            <div class="flex items-center justify-between">
-                                                                <h3 class="text-sm font-medium"><?php echo htmlspecialchars($result['subject_name']); ?></h3>
-                                                                <p class="text-sm text-gray-500"><?php echo date('M d, Y', strtotime($result['created_at'])); ?></p>
-                                                            </div>
-                                                            <p class="text-sm text-gray-500">
-                                                                <?php echo htmlspecialchars($result['exam_name']); ?> | 
-                                                                Theory: <?php echo $result['theory_marks']; ?> | 
-                                                                Practical: <?php echo $result['practical_marks'] ?? 'N/A'; ?>
-                                                            </p>
-                                                            <div class="mt-1">
-                                                                <span class="grade-badge grade-<?php echo strtolower(str_replace('+', '-plus', $result['grade'])); ?>">
-                                                                    Grade: <?php echo $result['grade']; ?> (GPA: <?php echo number_format($result['gpa'], 2); ?>)
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-
-                            <!-- Upcoming Exams -->
-                            <div class="bg-white shadow rounded-lg overflow-hidden hover-scale card-hover">
-                                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                                    <h3 class="text-lg font-medium text-gray-900">Upcoming Exams</h3>
-                                    <p class="mt-1 text-sm text-gray-500">Scheduled examinations for your class</p>
-                                </div>
-                                <div class="px-4 py-5 sm:p-6">
-                                    <?php if (empty($upcoming_exams)): ?>
-                                        <div class="text-center py-4">
-                                            <i class="fas fa-calendar-check text-green-500 text-2xl mb-2"></i>
-                                            <p class="text-gray-500">No upcoming exams scheduled.</p>
-                                        </div>
-                                    <?php else: ?>
-                                        <ul class="divide-y divide-gray-200">
-                                            <?php foreach ($upcoming_exams as $exam): ?>
-                                                <li class="py-4">
-                                                    <div class="flex space-x-3">
-                                                        <div class="flex-shrink-0">
-                                                            <div class="h-10 w-10 rounded-md bg-indigo-500 flex items-center justify-center">
-                                                                <i class="fas fa-calendar-alt text-white"></i>
-                                                            </div>
-                                                        </div>
-                                                        <div class="flex-1 space-y-1">
-                                                            <div class="flex items-center justify-between">
-                                                                <h3 class="text-sm font-medium"><?php echo htmlspecialchars($exam['exam_name']); ?></h3>
-                                                                <?php 
-                                                                $days_left = ceil((strtotime($exam['start_date']) - time()) / (60 * 60 * 24));
-                                                                $badge_color = $days_left <= 3 ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
-                                                                ?>
-                                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?php echo $badge_color; ?>">
-                                                                    <?php echo $days_left; ?> days left
-                                                                </span>
-                                                            </div>
-                                                            <p class="text-sm text-gray-500">
-                                                                Date: <?php echo date('M d, Y', strtotime($exam['start_date'])); ?> | 
-                                                                Time: <?php echo !empty($exam['start_time']) ? date('h:i A', strtotime($exam['start_time'])) : 'TBA'; ?>
-                                                            </p>
-                                                            <p class="text-sm text-gray-500">
-                                                                <?php echo !empty($exam['description']) ? htmlspecialchars($exam['description']) : 'No additional details available.'; ?>
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
+                     
 
                       
 
@@ -854,14 +705,6 @@ $conn->close();
     </div>
 
     <script>
-        // Initialize live clock
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('live-clock').textContent = now.toLocaleTimeString();
-        }
-
-        updateClock();
-        setInterval(updateClock, 1000);
 
         // Mobile sidebar toggle
         document.getElementById('sidebar-toggle').addEventListener('click', function() {

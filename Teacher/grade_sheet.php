@@ -35,269 +35,308 @@ if (!$stmt) {
     $stmt->close();
 }
 
-// Get filter parameters
-$selected_class = isset($_GET['class_id']) ? intval($_GET['class_id']) : 0;
-$selected_subject = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
-$selected_exam = isset($_GET['exam_id']) ? intval($_GET['exam_id']) : 0;
-$selected_academic_year = isset($_GET['academic_year']) ? $_GET['academic_year'] : '';
-
-// Get all classes
-$classes = [];
-$classes_query = "SELECT c.class_id, c.class_name, c.section, c.academic_year
-                 FROM classes c
-                 ORDER BY c.class_name, c.section";
-$stmt = $conn->prepare($classes_query);
-if (!$stmt) {
-    $error_message = "Database error: " . $conn->error;
-} else {
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $classes[] = $row;
-    }
-    $stmt->close();
-}
-
-// Get all academic years
-$academic_years = [];
-foreach ($classes as $class) {
-    if (!in_array($class['academic_year'], $academic_years)) {
-        $academic_years[] = $class['academic_year'];
-    }
-}
-sort($academic_years);
-
-// Get subjects assigned to this teacher
+// Initialize variables
+$student = [];
 $subjects = [];
-$subjects_query = "SELECT s.subject_id, s.subject_name, s.subject_code 
-                  FROM subjects s
-                  JOIN teachersubjects ts ON s.subject_id = ts.subject_id
-                  WHERE ts.teacher_id = ?
-                  ORDER BY s.subject_name";
-$stmt = $conn->prepare($subjects_query);
-if (!$stmt) {
-    // Try alternative query if the first one fails
-    $alt_subjects_query = "SELECT s.subject_id, s.subject_name, s.subject_code 
-                          FROM subjects s
-                          ORDER BY s.subject_name";
-    $stmt = $conn->prepare($alt_subjects_query);
-    if (!$stmt) {
-        $error_message = "Database error: " . $conn->error;
-    } else {
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $subjects[] = $row;
-        }
-        $stmt->close();
-    }
-} else {
+$results = [];
+$exams = [];
+$performance_data = [];
+$chart_data = [];
+$subject_names = [];
+$time_periods = [];
+$gpa_trend = [];
+
+// Get available exams for teacher's subjects
+$exams_query = "SELECT DISTINCT e.exam_id, e.exam_name, e.exam_type, e.academic_year 
+                FROM exams e
+                JOIN results r ON e.exam_id = r.exam_id
+                JOIN teachersubjects ts ON r.subject_id = ts.subject_id
+                WHERE ts.teacher_id = ? AND e.is_active = 1 
+                ORDER BY e.created_at DESC";
+$stmt = $conn->prepare($exams_query);
+if ($stmt) {
     $stmt->bind_param("i", $teacher_id);
     $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $subjects[] = $row;
-    }
-    $stmt->close();
-}
-
-// Get all exams
-$exams = [];
-$exams_query = "SELECT e.exam_id, e.exam_name, e.exam_type, e.academic_year, e.start_date, e.end_date
-               FROM exams e
-               ORDER BY e.start_date DESC";
-$stmt = $conn->prepare($exams_query);
-if (!$stmt) {
-    $error_message = "Database error: " . $conn->error;
-} else {
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
+    $exams_result = $stmt->get_result();
+    while ($row = $exams_result->fetch_assoc()) {
         $exams[] = $row;
     }
     $stmt->close();
+} else {
+    // Fallback query
+    $exams_result = $conn->query("SELECT exam_id, exam_name, exam_type, academic_year FROM exams WHERE is_active = 1 ORDER BY created_at DESC");
+    while ($row = $exams_result->fetch_assoc()) {
+        $exams[] = $row;
+    }
 }
 
-// Get grade sheets based on filters
-$grade_sheets = [];
-$filter_conditions = [];
-$filter_params = [];
-$param_types = "";
-
-$base_query = "SELECT 
-                e.exam_id, e.exam_name, e.exam_type, e.academic_year, e.start_date, e.end_date,
-                c.class_id, c.class_name, c.section,
-                s.subject_id, s.subject_name, s.subject_code,
-                COUNT(DISTINCT r.student_id) as students_count,
-                COUNT(r.result_id) as results_count,
-                AVG(r.percentage) as average_percentage,
-                SUM(CASE WHEN r.remarks = 'Pass' THEN 1 ELSE 0 END) as pass_count
-              FROM exams e
-              JOIN results r ON e.exam_id = r.exam_id
-              JOIN students st ON r.student_id = st.student_id
-              JOIN classes c ON st.class_id = c.class_id
-              JOIN subjects s ON r.subject_id = s.subject_id
-              JOIN teachersubjects ts ON s.subject_id = ts.subject_id AND c.class_id = ts.class_id";
-
-// Add teacher filter
-$base_query .= " WHERE ts.teacher_id = ?";
-$param_types .= "i";
-$filter_params[] = $teacher_id;
-
-// Add filters based on selection
-if ($selected_class) {
-    $filter_conditions[] = "c.class_id = ?";
-    $param_types .= "i";
-    $filter_params[] = $selected_class;
-}
-
-if ($selected_subject) {
-    $filter_conditions[] = "s.subject_id = ?";
-    $param_types .= "i";
-    $filter_params[] = $selected_subject;
-}
-
-if ($selected_exam) {
-    $filter_conditions[] = "e.exam_id = ?";
-    $param_types .= "i";
-    $filter_params[] = $selected_exam;
-}
-
-if ($selected_academic_year) {
-    $filter_conditions[] = "e.academic_year = ?";
-    $param_types .= "s";
-    $filter_params[] = $selected_academic_year;
-}
-
-// Add filter conditions to query
-if (!empty($filter_conditions)) {
-    $base_query .= " AND " . implode(" AND ", $filter_conditions);
-}
-
-// Group by and order by
-$base_query .= " GROUP BY e.exam_id, c.class_id, s.subject_id
-                ORDER BY e.start_date DESC, c.class_name, s.subject_name";
-
-// Execute query
-$stmt = $conn->prepare($base_query);
-if (!$stmt) {
-    $error_message = "Database error: " . $conn->error;
+// Check if viewing a specific student result
+if (isset($_GET['student_id'])) {
+    $student_id = $_GET['student_id'];
     
-    // Try alternative query with different join structure
-    $alt_base_query = "SELECT 
-                        e.exam_id, e.exam_name, e.exam_type, e.academic_year, e.start_date, e.end_date,
-                        c.class_id, c.class_name, c.section,
-                        s.subject_id, s.subject_name, s.subject_code,
-                        COUNT(DISTINCT r.student_id) as students_count,
-                        COUNT(r.result_id) as results_count,
-                        AVG(IFNULL(r.percentage, 0)) as average_percentage,
-                        SUM(CASE WHEN r.remarks = 'Pass' THEN 1 ELSE 0 END) as pass_count
-                      FROM teachersubjects ts
-                      JOIN subjects s ON ts.subject_id = s.subject_id
-                      JOIN classes c ON ts.class_id = c.class_id
-                      JOIN exams e ON e.academic_year = c.academic_year
-                      LEFT JOIN results r ON e.exam_id = r.exam_id AND s.subject_id = r.subject_id
-                      LEFT JOIN students st ON r.student_id = st.student_id AND st.class_id = c.class_id
-                      WHERE ts.teacher_id = ?";
+    // Get student details
+    $stmt = $conn->prepare("
+        SELECT s.student_id, s.roll_number, s.registration_number, u.full_name, 
+               c.class_name, c.section, c.academic_year
+        FROM students s
+        JOIN users u ON s.user_id = u.user_id
+        JOIN classes c ON s.class_id = c.class_id
+        WHERE s.student_id = ?
+    ");
+    $stmt->bind_param("s", $student_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
     
-    // Add filter conditions to alternative query
-    if (!empty($filter_conditions)) {
-        $alt_base_query .= " AND " . implode(" AND ", $filter_conditions);
+    if ($result->num_rows == 0) {
+        die("Student not found");
     }
     
-    // Group by and order by for alternative query
-    $alt_base_query .= " GROUP BY e.exam_id, c.class_id, s.subject_id
-                        ORDER BY e.start_date DESC, c.class_name, s.subject_name";
+    $student = $result->fetch_assoc();
+    $stmt->close();
     
-    $stmt = $conn->prepare($alt_base_query);
-    if (!$stmt) {
-        // If alternative query also fails, keep the error message
-    } else {
-        if (!empty($filter_params)) {
-            $stmt->bind_param($param_types, ...$filter_params);
+    // Get subjects taught by this teacher for this student
+    $stmt = $conn->prepare("
+        SELECT DISTINCT s.subject_id, s.subject_name, s.subject_code, s.credit_hours
+        FROM subjects s
+        JOIN results r ON s.subject_id = r.subject_id
+        JOIN teachersubjects ts ON s.subject_id = ts.subject_id
+        WHERE r.student_id = ? AND ts.teacher_id = ?
+        ORDER BY s.subject_id
+    ");
+    $stmt->bind_param("si", $student_id, $teacher_id);
+    $stmt->execute();
+    $subjects_result = $stmt->get_result();
+    
+    while ($row = $subjects_result->fetch_assoc()) {
+        $subjects[] = $row;
+        $subject_names[] = $row['subject_name'];
+    }
+    $stmt->close();
+    
+    // Get selected exam or default to the most recent
+    $selected_exam = isset($_GET['exam_id']) ? $_GET['exam_id'] : null;
+    
+    if (!$selected_exam && count($exams) > 0) {
+        $selected_exam = $exams[0]['exam_id'];
+    }
+    
+    // Get results for all exams for this student (only for teacher's subjects)
+    $query = "SELECT r.*, e.exam_name, e.exam_type, e.academic_year, s.subject_name
+        FROM results r
+        JOIN exams e ON r.exam_id = e.exam_id
+        JOIN subjects s ON r.subject_id = s.subject_id
+        JOIN teachersubjects ts ON s.subject_id = ts.subject_id
+        WHERE r.student_id = ? AND ts.teacher_id = ?
+        ORDER BY e.created_at DESC, s.subject_name ASC";
+
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("si", $student_id, $teacher_id);
+    $stmt->execute();
+    $results_data = $stmt->get_result();
+    
+    // Organize results by exam
+    $results_by_exam = [];
+    $chart_data = [];
+    $time_periods = [];
+    
+    while ($row = $results_data->fetch_assoc()) {
+        $exam_id = $row['exam_id'];
+        
+        if (!isset($results_by_exam[$exam_id])) {
+            $results_by_exam[$exam_id] = [
+                'exam_id' => $exam_id,
+                'exam_name' => $row['exam_name'],
+                'exam_type' => $row['exam_type'],
+                'academic_year' => $row['academic_year'],
+                'subjects' => []
+            ];
+            
+            // Add to time periods for charts
+            if (!in_array($row['exam_name'], $time_periods)) {
+                $time_periods[] = $row['exam_name'];
+            }
         }
+        
+        $results_by_exam[$exam_id]['subjects'][$row['subject_id']] = [
+            'subject_id' => $row['subject_id'],
+            'subject_name' => $row['subject_name'],
+            'theory_marks' => $row['theory_marks'],
+            'practical_marks' => $row['practical_marks'],
+            'total_marks' => $row['theory_marks'] + $row['practical_marks'],
+            'grade' => $row['grade'],
+            'gpa' => $row['gpa'],
+            'remarks' => $row['remarks'] ?? ''
+        ];
+        
+        // Add to chart data
+        $chart_data[] = [
+            'period' => $row['exam_name'],
+            'subject' => $row['subject_name'],
+            'theory_marks' => $row['theory_marks'],
+            'practical_marks' => $row['practical_marks'],
+            'gpa' => $row['gpa']
+        ];
+    }
+    $stmt->close();
+    
+    // Get performance data for all exams
+    $stmt = $conn->prepare("
+        SELECT sp.*, e.exam_name
+        FROM student_performance sp
+        JOIN exams e ON sp.exam_id = e.exam_id
+        WHERE sp.student_id = ?
+        ORDER BY e.created_at DESC
+    ");
+    $stmt->bind_param("s", $student_id);
+    $stmt->execute();
+    $performance_result = $stmt->get_result();
+    
+    while ($row = $performance_result->fetch_assoc()) {
+        $performance_data[$row['exam_id']] = $row;
+        
+        // Add to GPA trend for charts
+        $gpa_trend[] = $row['gpa'];
+    }
+    $stmt->close();
+    
+    // If we have a selected exam, get detailed results for it
+    if ($selected_exam) {
+        $stmt = $conn->prepare("
+            SELECT r.*, s.subject_name, s.subject_code, s.full_marks_theory, s.full_marks_practical
+            FROM results r
+            JOIN subjects s ON r.subject_id = s.subject_id
+            JOIN teachersubjects ts ON s.subject_id = ts.subject_id
+            WHERE r.student_id = ? AND r.exam_id = ? AND ts.teacher_id = ?
+            ORDER BY s.subject_id
+        ");
+        $stmt->bind_param("sii", $student_id, $selected_exam, $teacher_id);
         $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $grade_sheets[] = $row;
+        $current_results = $stmt->get_result();
+        
+        $results = [];
+        $total_marks = 0;
+        $total_max_marks = 0;
+        
+        while ($row = $current_results->fetch_assoc()) {
+            $theory_marks = $row['theory_marks'] ?? 0;
+            $practical_marks = $row['practical_marks'] ?? 0;
+            $total_subject_marks = $theory_marks + $practical_marks;
+            $max_marks = $row['full_marks_theory'] + $row['full_marks_practical'];
+            
+            $results[] = [
+                'subject_id' => $row['subject_id'],
+                'subject_name' => $row['subject_name'],
+                'subject_code' => $row['subject_code'] ?? $row['subject_id'],
+                'credit_hours' => $row['credit_hours'],
+                'theory_marks' => $theory_marks,
+                'practical_marks' => $practical_marks,
+                'total_marks' => $total_subject_marks,
+                'max_marks' => $max_marks,
+                'grade' => $row['grade'],
+                'gpa' => $row['gpa'],
+                'remarks' => $row['remarks'] ?? '',
+                'full_marks_theory' => $row['full_marks_theory'],
+                'full_marks_practical' => $row['full_marks_practical']
+            ];
+            
+            $total_marks += $total_subject_marks;
+            $total_max_marks += $max_marks;
         }
         $stmt->close();
-        $error_message = ''; // Clear error if alternative query succeeds
+        
+        // Get overall performance for selected exam
+        $overall_performance = isset($performance_data[$selected_exam]) ? $performance_data[$selected_exam] : null;
+        
+        if (!$overall_performance) {
+            // Calculate basic performance metrics if not available
+            $percentage = $total_max_marks > 0 ? ($total_marks / $total_max_marks) * 100 : 0;
+            $gpa = calculateGPA($percentage, $conn);
+            
+            $overall_performance = [
+                'average_marks' => $percentage,
+                'gpa' => $gpa,
+                'rank' => 'N/A'
+            ];
+        }
     }
 } else {
-    if (!empty($filter_params)) {
-        $stmt->bind_param($param_types, ...$filter_params);
+    // If no specific student is requested, show a list of students to select
+    $show_student_list = true;
+    
+    // Get students taught by this teacher
+    $students = [];
+    $students_query = "
+        SELECT DISTINCT s.student_id, s.roll_number, u.full_name, c.class_name, c.section
+        FROM students s
+        JOIN users u ON s.user_id = u.user_id
+        JOIN classes c ON s.class_id = c.class_id
+        JOIN results r ON s.student_id = r.student_id
+        JOIN teachersubjects ts ON r.subject_id = ts.subject_id
+        WHERE ts.teacher_id = ?
+        ORDER BY c.class_name, c.section, s.roll_number
+    ";
+    $stmt = $conn->prepare($students_query);
+    if ($stmt) {
+        $stmt->bind_param("i", $teacher_id);
+        $stmt->execute();
+        $students_result = $stmt->get_result();
+        
+        while ($row = $students_result->fetch_assoc()) {
+            $students[] = $row;
+        }
+        $stmt->close();
     }
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $grade_sheets[] = $row;
-    }
-    $stmt->close();
 }
 
-// Get recent activity (last 5 results entered)
-$recent_activity = [];
-$activity_query = "SELECT 
-                    r.result_id, r.updated_at, 
-                    s.subject_name, 
-                    c.class_name, c.section,
-                    e.exam_name,
-                    u.full_name as student_name,
-                    r.grade, r.remarks
-                  FROM results r
-                  JOIN subjects s ON r.subject_id = s.subject_id
-                  JOIN students st ON r.student_id = st.student_id
-                  JOIN classes c ON st.class_id = c.class_id
-                  JOIN exams e ON r.exam_id = e.exam_id
-                  JOIN users u ON st.user_id = u.user_id
-                  JOIN teachersubjects ts ON s.subject_id = ts.subject_id AND c.class_id = ts.class_id
-                  WHERE ts.teacher_id = ?
-                  ORDER BY r.updated_at DESC
-                  LIMIT 5";
-
-$stmt = $conn->prepare($activity_query);
-if (!$stmt) {
-    // Skip recent activity if query fails
-} else {
-    $stmt->bind_param("i", $teacher_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $recent_activity[] = $row;
+// Function to calculate GPA based on percentage
+function calculateGPA($percentage, $conn)
+{
+    // Get grading system from database
+    $result = $conn->query("SELECT * FROM grading_system ORDER BY min_percentage DESC");
+    
+    while ($grade = $result->fetch_assoc()) {
+        if ($percentage >= $grade['min_percentage']) {
+            return $grade['gpa'];
+        }
     }
-    $stmt->close();
+    
+    return 0; // Default if no matching grade found
 }
 
-// Get pending tasks (classes/subjects with no results)
-$pending_tasks = [];
-$pending_query = "SELECT 
-                    c.class_id, c.class_name, c.section,
-                    s.subject_id, s.subject_name,
-                    e.exam_id, e.exam_name, e.end_date
-                  FROM teachersubjects ts
-                  JOIN classes c ON ts.class_id = c.class_id
-                  JOIN subjects s ON ts.subject_id = s.subject_id
-                  JOIN exams e ON e.academic_year = c.academic_year
-                  LEFT JOIN (
-                    SELECT DISTINCT exam_id, class_id, subject_id
-                    FROM results
-                  ) r ON e.exam_id = r.exam_id AND c.class_id = r.class_id AND s.subject_id = r.subject_id
-                  WHERE ts.teacher_id = ? AND r.exam_id IS NULL
-                  ORDER BY e.end_date DESC
-                  LIMIT 5";
+// Function to get grade letter from percentage
+function getGradeLetter($percentage)
+{
+    if ($percentage >= 90) return 'A+';
+    if ($percentage >= 80) return 'A';
+    if ($percentage >= 70) return 'B+';
+    if ($percentage >= 60) return 'B';
+    if ($percentage >= 50) return 'C+';
+    if ($percentage >= 40) return 'C';
+    if ($percentage >= 33) return 'D';
+    return 'F';
+}
 
-$stmt = $conn->prepare($pending_query);
-if (!$stmt) {
-    // Skip pending tasks if query fails
-} else {
-    $stmt->bind_param("i", $teacher_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $pending_tasks[] = $row;
+// Function to get remarks based on grade
+function getRemarks($grade)
+{
+    switch ($grade) {
+        case 'A+': return 'Outstanding';
+        case 'A': return 'Excellent';
+        case 'B+': return 'Very Good';
+        case 'B': return 'Good';
+        case 'C+': return 'Satisfactory';
+        case 'C': return 'Acceptable';
+        case 'D': return 'Needs Improvement';
+        case 'F': return 'Fail';
+        default: return '';
     }
-    $stmt->close();
+}
+
+// Get school settings
+$settings = [];
+$settings_result = $conn->query("SELECT setting_key, setting_value FROM settings");
+while ($row = $settings_result->fetch_assoc()) {
+    $settings[$row['setting_key']] = $row['setting_value'];
 }
 
 $conn->close();
@@ -305,81 +344,293 @@ $conn->close();
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grade Sheets | Teacher Dashboard</title>
     <link href="../css/tailwind.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <style>
-        .grade-card {
-            transition: all 0.3s ease;
+        @page {
+            size: A4;
+            margin: 0;
         }
-        
-        .grade-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+        .result-container {
+            width: 21cm;
+            min-height: 29.7cm;
+            padding: 1cm;
+            margin: 20px auto;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+            box-sizing: border-box;
         }
-        
-        .status-badge {
-            display: inline-flex;
+
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 100px;
+            color: rgba(0, 0, 0, 0.03);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+            border-bottom: 2px solid #1a5276;
+            padding-bottom: 10px;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 10px;
+            background-color: #f0f0f0;
+            border-radius: 50%;
+            display: flex;
             align-items: center;
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 500;
+            justify-content: center;
+            font-weight: bold;
+            color: #555;
         }
-        
-        .status-badge.good {
-            background-color: #d1fae5;
-            color: #065f46;
+
+        .title {
+            font-weight: bold;
+            font-size: 22px;
+            margin-bottom: 5px;
+            color: #1a5276;
         }
-        
-        .status-badge.average {
-            background-color: #fef3c7;
-            color: #92400e;
+
+        .subtitle {
+            font-size: 18px;
+            margin-bottom: 5px;
+            color: #2874a6;
         }
-        
-        .status-badge.poor {
-            background-color: #fee2e2;
-            color: #b91c1c;
+
+        .exam-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #1a5276;
+            border: 2px solid #1a5276;
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 5px;
         }
-        
-        .filter-badge {
-            display: inline-flex;
-            align-items: center;
+
+        .student-info {
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .info-item {
+            margin-bottom: 8px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #2874a6;
+        }
+
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-table,
+        .result-table th,
+        .result-table td {
+            border: 1px solid #bdc3c7;
+        }
+
+        .result-table th,
+        .result-table td {
+            padding: 10px;
+            text-align: center;
+        }
+
+        .result-table th {
+            background-color: #1a5276;
+            color: white;
+            font-weight: bold;
+        }
+
+        .result-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        .summary {
+            margin: 20px 0;
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .summary-item {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .summary-label {
+            font-weight: bold;
+            color: #2874a6;
+            margin-bottom: 5px;
+        }
+
+        .summary-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+
+        .grade-badge {
+            display: inline-block;
             padding: 0.25rem 0.5rem;
             border-radius: 9999px;
             font-size: 0.75rem;
             font-weight: 500;
-            background-color: #e5e7eb;
-            color: #374151;
-            margin-right: 0.5rem;
-            margin-bottom: 0.5rem;
         }
-        
-        .filter-badge button {
-            margin-left: 0.25rem;
-            color: #6b7280;
+
+        .grade-a-plus {
+            background-color: #dcfce7;
+            color: #166534;
         }
-        
-        .filter-badge button:hover {
-            color: #ef4444;
+
+        .grade-a {
+            background-color: #dcfce7;
+            color: #166534;
         }
-        
-        @media (max-width: 640px) {
-            .filter-container {
-                flex-direction: column;
-                align-items: stretch;
+
+        .grade-b-plus {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+
+        .grade-b {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+
+        .grade-c-plus {
+            background-color: #fef9c3;
+            color: #854d0e;
+        }
+
+        .grade-c {
+            background-color: #fef9c3;
+            color: #854d0e;
+        }
+
+        .grade-d {
+            background-color: #ffedd5;
+            color: #9a3412;
+        }
+
+        .grade-f {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media print {
+            body {
+                background-color: white !important;
             }
-            
-            .filter-container > div {
-                margin-bottom: 1rem;
+
+            .result-container {
+                width: 100%;
+                min-height: auto;
+                padding: 0.5cm;
+                margin: 0;
+                box-shadow: none;
             }
+
+            .print-button,
+            .back-button,
+            .sidebar,
+            .top-navigation,
+            .selection-container,
+            .tab-buttons,
+            .no-print {
+                display: none !important;
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+                padding: 0 !important;
+            }
+
+            .tab-content {
+                display: block !important;
+            }
+        }
+
+        .grade-scale {
+            margin-top: 20px;
+            font-size: 12px;
+            border: 1px solid #bdc3c7;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+
+        .grade-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .grade-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .grade-table th,
+        .grade-table td {
+            padding: 3px;
+            text-align: center;
+            border: 1px solid #ddd;
         }
     </style>
 </head>
+
 <body class="bg-gray-100">
+    <?php include 'includes/teacher_topbar.php'; ?>
     
     <div class="flex">
         <?php include 'includes/teacher_sidebar.php'; ?>
@@ -429,304 +680,420 @@ $conn->close();
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between">
                     <div>
                         <h2 class="text-xl font-semibold text-gray-800"><?php echo htmlspecialchars($teacher_name ?? 'Teacher'); ?></h2>
-                        <p class="mt-1 text-sm text-gray-600">Manage and view grade sheets for your assigned classes and subjects.</p>
-                    </div>
-                    <div class="mt-4 md:mt-0">
-                        <a href="edit_results.php" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <i class="fas fa-plus-circle mr-2"></i> Add New Results
-                        </a>
+                        <p class="mt-1 text-sm text-gray-600">View grade sheets for your students.</p>
                     </div>
                 </div>
             </div>
             
-            <!-- Filters -->
-            <div class="bg-white shadow rounded-lg p-6 mb-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Filter Grade Sheets</h3>
-                
-                <form action="" method="get" class="filter-container flex flex-wrap gap-4 mb-4">
-                    <!-- Class Filter -->
-                    <div class="w-full sm:w-auto">
-                        <label for="class_id" class="block text-sm font-medium text-gray-700 mb-1">Class</label>
-                        <select id="class_id" name="class_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                            <option value="">All Classes</option>
-                            <?php foreach ($classes as $class): ?>
-                                <option value="<?php echo $class['class_id']; ?>" <?php echo $selected_class == $class['class_id'] ? 'selected' : ''; ?>>
-                                    <?php echo $class['class_name'] . ' ' . $class['section'] . ' (' . $class['academic_year'] . ')'; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <!-- Subject Filter -->
-                    <div class="w-full sm:w-auto">
-                        <label for="subject_id" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                        <select id="subject_id" name="subject_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                            <option value="">All Subjects</option>
-                            <?php foreach ($subjects as $subject): ?>
-                                <option value="<?php echo $subject['subject_id']; ?>" <?php echo $selected_subject == $subject['subject_id'] ? 'selected' : ''; ?>>
-                                    <?php echo $subject['subject_name'] . ' (' . $subject['subject_code'] . ')'; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <!-- Exam Filter -->
-                    <div class="w-full sm:w-auto">
-                        <label for="exam_id" class="block text-sm font-medium text-gray-700 mb-1">Exam</label>
-                        <select id="exam_id" name="exam_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                            <option value="">All Exams</option>
-                            <?php foreach ($exams as $exam): ?>
-                                <option value="<?php echo $exam['exam_id']; ?>" <?php echo $selected_exam == $exam['exam_id'] ? 'selected' : ''; ?>>
-                                    <?php echo $exam['exam_name'] . ' (' . $exam['academic_year'] . ')'; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <!-- Academic Year Filter -->
-                    <div class="w-full sm:w-auto">
-                        <label for="academic_year" class="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
-                        <select id="academic_year" name="academic_year" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                            <option value="">All Years</option>
-                            <?php foreach ($academic_years as $year): ?>
-                                <option value="<?php echo $year; ?>" <?php echo $selected_academic_year == $year ? 'selected' : ''; ?>>
-                                    <?php echo $year; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <!-- Filter Button -->
-                    <div class="w-full sm:w-auto flex items-end">
-                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <i class="fas fa-filter mr-2"></i> Apply Filters
-                        </button>
-                    </div>
-                    
-                    <!-- Reset Filters -->
-                    <?php if ($selected_class || $selected_subject || $selected_exam || $selected_academic_year): ?>
-                        <div class="w-full sm:w-auto flex items-end">
-                            <a href="grade_sheet.php" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                <i class="fas fa-times mr-2"></i> Reset Filters
-                            </a>
+            <?php if (isset($show_student_list)): ?>
+                <!-- Student Selection Form -->
+                <div class="bg-white shadow rounded-lg p-6 mb-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Select Student</h2>
+                    <?php if (empty($students)): ?>
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-yellow-700">
+                                        No students found. You may not have any assigned subjects with results yet.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll Number</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <?php foreach ($students as $student): ?>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $student['roll_number']; ?></td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $student['full_name']; ?></td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $student['class_name'] . ' ' . $student['section']; ?></td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <a href="?student_id=<?php echo $student['student_id']; ?>" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                    <i class="fas fa-eye mr-1"></i> View Grade Sheet
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         </div>
                     <?php endif; ?>
-                </form>
-                
-                <!-- Active Filters -->
-                <?php if ($selected_class || $selected_subject || $selected_exam || $selected_academic_year): ?>
-                    <div class="mt-4">
-                        <h4 class="text-sm font-medium text-gray-500 mb-2">Active Filters:</h4>
+                </div>
+            <?php else: ?>
+                <!-- Student Result View -->
+                <div class="mb-4 flex justify-between">
+                    <a href="grade_sheet.php" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-arrow-left mr-2"></i> Back to List
+                    </a>
+                    <div>
+                        <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mr-2">
+                            <i class="fas fa-print mr-2"></i> Print Grade Sheet
+                        </button>
+                        <button onclick="generatePDF('current')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                            <i class="fas fa-file-pdf mr-2"></i> Download PDF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Student Information Card -->
+                <div class="bg-white shadow rounded-lg p-6 mb-6">
+                    <div class="flex flex-col md:flex-row justify-between">
                         <div>
-                            <?php if ($selected_class): ?>
-                                <?php 
-                                $class_name = '';
-                                foreach ($classes as $class) {
-                                    if ($class['class_id'] == $selected_class) {
-                                        $class_name = $class['class_name'] . ' ' . $class['section'];
-                                        break;
-                                    }
-                                }
-                                ?>
-                                <span class="filter-badge">
-                                    Class: <?php echo $class_name; ?>
-                                    <a href="?<?php 
-                                        $params = $_GET;
-                                        unset($params['class_id']);
-                                        echo http_build_query($params);
-                                    ?>" class="ml-1 text-gray-500 hover:text-red-500">
-                                        <i class="fas fa-times-circle"></i>
-                                    </a>
-                                </span>
-                            <?php endif; ?>
-                            
-                            <?php if ($selected_subject): ?>
-                                <?php 
-                                $subject_name = '';
-                                foreach ($subjects as $subject) {
-                                    if ($subject['subject_id'] == $selected_subject) {
-                                        $subject_name = $subject['subject_name'];
-                                        break;
-                                    }
-                                }
-                                ?>
-                                <span class="filter-badge">
-                                    Subject: <?php echo $subject_name; ?>
-                                    <a href="?<?php 
-                                        $params = $_GET;
-                                        unset($params['subject_id']);
-                                        echo http_build_query($params);
-                                    ?>" class="ml-1 text-gray-500 hover:text-red-500">
-                                        <i class="fas fa-times-circle"></i>
-                                    </a>
-                                </span>
-                            <?php endif; ?>
-                            
-                            <?php if ($selected_exam): ?>
-                                <?php 
-                                $exam_name = '';
-                                foreach ($exams as $exam) {
-                                    if ($exam['exam_id'] == $selected_exam) {
-                                        $exam_name = $exam['exam_name'];
-                                        break;
-                                    }
-                                }
-                                ?>
-                                <span class="filter-badge">
-                                    Exam: <?php echo $exam_name; ?>
-                                    <a href="?<?php 
-                                        $params = $_GET;
-                                        unset($params['exam_id']);
-                                        echo http_build_query($params);
-                                    ?>" class="ml-1 text-gray-500 hover:text-red-500">
-                                        <i class="fas fa-times-circle"></i>
-                                    </a>
-                                </span>
-                            <?php endif; ?>
-                            
-                            <?php if ($selected_academic_year): ?>
-                                <span class="filter-badge">
-                                    Academic Year: <?php echo $selected_academic_year; ?>
-                                    <a href="?<?php 
-                                        $params = $_GET;
-                                        unset($params['academic_year']);
-                                        echo http_build_query($params);
-                                    ?>" class="ml-1 text-gray-500 hover:text-red-500">
-                                        <i class="fas fa-times-circle"></i>
-                                    </a>
-                                </span>
-                            <?php endif; ?>
+                            <h2 class="text-xl font-bold text-gray-900"><?php echo $student['full_name']; ?></h2>
+                            <p class="text-gray-600">Roll Number: <?php echo $student['roll_number']; ?></p>
+                            <p class="text-gray-600">Registration Number: <?php echo $student['registration_number']; ?></p>
+                        </div>
+                        <div class="mt-4 md:mt-0 text-right">
+                            <p class="text-gray-600">Class: <?php echo $student['class_name'] . ' ' . $student['section']; ?></p>
+                            <p class="text-gray-600">Academic Year: <?php echo $student['academic_year']; ?></p>
                         </div>
                     </div>
-                <?php endif; ?>
-            </div>
-            
-            <!-- Grade Sheets Grid -->
-            <div class="mb-8">
-                <?php if (empty($grade_sheets)): ?>
-                    <div class="bg-white shadow rounded-lg p-8 text-center">
-                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 text-yellow-500 mb-4">
-                            <i class="fas fa-exclamation-circle text-3xl"></i>
-                        </div>
-                        <h2 class="text-xl font-medium text-gray-900 mb-2">No Grade Sheets Found</h2>
-                        <p class="text-gray-600 mb-6 max-w-md mx-auto">
-                            <?php if ($selected_class || $selected_subject || $selected_exam || $selected_academic_year): ?>
-                                No grade sheets match your filter criteria. Try adjusting your filters or view all grade sheets.
-                            <?php else: ?>
-                                You don't have any grade sheets available yet. Start by adding results for your assigned classes and subjects.
+                </div>
+
+                <!-- Exam Selection -->
+                <div class="bg-white shadow rounded-lg p-6 mb-6 no-print">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Select Exam</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <?php foreach ($exams as $exam): ?>
+                            <?php if (isset($results_by_exam[$exam['exam_id']])): ?>
+                                <a href="?student_id=<?php echo $student_id; ?>&exam_id=<?php echo $exam['exam_id']; ?>" 
+                                   class="px-4 py-2 rounded-md text-sm font-medium <?php echo ($selected_exam == $exam['exam_id']) ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'; ?>">
+                                    <?php echo $exam['exam_name']; ?>
+                                </a>
                             <?php endif; ?>
-                        </p>
-                        
-                        <?php if ($selected_class || $selected_subject || $selected_exam || $selected_academic_year): ?>
-                            <a href="grade_sheet.php" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                <i class="fas fa-list mr-2"></i> View All Grade Sheets
-                            </a>
-                        <?php else: ?>
-                            <a href="edit_results.php" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                <i class="fas fa-plus-circle mr-2"></i> Add New Results
-                            </a>
-                        <?php endif; ?>
+                        <?php endforeach; ?>
                     </div>
-                <?php else: ?>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <?php foreach ($grade_sheets as $sheet): ?>
-                            <div class="bg-white shadow rounded-lg overflow-hidden grade-card">
-                                <div class="bg-blue-600 text-white px-4 py-3">
-                                    <div class="flex justify-between items-center">
-                                        <h3 class="font-semibold"><?php echo $sheet['exam_name']; ?></h3>
-                                        <span class="text-xs bg-blue-500 px-2 py-1 rounded-full">
-                                            <?php echo $sheet['exam_type'] ?? 'Exam'; ?>
-                                        </span>
-                                    </div>
-                                </div>
-                                
-                                <div class="p-4">
-                                    <div class="flex justify-between items-center mb-3">
-                                        <span class="text-sm text-gray-500">
-                                            <i class="far fa-calendar-alt mr-1"></i> 
-                                            <?php echo $sheet['academic_year']; ?>
-                                        </span>
-                                        
-                                        <?php 
-                                        $percentage = $sheet['average_percentage'] ?? 0;
-                                        $status_class = 'poor';
-                                        $status_text = 'Poor';
-                                        
-                                        if ($percentage >= 70) {
-                                            $status_class = 'good';
-                                            $status_text = 'Good';
-                                        } elseif ($percentage >= 40) {
-                                            $status_class = 'average';
-                                            $status_text = 'Average';
-                                        }
-                                        ?>
-                                        
-                                        <span class="status-badge <?php echo $status_class; ?>">
-                                            <?php echo $status_text; ?>
-                                        </span>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <p class="text-sm font-medium text-gray-700">
-                                            <i class="fas fa-book mr-1 text-blue-500"></i> 
-                                            <?php echo $sheet['subject_name']; ?> (<?php echo $sheet['subject_code']; ?>)
-                                        </p>
-                                        <p class="text-sm font-medium text-gray-700">
-                                            <i class="fas fa-users mr-1 text-green-500"></i> 
-                                            <?php echo $sheet['class_name'] . ' ' . $sheet['section']; ?>
-                                        </p>
-                                    </div>
-                                    
-                                    <div class="grid grid-cols-2 gap-2 mb-4">
-                                        <div class="bg-gray-50 p-2 rounded">
-                                            <p class="text-xs text-gray-500">Students</p>
-                                            <p class="font-semibold"><?php echo $sheet['students_count']; ?></p>
-                                        </div>
-                                        <div class="bg-gray-50 p-2 rounded">
-                                            <p class="text-xs text-gray-500">Pass Rate</p>
-                                            <p class="font-semibold">
+                </div>
+
+                <!-- Tab Navigation -->
+                <div class="bg-white shadow rounded-lg mb-6 overflow-hidden">
+                    <div class="border-b border-gray-200 no-print">
+                        <nav class="flex -mb-px">
+                            <button onclick="openTab('result')" class="tab-button w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm border-blue-500 text-blue-600">
+                                <i class="fas fa-clipboard-list mr-2"></i> Grade Sheet
+                            </button>
+                            <button onclick="openTab('progress')" class="tab-button w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                                <i class="fas fa-chart-line mr-2"></i> Progress Tracking
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Result Tab Content -->
+                    <div id="result" class="tab-content active p-6">
+                        <?php if (isset($selected_exam) && !empty($results)): ?>
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                                <?php echo $exams[array_search($selected_exam, array_column($exams, 'exam_id'))]['exam_name']; ?> Results
+                            </h3>
+                            
+                            <table class="result-table min-w-full">
+                                <thead>
+                                    <tr>
+                                        <th>SUBJECT CODE</th>
+                                        <th>SUBJECTS</th>
+                                        <th>CREDIT HOUR</th>
+                                        <th>THEORY GRADE</th>
+                                        <th>PRACTICAL GRADE</th>
+                                        <th>FINAL GRADE</th>
+                                        <th>GRADE POINT</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($results as $result): ?>
+                                        <tr>
+                                            <td><?php echo $result['subject_code']; ?></td>
+                                            <td><?php echo $result['subject_name']; ?></td>
+                                            <td><?php echo $result['credit_hours']; ?></td>
+                                            <td>
                                                 <?php 
-                                                $pass_rate = ($sheet['students_count'] > 0) ? 
-                                                    round(($sheet['pass_count'] / $sheet['students_count']) * 100) : 0;
-                                                echo $pass_rate . '%'; 
-                                                ?>
-                                            </p>
-                                        </div>
-                                        <div class="bg-gray-50 p-2 rounded">
-                                            <p class="text-xs text-gray-500">Average</p>
-                                            <p class="font-semibold"><?php echo round($sheet['average_percentage'], 1); ?>%</p>
-                                        </div>
-                                        <div class="bg-gray-50 p-2 rounded">
-                                            <p class="text-xs text-gray-500">Exam Date</p>
-                                            <p class="font-semibold text-xs">
-                                                <?php 
-                                                if (isset($sheet['start_date'])) {
-                                                    echo date('d M Y', strtotime($sheet['start_date']));
+                                                // Convert theory marks to grade format
+                                                $theory_marks = $result['theory_marks'];
+                                                $theory_full_marks = $result['full_marks_theory'] ?? 100;
+                                                if ($theory_marks > 0 && $theory_full_marks > 0) {
+                                                    $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
+                                                    if ($theory_percentage >= 91) echo 'A+';
+                                                    elseif ($theory_percentage >= 81) echo 'A';
+                                                    elseif ($theory_percentage >= 71) echo 'B+';
+                                                    elseif ($theory_percentage >= 61) echo 'B';
+                                                    elseif ($theory_percentage >= 51) echo 'C+';
+                                                    elseif ($theory_percentage >= 41) echo 'C';
+                                                    elseif ($theory_percentage >= 35) echo 'D+';
+                                                    else echo 'NG';
                                                 } else {
                                                     echo 'N/A';
                                                 }
                                                 ?>
-                                            </p>
-                                        </div>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                // Convert practical marks to grade format
+                                                $practical_marks = $result['practical_marks'];
+                                                $practical_full_marks = $result['full_marks_practical'] ?? 0;
+                                                if ($practical_full_marks > 0) {
+                                                    if ($practical_marks > 0) {
+                                                        $practical_percentage = ($practical_marks / $practical_full_marks) * 100;
+                                                        if ($practical_percentage >= 91) echo 'A+';
+                                                        elseif ($practical_percentage >= 81) echo 'A';
+                                                        elseif ($practical_percentage >= 71) echo 'B+';
+                                                        elseif ($practical_percentage >= 61) echo 'B';
+                                                        elseif ($practical_percentage >= 51) echo 'C+';
+                                                        elseif ($practical_percentage >= 41) echo 'C';
+                                                        elseif ($practical_percentage >= 35) echo 'D+';
+                                                        else echo 'NG';
+                                                    } else {
+                                                        echo 'N/A';
+                                                    }
+                                                } else {
+                                                    echo 'N/A';
+                                                }
+                                                ?>
+                                            </td>
+                                            <td><?php echo $result['grade']; ?></td>
+                                            <td>
+                                                <?php 
+                                                // Calculate grade point based on total marks percentage
+                                                $total_marks = $result['total_marks'];
+                                                $total_full_marks = ($result['full_marks_theory'] ?? 100) + ($result['full_marks_practical'] ?? 0);
+                                                if ($total_marks > 0 && $total_full_marks > 0) {
+                                                    $total_percentage = ($total_marks / $total_full_marks) * 100;
+                                                    if ($total_percentage >= 91) echo '3.8';
+                                                    elseif ($total_percentage >= 81) echo '3.4';
+                                                    elseif ($total_percentage >= 71) echo '3.0';
+                                                    elseif ($total_percentage >= 61) echo '2.7';
+                                                    elseif ($total_percentage >= 51) echo '2.4';
+                                                    elseif ($total_percentage >= 41) echo '1.9';
+                                                    elseif ($total_percentage >= 35) echo '1.6';
+                                                    else echo '0.0';
+                                                } else {
+                                                    echo '0.0';
+                                                }
+                                                ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+
+                            <!-- Result Summary -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                                    <div class="text-sm font-medium text-gray-500 mb-1">GPA</div>
+                                    <div class="flex items-baseline">
+                                        <span class="text-3xl font-bold text-gray-900"><?php echo number_format($overall_performance['gpa'], 2); ?></span>
+                                        <span class="text-sm text-gray-500 ml-1">/ 4.0</span>
                                     </div>
-                                    
-                                    <div class="flex space-x-2">
-                                        <a href="edit_results.php?subject_id=<?php echo $sheet['subject_id']; ?>&class_id=<?php echo $sheet['class_id']; ?>&exam_id=<?php echo $sheet['exam_id']; ?>" 
-                                           class="flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                            <i class="fas fa-edit mr-2"></i> Edit Results
-                                        </a>
-                                        <a href="view_students.php?subject_id=<?php echo $sheet['subject_id']; ?>&class_id=<?php echo $sheet['class_id']; ?>&exam_id=<?php echo $sheet['exam_id']; ?>" 
-                                           class="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                            <i class="fas fa-users mr-2"></i> Students
-                                        </a>
+                                    <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div class="h-full bg-blue-600 rounded-full" style="width: <?php echo ($overall_performance['gpa'] / 4) * 100; ?>%;"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                                    <div class="text-sm font-medium text-gray-500 mb-1">Percentage</div>
+                                    <div class="flex items-baseline">
+                                        <span class="text-3xl font-bold text-gray-900"><?php echo number_format($overall_performance['average_marks'], 2); ?></span>
+                                        <span class="text-sm text-gray-500 ml-1">%</span>
+                                    </div>
+                                    <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div class="h-full bg-green-600 rounded-full" style="width: <?php echo min(100, $overall_performance['average_marks']); ?>%;"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                                    <div class="text-sm font-medium text-gray-500 mb-1">Rank</div>
+                                    <div class="flex items-baseline">
+                                        <span class="text-3xl font-bold text-gray-900"><?php echo $overall_performance['rank']; ?></span>
+                                        <span class="text-sm text-gray-500 ml-1">in class</span>
+                                    </div>
+                                    <div class="mt-2 text-sm text-gray-500">
+                                        <?php 
+                                        $division = '';
+                                        $gpa = $overall_performance['gpa'];
+                                        if ($gpa >= 3.6) $division = 'Distinction';
+                                        elseif ($gpa >= 3.2) $division = 'First Division';
+                                        elseif ($gpa >= 2.8) $division = 'Second Division';
+                                        elseif ($gpa >= 2.0) $division = 'Third Division';
+                                        else $division = 'Fail';
+                                        
+                                        echo $division;
+                                        ?>
                                     </div>
                                 </div>
                             </div>
-                        <?php endforeach; ?>
+
+                            <!-- Grade Scale Reference -->
+                            <div class="grade-scale mt-6 bg-gray-50 p-4 rounded-lg text-sm">
+                                <div class="grade-title font-medium text-gray-700 mb-2 text-center">GRADING SCALE</div>
+                                <table class="grade-table min-w-full border-collapse text-xs">
+                                    <tr>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">Grade</th>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">A+</th>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">A</th>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">B+</th>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">B</th>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">C+</th>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">C</th>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">D+</th>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">NG</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">Marks Range</th>
+                                        <td class="border border-gray-300 p-2 text-center">91-100</td>
+                                        <td class="border border-gray-300 p-2 text-center">81-90</td>
+                                        <td class="border border-gray-300 p-2 text-center">71-80</td>
+                                        <td class="border border-gray-300 p-2 text-center">61-70</td>
+                                        <td class="border border-gray-300 p-2 text-center">51-60</td>
+                                        <td class="border border-gray-300 p-2 text-center">41-50</td>
+                                        <td class="border border-gray-300 p-2 text-center">35-40</td>
+                                        <td class="border border-gray-300 p-2 text-center">Below 35</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">Grade Point</th>
+                                        <td class="border border-gray-300 p-2 text-center">3.6-4.0</td>
+                                        <td class="border border-gray-300 p-2 text-center">3.2-3.6</td>
+                                        <td class="border border-gray-300 p-2 text-center">2.8-3.2</td>
+                                        <td class="border border-gray-300 p-2 text-center">2.6-2.8</td>
+                                        <td class="border border-gray-300 p-2 text-center">2.2-2.6</td>
+                                        <td class="border border-gray-300 p-2 text-center">1.6-2.2</td>
+                                        <td class="border border-gray-300 p-2 text-center">1.6</td>
+                                        <td class="border border-gray-300 p-2 text-center">0.0</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="border border-gray-300 p-2 bg-gray-100">Description</th>
+                                        <td class="border border-gray-300 p-2 text-center">Excellent</td>
+                                        <td class="border border-gray-300 p-2 text-center">Very Good</td>
+                                        <td class="border border-gray-300 p-2 text-center">Good</td>
+                                        <td class="border border-gray-300 p-2 text-center">Satisfactory</td>
+                                        <td class="border border-gray-300 p-2 text-center">Acceptable</td>
+                                        <td class="border border-gray-300 p-2 text-center">Partially Acceptable</td>
+                                        <td class="border border-gray-300 p-2 text-center">Borderline</td>
+                                        <td class="border border-gray-300 p-2 text-center">Not Graded</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm text-yellow-700">
+                                            No results found for this exam in your subjects. Please select another exam or contact your administrator.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     </div>
-                <?php endif; ?>
-            </div>
-                  
+
+                    <!-- Progress Tracking Tab -->
+                    <div id="progress" class="tab-content p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Academic Progress Tracking</h3>
+                        
+                        <?php if (count($gpa_trend) > 0): ?>
+                            <!-- GPA Progress Chart -->
+                            <div class="mb-8">
+                                <h4 class="text-md font-medium text-gray-700 mb-2">GPA Progress</h4>
+                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                                    <div class="chart-container">
+                                        <canvas id="gpaChart"></canvas>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-500 mt-2">This chart shows the student's GPA progression over time in your subjects.</p>
+                            </div>
+                            
+                            <!-- Subject Performance Chart -->
+                            <div class="mb-8">
+                                <h4 class="text-md font-medium text-gray-700 mb-2">Subject Performance</h4>
+                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                                    <div class="chart-container">
+                                        <canvas id="subjectChart"></canvas>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-500 mt-2">Compare the student's performance across your subjects.</p>
+                            </div>
+                            
+                            <!-- Performance Summary -->
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <h4 class="text-md font-medium text-blue-800 mb-2">Performance Summary</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                                        <h5 class="font-medium text-blue-700 mb-1">Current GPA</h5>
+                                        <div class="flex items-baseline">
+                                            <span class="text-2xl font-bold text-blue-900"><?php echo number_format(end($gpa_trend), 2); ?></span>
+                                            <span class="text-sm text-gray-500 ml-1">/ 4.0</span>
+                                        </div>
+                                        <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div class="h-full bg-blue-600 rounded-full" style="width: <?php echo (end($gpa_trend) / 4) * 100; ?>%;"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                                        <h5 class="font-medium text-blue-700 mb-1">Improvement</h5>
+                                        <?php 
+                                        $improvement = count($gpa_trend) >= 2 ? end($gpa_trend) - $gpa_trend[0] : 0;
+                                        $improvement_percent = count($gpa_trend) >= 2 ? ($improvement / max(0.1, $gpa_trend[0])) * 100 : 0;
+                                        ?>
+                                        <div class="flex items-baseline">
+                                            <span class="text-2xl font-bold <?php echo $improvement >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
+                                                <?php echo $improvement >= 0 ? '+' : ''; ?><?php echo number_format($improvement, 2); ?>
+                                            </span>
+                                            <span class="text-sm text-gray-500 ml-1">points</span>
+                                        </div>
+                                        <p class="text-sm <?php echo $improvement >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
+                                            <?php echo $improvement >= 0 ? '+' : ''; ?><?php echo number_format($improvement_percent, 1); ?>% since first term
+                                        </p>
+                                    </div>
+                                    
+                                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                                        <h5 class="font-medium text-blue-700 mb-1">Best Subject</h5>
+                                        <?php
+                                        // Find best subject from chart data
+                                        $best_subject = '';
+                                        $best_gpa = 0;
+                                        foreach ($chart_data as $data) {
+                                            if ($data['gpa'] > $best_gpa) {
+                                                $best_gpa = $data['gpa'];
+                                                $best_subject = $data['subject'];
+                                            }
+                                        }
+                                        ?>
+                                        <div class="text-lg font-semibold text-blue-900"><?php echo $best_subject; ?></div>
+                                        <div class="flex items-baseline">
+                                            <span class="text-2xl font-bold text-green-600"><?php echo number_format($best_gpa, 2); ?></span>
+                                            <span class="text-sm text-gray-500 ml-1">GPA</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm text-yellow-700">
+                                            Not enough data to show progress tracking. Results from multiple exams are needed.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
     
@@ -745,175 +1112,285 @@ $conn->close();
             }
         }, 5000);
         
-        // View Student Results
-        function viewStudentResults(classId, examId, studentId) {
-            const modal = document.getElementById('studentResultsModal');
-            const content = document.getElementById('studentResultsContent');
+        // Tab functionality
+        function openTab(tabName) {
+            const tabContents = document.getElementsByClassName('tab-content');
+            const tabButtons = document.getElementsByClassName('tab-button');
             
-            // Show modal with loading spinner
-            modal.classList.remove('hidden');
+            for (let i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove('active');
+                tabButtons[i].classList.remove('border-blue-500', 'text-blue-600');
+                tabButtons[i].classList.add('border-transparent', 'text-gray-500');
+            }
             
-            // Fetch student results
-            fetch(`../Admin/get_student_results.php?id=${studentId}&exam_id=${examId}`)
-                .then(response => response.text())
-                .then(data => {
-                    content.innerHTML = data;
-                })
-                .catch(error => {
-                    content.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
-                        <p class="font-bold">Error</p>
-                        <p>Failed to load student results. Please try again.</p>
-                    </div>`;
-                    console.error('Error:', error);
-                });
-        }
-        
-        // Close Student Results Modal
-        function closeResultsModal() {
-            const modal = document.getElementById('studentResultsModal');
-            modal.classList.add('hidden');
-        }
-        
-        // Edit Student Marks
-        function editStudentMarks(resultId, studentId, examId, subjectId) {
-            const modal = document.getElementById('editMarksModal');
-            const content = document.getElementById('editMarksContent');
+            document.getElementById(tabName).classList.add('active');
             
-            // Show modal with loading spinner
-            modal.classList.remove('hidden');
-            
-            // Fetch the edit form
-            fetch(`get_edit_marks_form.php?result_id=${resultId}&student_id=${studentId}&exam_id=${examId}&subject_id=${subjectId}`)
-                .then(response => response.text())
-                .then(data => {
-                    content.innerHTML = data;
-                })
-                .catch(error => {
-                    content.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
-                        <p class="font-bold">Error</p>
-                        <p>Failed to load edit form. Please try again.</p>
-                    </div>`;
-                    console.error('Error:', error);
-                });
-        }
-        
-        // Close Edit Marks Modal
-        function closeEditMarksModal() {
-            const modal = document.getElementById('editMarksModal');
-            modal.classList.add('hidden');
-        }
-        
-        // Update Student Marks
-        function updateStudentMarks(formId) {
-            const form = document.getElementById(formId);
-            const formData = new FormData(form);
-            
-            // Show loading state
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const originalBtnText = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Updating...';
-            
-            // Clear previous error messages
-            const errorElements = form.querySelectorAll('.error-message');
-            errorElements.forEach(el => el.remove());
-            
-            fetch('update_student_marks.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Show success message
-                    const successMsg = document.createElement('div');
-                    successMsg.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4';
-                    successMsg.innerHTML = `
-                        <div class="flex items-center">
-                            <div class="py-1"><i class="fas fa-check-circle text-green-500 mr-3"></i></div>
-                            <div>
-                                <p class="font-bold">Success!</p>
-                                <p>${data.message}</p>
-                            </div>
-                        </div>
-                    `;
-                    form.prepend(successMsg);
-                    
-                    // Close modal after 2 seconds and refresh the page
-                    setTimeout(() => {
-                        closeEditMarksModal();
-                        location.reload();
-                    }, 2000);
-                } else {
-                    // Show error message
-                    const errorMsg = document.createElement('div');
-                    errorMsg.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4';
-                    errorMsg.innerHTML = `
-                        <div class="flex items-center">
-                            <div class="py-1"><i class="fas fa-exclamation-circle text-red-500 mr-3"></i></div>
-                            <div>
-                                <p class="font-bold">Error!</p>
-                                <p>${data.message}</p>
-                            </div>
-                        </div>
-                    `;
-                    form.prepend(errorMsg);
+            // Find the button that opened this tab and style it as active
+            for (let i = 0; i < tabButtons.length; i++) {
+                if (tabButtons[i].getAttribute('onclick').includes(tabName)) {
+                    tabButtons[i].classList.remove('border-transparent', 'text-gray-500');
+                    tabButtons[i].classList.add('border-blue-500', 'text-blue-600');
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                // Show error message
-                const errorMsg = document.createElement('div');
-                errorMsg.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4';
-                errorMsg.innerHTML = `
-                    <div class="flex items-center">
-                        <div class="py-1"><i class="fas fa-exclamation-circle text-red-500 mr-3"></i></div>
-                        <div>
-                            <p class="font-bold">Error!</p>
-                            <p>An unexpected error occurred. Please try again.</p>
-                        </div>
-                    </div>
-                `;
-                form.prepend(errorMsg);
-            })
-            .finally(() => {
-                // Restore button state
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnText;
-            });
+            }
+        }
+        
+        // Initialize charts
+        document.addEventListener('DOMContentLoaded', function() {
+            <?php if (count($gpa_trend) > 0): ?>
+            // GPA Progress Chart
+            const gpaCtx = document.getElementById('gpaChart');
+            if (gpaCtx) {
+                new Chart(gpaCtx, {
+                    type: 'line',
+                    data: {
+                        labels: <?php echo json_encode($time_periods); ?>,
+                        datasets: [{
+                            label: 'GPA',
+                            data: <?php echo json_encode($gpa_trend); ?>,
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            fill: true,
+                            pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                min: 0,
+                                max: 4,
+                                title: {
+                                    display: true,
+                                    text: 'GPA (0-4)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Exams'
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `GPA: ${context.raw.toFixed(2)}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
             
-            return false; // Prevent form submission
+            // Subject Performance Chart
+            const subjectCtx = document.getElementById('subjectChart');
+            if (subjectCtx) {
+                // Prepare data for subject chart
+                const subjectData = {};
+                <?php foreach ($subject_names as $subject): ?>
+                    subjectData['<?php echo $subject; ?>'] = [];
+                <?php endforeach; ?>
+                
+                <?php foreach ($chart_data as $data): ?>
+                    if (subjectData['<?php echo $data['subject']; ?>']) {
+                        subjectData['<?php echo $data['subject']; ?>'].push({
+                            x: '<?php echo $data['period']; ?>',
+                            y: <?php echo $data['gpa']; ?>
+                        });
+                    }
+                <?php endforeach; ?>
+                
+                const datasets = [];
+                const colors = [
+                    'rgba(59, 130, 246, 1)', // blue
+                    'rgba(16, 185, 129, 1)', // green
+                    'rgba(245, 158, 11, 1)', // amber
+                    'rgba(239, 68, 68, 1)',  // red
+                    'rgba(139, 92, 246, 1)', // purple
+                    'rgba(236, 72, 153, 1)'  // pink
+                ];
+                
+                let colorIndex = 0;
+                for (const subject in subjectData) {
+                    if (subjectData[subject].length > 0) {
+                        datasets.push({
+                            label: subject,
+                            data: subjectData[subject],
+                            borderColor: colors[colorIndex % colors.length],
+                            backgroundColor: colors[colorIndex % colors.length].replace('1)', '0.2)'),
+                            borderWidth: 2,
+                            tension: 0.1
+                        });
+                        colorIndex++;
+                    }
+                }
+                
+                new Chart(subjectCtx, {
+                    type: 'line',
+                    data: {
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                min: 0,
+                                max: 4,
+                                title: {
+                                    display: true,
+                                    text: 'GPA (0-4)'
+                                }
+                            },
+                            x: {
+                                type: 'category',
+                                title: {
+                                    display: true,
+                                    text: 'Exams'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            <?php endif; ?>
+        });
+        
+        // PDF Generation
+        function generatePDF(type = 'current') {
+            // Check if jsPDF is loaded
+            if (typeof jsPDF === 'undefined') {
+                console.error('jsPDF library not loaded');
+                alert('PDF generation library not loaded. Please refresh the page and try again.');
+                return;
+            }
+            
+            const doc = new jsPDF('p', 'mm', 'a4');
+            
+            // Add title
+            doc.setFontSize(18);
+            doc.setTextColor(26, 82, 118); // #1a5276
+            
+            if (type === 'current') {
+                doc.text('Student Grade Sheet', 105, 20, { align: 'center' });
+                
+                // Add student info
+                doc.setFontSize(12);
+                doc.setTextColor(0, 0, 0);
+                doc.text('Student Name: <?php echo isset($student['full_name']) ? $student['full_name'] : ''; ?>', 20, 35);
+                doc.text('Roll Number: <?php echo isset($student['roll_number']) ? $student['roll_number'] : ''; ?>', 20, 42);
+                doc.text('Class: <?php echo isset($student['class_name']) && isset($student['section']) ? $student['class_name'] . ' ' . $student['section'] : ''; ?>', 20, 49);
+                
+                <?php if (isset($selected_exam) && !empty($results)): ?>
+                // Add exam info
+                doc.text('Exam: <?php echo $exams[array_search($selected_exam, array_column($exams, 'exam_id'))]['exam_name']; ?>', 20, 56);
+                doc.text('Academic Year: <?php echo $student['academic_year']; ?>', 20, 63);
+                
+                // Add results table
+                doc.autoTable({
+                    startY: 70,
+                    head: [['Subject Code', 'Subject', 'Credit Hr', 'Theory Grade', 'Practical Grade', 'Final Grade', 'Grade Point']],
+                    body: [
+                        <?php foreach ($results as $result): ?>
+                        ['<?php echo $result['subject_code']; ?>', 
+                         '<?php echo $result['subject_name']; ?>', 
+                         '<?php echo $result['credit_hours']; ?>',
+                         '<?php 
+                         $theory_marks = $result['theory_marks'];
+                         $theory_full_marks = $result['full_marks_theory'] ?? 100;
+                         if ($theory_marks > 0 && $theory_full_marks > 0) {
+                             $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
+                             if ($theory_percentage >= 91) echo 'A+';
+                             elseif ($theory_percentage >= 81) echo 'A';
+                             elseif ($theory_percentage >= 71) echo 'B+';
+                             elseif ($theory_percentage >= 61) echo 'B';
+                             elseif ($theory_percentage >= 51) echo 'C+';
+                             elseif ($theory_percentage >= 41) echo 'C';
+                             elseif ($theory_percentage >= 35) echo 'D+';
+                             else echo 'NG';
+                         } else {
+                             echo 'N/A';
+                         }
+                         ?>', 
+                         '<?php 
+                         $practical_marks = $result['practical_marks'];
+                         $practical_full_marks = $result['full_marks_practical'] ?? 0;
+                         if ($practical_full_marks > 0) {
+                             if ($practical_marks > 0) {
+                                 $practical_percentage = ($practical_marks / $practical_full_marks) * 100;
+                                 if ($practical_percentage >= 91) echo 'A+';
+                                 elseif ($practical_percentage >= 81) echo 'A';
+                                 elseif ($practical_percentage >= 71) echo 'B+';
+                                 elseif ($practical_percentage >= 61) echo 'B';
+                                 elseif ($practical_percentage >= 51) echo 'C+';
+                                 elseif ($practical_percentage >= 41) echo 'C';
+                                 elseif ($practical_percentage >= 35) echo 'D+';
+                                 else echo 'NG';
+                             } else {
+                                 echo 'N/A';
+                             }
+                         } else {
+                             echo 'N/A';
+                         }
+                         ?>', 
+                         '<?php echo $result['grade']; ?>',
+                         '<?php 
+                         $total_marks = $result['total_marks'];
+                         $total_full_marks = ($result['full_marks_theory'] ?? 100) + ($result['full_marks_practical'] ?? 0);
+                         if ($total_marks > 0 && $total_full_marks > 0) {
+                             $total_percentage = ($total_marks / $total_full_marks) * 100;
+                             if ($total_percentage >= 91) echo '3.8';
+                             elseif ($total_percentage >= 81) echo '3.4';
+                             elseif ($total_percentage >= 71) echo '3.0';
+                             elseif ($total_percentage >= 61) echo '2.7';
+                             elseif ($total_percentage >= 51) echo '2.4';
+                             elseif ($total_percentage >= 41) echo '1.9';
+                             elseif ($total_percentage >= 35) echo '1.6';
+                             else echo '0.0';
+                         } else {
+                             echo '0.0';
+                         }
+                         ?>'],
+                        <?php endforeach; ?>
+                    ],
+                    theme: 'striped',
+                    headStyles: { fillColor: [26, 82, 118] },
+                    styles: { fontSize: 8 }
+                });
+                
+                // Add summary
+                const finalY = doc.lastAutoTable.finalY + 10;
+                doc.setFontSize(12);
+                doc.text('Summary:', 20, finalY);
+                doc.text('GPA: <?php echo number_format($overall_performance['gpa'], 2); ?>', 20, finalY + 7);
+                doc.text('Percentage: <?php echo number_format($overall_performance['average_marks'], 2); ?>%', 20, finalY + 14);
+                doc.text('Rank: <?php echo $overall_performance['rank']; ?>', 20, finalY + 21);
+                <?php endif; ?>
+            }
+            
+            // Add footer
+            doc.setFontSize(8);
+            doc.setTextColor(128, 128, 128);
+            doc.text('Generated on: ' + new Date().toLocaleDateString(), 20, 280);
+            doc.text('Teacher: <?php echo $teacher_name; ?>', 20, 285);
+            
+            // Save the PDF
+            const filename = type === 'current' ? 
+                'grade_sheet_<?php echo isset($student['full_name']) ? str_replace(' ', '_', $student['full_name']) : 'student'; ?>.pdf' :
+                'progress_report_<?php echo isset($student['full_name']) ? str_replace(' ', '_', $student['full_name']) : 'student'; ?>.pdf';
+            
+            doc.save(filename);
         }
     </script>
-    
-    <!-- Student Results Modal -->
-    <div id="studentResultsModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-xl w-11/12 md:w-4/5 lg:w-3/4 max-h-screen overflow-y-auto">
-            <div id="studentResultsContent" class="p-4">
-                <!-- Content will be loaded dynamically -->
-                <div class="flex justify-center items-center h-64">
-                    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Marks Modal -->
-    <div id="editMarksModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-xl w-11/12 md:w-3/5 lg:w-2/5 max-h-screen overflow-y-auto">
-            <div class="bg-blue-600 text-white px-4 py-3 flex justify-between items-center">
-                <h3 class="text-lg font-semibold">Edit Student Marks</h3>
-                <button onclick="closeEditMarksModal()" class="text-white hover:text-gray-200">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div id="editMarksContent" class="p-6">
-                <!-- Content will be loaded dynamically -->
-                <div class="flex justify-center items-center h-64">
-                    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-                </div>
-            </div>
-        </div>
-    </div>
 </body>
 </html>
