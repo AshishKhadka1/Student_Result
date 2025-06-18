@@ -1630,16 +1630,6 @@ $conn->close();
             }
         }
 
-        // Dark mode toggle
-        document.addEventListener('DOMContentLoaded', function() {
-            const darkModeToggle = document.getElementById('dark-mode-toggle');
-            if (darkModeToggle) {
-                darkModeToggle.addEventListener('click', function() {
-                    document.getElementById('body').classList.toggle('dark-mode');
-                });
-            }
-        });
-
 // Student selection functions
 function selectAllStudents() {
     const checkboxes = document.querySelectorAll('input[name="student_ids[]"]');

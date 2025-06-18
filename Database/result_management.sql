@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 19, 2025 at 05:02 PM
+-- Generation Time: Jun 18, 2025 at 06:36 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -64,7 +64,6 @@ CREATE TABLE `activity_logs` (
 --
 
 INSERT INTO `activity_logs` (`log_id`, `user_id`, `action`, `details`, `ip_address`, `created_at`) VALUES
-(52, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 2', NULL, '2025-05-15 03:41:42'),
 (53, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 2', NULL, '2025-05-15 03:47:00'),
 (54, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 12', NULL, '2025-05-15 03:53:11'),
 (55, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 12', NULL, '2025-05-15 04:00:39'),
@@ -73,7 +72,12 @@ INSERT INTO `activity_logs` (`log_id`, `user_id`, `action`, `details`, `ip_addre
 (58, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S002, Exam ID: 5', NULL, '2025-05-15 14:32:05'),
 (59, 1, 'MANUAL_ENTRY', 'Added/updated 5 results for Student ID: S002, Exam ID: 1', NULL, '2025-05-15 14:36:08'),
 (60, 1, 'MANUAL_ENTRY', 'Added/updated 5 results for Student ID: S002, Exam ID: 2', NULL, '2025-05-15 14:37:12'),
-(61, 1, 'MANUAL_ENTRY', 'Added/updated 3 results for Student ID: S001, Exam ID: 1', NULL, '2025-05-19 03:20:47');
+(61, 1, 'MANUAL_ENTRY', 'Added/updated 3 results for Student ID: S001, Exam ID: 1', NULL, '2025-05-19 03:20:47'),
+(62, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S001, Exam ID: 12', NULL, '2025-06-17 12:14:45'),
+(63, 1, 'MANUAL_ENTRY', 'Added/updated 3 results for Student ID: S002, Exam ID: 5', NULL, '2025-06-17 18:29:42'),
+(64, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S001, Exam ID: 12', NULL, '2025-06-18 03:19:59'),
+(65, 1, 'MANUAL_ENTRY', 'Added/updated 1 results for Student ID: S001, Exam ID: 12', NULL, '2025-06-18 03:55:25'),
+(66, 1, 'PUBLISH_RESULTS', 'Published results for exam ID: 2', '::1', '2025-06-18 15:29:29');
 
 -- --------------------------------------------------------
 
@@ -117,7 +121,8 @@ CREATE TABLE `classes` (
 INSERT INTO `classes` (`class_id`, `class_name`, `class_numeric`, `class_teacher_id`, `section`, `academic_year`, `description`, `is_active`, `created_at`, `updated_at`) VALUES
 (3, 'Class 11', 11, NULL, 'A', '2023-2024', NULL, 1, '2025-04-03 13:58:45', '2025-05-03 11:16:39'),
 (5, 'Class 12', 12, NULL, 'A', '2023-2024', NULL, 1, '2025-04-03 13:58:45', '2025-05-03 11:16:39'),
-(8, 'class 5', 0, NULL, NULL, '2002', '', 1, '2025-05-09 17:06:19', '2025-05-09 17:06:19');
+(8, 'class 5', 0, NULL, NULL, '2002', '', 1, '2025-05-09 17:06:19', '2025-05-09 17:06:19'),
+(9, 'class 1', 0, NULL, NULL, '2022', '', 1, '2025-06-17 03:57:45', '2025-06-17 03:57:45');
 
 -- --------------------------------------------------------
 
@@ -147,7 +152,6 @@ INSERT INTO `classsubjects` (`id`, `class_id`, `subject_id`, `is_mandatory`, `ac
 (5, 3, '105', 1, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
 (6, 3, '106', 0, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
 (7, 3, '107', 0, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
-(8, 3, '108', 0, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
 (9, 3, '120', 0, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
 (10, 5, '101', 1, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
 (11, 5, '102', 1, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
@@ -156,7 +160,6 @@ INSERT INTO `classsubjects` (`id`, `class_id`, `subject_id`, `is_mandatory`, `ac
 (14, 5, '105', 1, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
 (15, 5, '106', 0, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
 (16, 5, '107', 0, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
-(17, 5, '108', 0, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28'),
 (18, 5, '120', 0, '2023-2024', '2025-05-11 01:37:28', '2025-05-11 01:37:28');
 
 -- --------------------------------------------------------
@@ -190,7 +193,7 @@ CREATE TABLE `exams` (
 
 INSERT INTO `exams` (`exam_id`, `exam_name`, `exam_type`, `class_id`, `start_date`, `end_date`, `total_marks`, `passing_marks`, `academic_year`, `description`, `status`, `exam_date`, `is_active`, `created_at`, `updated_at`, `results_published`) VALUES
 (1, 'third', 'Third Terminal', 3, '2023-10-01', '2023-10-10', 100, 40, '2023-2024', 'Midterm examination for Class 10', 'upcoming', '2020-09-09', 1, '2025-03-28 04:26:17', '2025-05-12 00:59:07', 0),
-(2, 'second', 'Second Terminal', 8, NULL, NULL, 0, 0, '2025', '', 'upcoming', '2025-09-01', 1, '2025-05-03 14:17:10', '2025-05-12 00:58:55', 0),
+(2, 'second', 'Second Terminal', 8, NULL, NULL, 0, 0, '2025', '', 'upcoming', '2025-09-01', 1, '2025-05-03 14:17:10', '2025-06-18 15:29:29', 1),
 (5, 'first', 'First Terminal', 3, NULL, NULL, 0, 0, '2020', '', 'upcoming', '2020-02-02', 1, '2025-05-03 14:44:49', '2025-05-12 00:59:18', 0),
 (12, 'final', 'Final Terminal', 3, NULL, NULL, 100, 40, '2026', '', 'upcoming', '1010-09-09', 1, '2025-05-10 06:41:16', '2025-05-12 00:59:28', 0);
 
@@ -224,78 +227,6 @@ INSERT INTO `grading_system` (`id`, `grade`, `min_percentage`, `max_percentage`,
 (6, 'C', 40.00, 49.99, 2.30, 'Acceptable', '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
 (7, 'D', 33.00, 39.99, 1.00, 'Partially Acceptable', '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
 (8, 'F', 0.00, 32.99, 0.00, 'Fail', '2025-03-28 04:26:17', '2025-05-02 08:30:00');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `loginlogs`
---
-
-CREATE TABLE `loginlogs` (
-  `log_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `ip_address` varchar(45) NOT NULL,
-  `user_agent` text NOT NULL,
-  `login_time` datetime NOT NULL,
-  `logout_time` datetime DEFAULT NULL,
-  `session_duration` int(11) DEFAULT NULL,
-  `status` enum('success','failed') NOT NULL DEFAULT 'success',
-  `failure_reason` varchar(255) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `loginlogs`
---
-
-INSERT INTO `loginlogs` (`log_id`, `user_id`, `ip_address`, `user_agent`, `login_time`, `logout_time`, `session_duration`, `status`, `failure_reason`) VALUES
-(88, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-15 20:03:03', NULL, NULL, 'success', NULL),
-(89, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-16 21:18:11', NULL, NULL, 'success', NULL),
-(90, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 06:07:13', NULL, NULL, 'success', NULL),
-(91, 83, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 06:08:11', NULL, NULL, 'success', NULL),
-(92, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 06:08:48', NULL, NULL, 'success', NULL),
-(93, 83, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 06:09:34', NULL, NULL, 'success', NULL),
-(94, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 06:10:03', NULL, NULL, 'success', NULL),
-(95, 83, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 19:50:21', NULL, NULL, 'success', NULL),
-(96, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 20:36:07', NULL, NULL, 'success', NULL),
-(97, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 20:38:34', NULL, NULL, 'success', NULL),
-(98, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 20:39:04', NULL, NULL, 'success', NULL),
-(99, 83, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 20:40:11', NULL, NULL, 'success', NULL),
-(100, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 20:44:50', NULL, NULL, 'success', NULL),
-(101, 83, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-17 20:51:27', NULL, NULL, 'success', NULL),
-(102, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-18 07:49:49', NULL, NULL, 'success', NULL),
-(103, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-18 10:27:20', NULL, NULL, 'success', NULL),
-(104, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-18 10:32:01', NULL, NULL, 'success', NULL),
-(105, 83, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-18 10:32:11', NULL, NULL, 'success', NULL),
-(107, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-18 16:23:51', NULL, NULL, 'success', NULL),
-(108, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-18 21:07:22', NULL, NULL, 'success', NULL),
-(110, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-19 08:48:47', NULL, NULL, 'success', NULL),
-(111, 83, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-19 08:48:54', NULL, NULL, 'success', NULL),
-(113, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-19 08:49:24', NULL, NULL, 'success', NULL),
-(114, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-19 08:51:57', NULL, NULL, 'success', NULL),
-(115, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-19 08:55:44', NULL, NULL, 'success', NULL),
-(116, 87, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-19 08:58:12', NULL, NULL, 'success', NULL),
-(117, 1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-19 09:00:08', NULL, NULL, 'success', NULL),
-(118, 87, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', '2025-05-19 09:08:23', NULL, NULL, 'success', NULL);
-
--- --------------------------------------------------------
-
---
--- Table structure for table `notifications`
---
-
--- CREATE TABLE `notifications` (
---   `notification_id` int(11) NOT NULL,
---   `user_id` int(11) NOT NULL,
---   `sender_id` int(11) DEFAULT NULL COMMENT 'User who triggered the notification',
---   `title` varchar(255) NOT NULL,
---   `message` text NOT NULL,
---   `notification_type` enum('system','result','exam','announcement','other') NOT NULL,
---   `related_id` int(11) DEFAULT NULL COMMENT 'ID of related entity (exam_id, result_id, etc.)',
---   `is_read` tinyint(1) DEFAULT 0,
---   `priority` enum('low','medium','high') DEFAULT 'medium',
---   `expires_at` datetime DEFAULT NULL,
---   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
--- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -434,7 +365,22 @@ INSERT INTO `resultdetails` (`detail_id`, `result_id`, `subject_id`, `marks_obta
 (141, 95, 102, 65.00, 100.00, 65.00, 'B', 1, NULL),
 (142, 95, 103, 66.00, 100.00, 66.00, 'B', 1, NULL),
 (143, 95, 104, 95.00, 100.00, 95.00, 'A+', 1, NULL),
-(144, 95, 105, 68.00, 100.00, 68.00, 'B', 1, NULL);
+(144, 95, 105, 68.00, 100.00, 68.00, 'B', 1, NULL),
+(145, 104, 101, 61.00, 100.00, 61.00, 'B', 1, NULL),
+(146, 104, 102, 66.00, 100.00, 66.00, 'B', 1, NULL),
+(147, 104, 103, 88.00, 100.00, 88.00, 'A', 1, NULL),
+(148, 104, 104, 86.00, 100.00, 86.00, 'A', 1, NULL),
+(149, 104, 105, 74.00, 100.00, 74.00, 'B+', 1, NULL),
+(150, 107, 101, 70.00, 100.00, 70.00, 'B+', 1, NULL),
+(151, 107, 102, 69.00, 100.00, 69.00, 'B', 1, NULL),
+(152, 107, 103, 94.00, 100.00, 94.00, 'A+', 1, NULL),
+(153, 107, 104, 84.00, 100.00, 84.00, 'A', 1, NULL),
+(154, 107, 105, 85.00, 100.00, 85.00, 'A', 1, NULL),
+(155, 109, 101, 88.00, 100.00, 88.00, 'A', 1, NULL),
+(156, 109, 102, 85.00, 100.00, 85.00, 'A', 1, NULL),
+(157, 109, 103, 76.00, 100.00, 76.00, 'B+', 1, NULL),
+(158, 109, 104, 85.00, 100.00, 85.00, 'A', 1, NULL),
+(159, 109, 105, 64.00, 100.00, 64.00, 'B', 1, NULL);
 
 -- --------------------------------------------------------
 
@@ -474,10 +420,16 @@ CREATE TABLE `results` (
 --
 
 INSERT INTO `results` (`result_id`, `student_id`, `subject_id`, `exam_id`, `theory_marks`, `practical_marks`, `credit_hours`, `grade`, `gpa`, `remarks`, `upload_id`, `batch_id`, `status`, `status_changed_at`, `status_changed_by`, `created_by`, `updated_by`, `created_at`, `updated_at`, `is_published`, `percentage`, `is_pass`, `total_marks`, `marks_obtained`) VALUES
-(104, 'S001', '101', 2, 20.00, 20.00, 4.0, 'C', 2.30, 'A', 41, NULL, 'pending', NULL, NULL, 1, 1, '2025-05-16 15:29:59', '2025-05-16 15:29:59', 0, 0.00, 0, 0.00, 0.00),
+(104, 'S001', '101', 2, 20.00, 20.00, 4.0, 'B+', 2.30, 'A', 41, NULL, 'pending', NULL, NULL, 1, 1, '2025-05-16 15:29:59', '2025-06-18 15:32:03', 1, 75.00, 1, 500.00, 375.00),
 (106, 'S001', '120', 1, 77.00, 66.00, 1.0, 'A+', 4.00, 'Numquam quas et dolo', 42, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-19 03:20:47', '2025-05-19 03:20:47', 0, 0.00, 0, 0.00, 0.00),
-(107, 'S001', '101', 1, 42.00, 51.00, 1.0, 'A+', 4.00, 'Laboris veniam ea n', 42, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-19 03:20:47', '2025-05-19 03:20:47', 0, 0.00, 0, 0.00, 0.00),
-(108, 'S001', '106', 1, 47.00, 9.00, 1.0, 'C+', 2.70, 'Voluptatum repudiand', 42, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-19 03:20:47', '2025-05-19 03:20:47', 0, 0.00, 0, 0.00, 0.00);
+(107, 'S001', '101', 1, 42.00, 51.00, 1.0, 'A', 4.00, 'Laboris veniam ea n', 42, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-05-19 03:20:47', '2025-06-17 17:09:08', 0, 80.40, 1, 500.00, 402.00),
+(108, 'S001', '106', 1, 50.00, 19.00, 1.0, 'B', 3.00, 'Pass', 42, NULL, 'pending', NULL, NULL, NULL, 87, '2025-05-19 03:20:47', '2025-06-17 18:02:14', 0, 69.00, 0, 69.00, 0.00),
+(110, 'S002', '101', 5, 90.00, 100.00, 4.0, 'A+', 4.00, '', 45, NULL, 'pending', NULL, NULL, NULL, 1, '2025-06-17 18:29:42', '2025-06-18 03:36:57', 0, 0.00, 0, 0.00, 0.00),
+(111, 'S002', '104', 5, 50.00, 10.00, 1.0, 'B', 3.00, '', 44, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-06-17 18:29:42', '2025-06-17 18:29:42', 0, 0.00, 0, 0.00, 0.00),
+(112, 'S002', '103', 5, 50.00, 0.00, 1.0, 'C+', 2.70, '', 44, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-06-17 18:29:42', '2025-06-17 18:29:42', 0, 0.00, 0, 0.00, 0.00),
+(113, 'S001', '103', 12, 90.00, 0.00, 1.0, 'A+', 4.00, '', 46, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-06-18 03:19:59', '2025-06-18 03:19:59', 0, 0.00, 0, 0.00, 0.00),
+(114, 'S001', '101', 12, 86.00, 0.00, 1.0, 'A', 3.70, '', 46, NULL, 'pending', NULL, NULL, NULL, NULL, '2025-06-18 03:55:25', '2025-06-18 03:55:25', 0, 0.00, 0, 0.00, 0.00),
+(115, 'S002', '101', 12, 89.00, 12.00, 4.0, 'A+', 3.70, '', 47, NULL, 'pending', NULL, NULL, 1, 1, '2025-06-18 16:19:54', '2025-06-18 16:28:09', 0, 0.00, 0, 0.00, 0.00);
 
 --
 -- Triggers `results`
@@ -532,27 +484,6 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `result_history`
---
-
-CREATE TABLE `result_history` (
-  `history_id` int(11) NOT NULL,
-  `result_id` int(11) NOT NULL,
-  `student_id` varchar(20) NOT NULL,
-  `subject_id` varchar(20) NOT NULL,
-  `exam_id` int(11) NOT NULL,
-  `theory_marks` decimal(5,2) DEFAULT NULL,
-  `practical_marks` decimal(5,2) DEFAULT NULL,
-  `grade` varchar(5) DEFAULT NULL,
-  `gpa` decimal(3,2) DEFAULT NULL,
-  `changed_by` int(11) NOT NULL,
-  `change_type` enum('create','update','delete') NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
 -- Stand-in structure for view `result_summary`
 -- (See below for the actual view)
 --
@@ -597,12 +528,14 @@ CREATE TABLE `result_uploads` (
 --
 
 INSERT INTO `result_uploads` (`id`, `file_name`, `description`, `status`, `uploaded_by`, `upload_date`, `student_count`, `success_count`, `error_count`, `error_details`, `is_manual_entry`, `exam_id`, `class_id`, `created_at`, `updated_at`) VALUES
-(37, 'Manual Entry', 'Manual entry for Student ID: S002, Exam ID: 1, Student ID: S002', 'Published', 1, '2025-05-15 20:08:35', 2, 6, 0, NULL, 0, 1, 8, '2025-05-15 14:23:35', '2025-05-15 14:36:08'),
-(38, 'Manual Entry', 'Manual entry for Student ID: S002, Exam ID: 5', 'Published', 1, '2025-05-15 20:17:05', 1, 1, 0, NULL, 0, 5, 8, '2025-05-15 14:32:05', '2025-05-15 14:32:05'),
 (39, 'Manual Entry', 'Manual entry for Student ID: S002, Exam ID: 2', 'Published', 1, '2025-05-15 20:22:12', 1, 5, 0, NULL, 0, 2, 8, '2025-05-15 14:37:12', '2025-05-15 14:37:12'),
 (40, 'Batch Entry', 'Batch entry for subject ID 101', 'Published', 1, '2025-05-15 20:25:51', 1, 1, 0, NULL, 1, 12, 8, '2025-05-15 14:40:51', '2025-05-15 14:40:51'),
 (41, 'Batch Entry', 'Batch entry for subject ID 101', 'Published', 1, '2025-05-16 21:14:59', 2, 2, 0, NULL, 1, 2, 8, '2025-05-16 15:29:59', '2025-05-16 15:30:01'),
-(42, 'Manual Entry', 'Manual entry for Student ID: S001, Exam ID: 1', 'Published', 1, '2025-05-19 09:05:47', 1, 3, 0, NULL, 0, 1, 8, '2025-05-19 03:20:47', '2025-05-19 03:20:47');
+(42, 'Manual Entry', 'Manual entry for Student ID: S001, Exam ID: 1', 'Published', 1, '2025-05-19 09:05:47', 1, 3, 0, NULL, 0, 1, 8, '2025-05-19 03:20:47', '2025-05-19 03:20:47'),
+(44, 'Manual Entry', 'Manual entry for Student ID: S002, Exam ID: 5', 'Published', 1, '2025-06-18 00:14:42', 1, 3, 0, NULL, 0, 5, 9, '2025-06-17 18:29:42', '2025-06-17 18:29:42'),
+(45, 'Batch Entry', 'Batch entry for subject ID 101', 'Published', 1, '2025-06-18 09:04:20', 1, 1, 0, NULL, 1, 5, 9, '2025-06-18 03:19:20', '2025-06-18 03:19:20'),
+(46, 'Manual Entry', 'Manual entry for Student ID: S001, Exam ID: 12, Student ID: S001', 'Published', 1, '2025-06-18 09:04:59', 2, 2, 0, NULL, 0, 12, 8, '2025-06-18 03:19:59', '2025-06-18 03:55:25'),
+(47, 'Batch Entry', 'Batch entry for subject ID 101', 'Published', 1, '2025-06-18 22:04:54', 1, 1, 0, NULL, 1, 12, 9, '2025-06-18 16:19:54', '2025-06-18 16:19:54');
 
 -- --------------------------------------------------------
 
@@ -628,45 +561,8 @@ CREATE TABLE `sections` (
 INSERT INTO `sections` (`section_id`, `class_id`, `section_name`, `capacity`, `teacher_id`, `is_active`, `created_at`, `updated_at`) VALUES
 (3, 3, 'A', NULL, NULL, 1, '2025-05-03 11:16:39', '2025-05-03 11:16:39'),
 (5, 5, 'A', NULL, NULL, 1, '2025-05-03 11:16:39', '2025-05-03 11:16:39'),
-(8, 5, 'Sacha Heath', 46, NULL, 1, '2025-05-03 11:41:38', '2025-05-03 11:41:38'),
-(11, 3, 'r', 74, NULL, 1, '2025-05-03 11:43:00', '2025-05-03 11:43:00');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `settings`
---
-
-CREATE TABLE `settings` (
-  `setting_id` int(11) NOT NULL,
-  `setting_key` varchar(50) NOT NULL,
-  `setting_value` text NOT NULL,
-  `description` text DEFAULT NULL,
-  `is_public` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Whether setting is visible to non-admin users',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `settings`
---
-
-INSERT INTO `settings` (`setting_id`, `setting_key`, `setting_value`, `description`, `is_public`, `created_at`, `updated_at`) VALUES
-(1, 'school_name', 'ABC School', 'Name of the school', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(2, 'school_address', '123 Main Street, City, Country', 'Address of the school', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(3, 'school_phone', '+1234567890', 'Contact number of the school', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(4, 'school_email', 'info@abcschool.com', 'Email address of the school', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(5, 'school_website', 'www.abcschool.com', 'Website of the school', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(6, 'academic_year', '2023-2024', 'Current academic year', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(7, 'result_publish_date', '2024-03-15', 'Date when results will be published', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(8, 'school_logo', '', 'Path to school logo image', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(9, 'result_header', 'SECONDARY EDUCATION EXAMINATION', 'Header text for result sheets', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(10, 'result_footer', 'This is a computer-generated document. No signature is required.', 'Footer text for result sheets', 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-(11, 'enable_result_download', '1', 'Allow students to download results', 0, '2025-05-02 08:30:00', '2025-05-02 08:30:00'),
-(12, 'enable_progress_tracking', '1', 'Enable progress tracking features', 0, '2025-05-02 08:30:00', '2025-05-02 08:30:00'),
-(13, 'max_login_attempts', '5', 'Maximum login attempts before account lockout', 0, '2025-05-02 08:30:00', '2025-05-02 08:30:00'),
-(14, 'lockout_duration_minutes', '30', 'Account lockout duration in minutes', 0, '2025-05-02 08:30:00', '2025-05-02 08:30:00'),
-(15, 'maintenance_mode', '0', 'System maintenance mode (0=off, 1=on)', 0, '2025-05-02 08:30:00', '2025-05-02 08:30:00');
+(11, 3, 'r', 74, NULL, 1, '2025-05-03 11:43:00', '2025-05-03 11:43:00'),
+(12, 9, 'A', 40, 87, 1, '2025-06-17 18:14:50', '2025-06-17 18:14:50');
 
 -- --------------------------------------------------------
 
@@ -699,7 +595,8 @@ CREATE TABLE `students` (
 --
 
 INSERT INTO `students` (`student_id`, `user_id`, `roll_number`, `registration_number`, `class_id`, `batch_year`, `date_of_birth`, `gender`, `address`, `phone`, `parent_name`, `parent_phone`, `parent_email`, `is_active`, `created_at`, `updated_at`, `section_id`) VALUES
-('S001', 83, '1', 'S001', 8, '2002', '2002-02-02', 'male', NULL, NULL, 'Gita khadka', '9842239607', 'gita@mailinator.com', 1, '2025-05-16 15:23:03', '2025-05-16 15:23:03', NULL);
+('S001', 83, '1', 'S001', 8, '2002', '2002-02-02', 'male', NULL, NULL, 'Gita khadka', '9842239607', 'gita@mailinator.com', 1, '2025-05-16 15:23:03', '2025-05-16 15:23:03', NULL),
+('S002', 91, '37', 'S002', 9, '1973', '1971-03-13', 'male', NULL, NULL, 'Nina Sweet', '+1 (534) 812-2937', 'befowofux@mailinator.com', 1, '2025-06-17 18:26:11', '2025-06-17 18:27:21', 12);
 
 -- --------------------------------------------------------
 
@@ -727,7 +624,10 @@ CREATE TABLE `student_performance` (
 
 INSERT INTO `student_performance` (`performance_id`, `student_id`, `exam_id`, `average_marks`, `gpa`, `total_subjects`, `subjects_passed`, `rank`, `remarks`, `created_at`, `updated_at`) VALUES
 (65, 'S001', 2, 40.00, 2.30, 1, 1, 2, NULL, '2025-05-16 15:29:59', '2025-05-16 15:30:01'),
-(67, 'S001', 1, 97.33, 3.57, 3, 3, NULL, NULL, '2025-05-19 03:20:47', '2025-05-19 03:20:47');
+(67, 'S001', 1, 97.33, 3.57, 3, 3, NULL, NULL, '2025-05-19 03:20:47', '2025-05-19 03:20:47'),
+(70, 'S001', 12, 88.00, 3.85, 2, 2, 1, NULL, '2025-06-17 12:14:45', '2025-06-18 16:19:54'),
+(71, 'S002', 5, 66.67, 3.23, 3, 3, 1, NULL, '2025-06-17 18:29:42', '2025-06-18 03:19:20'),
+(76, 'S002', 12, 89.00, 3.70, 1, 1, 2, NULL, '2025-06-18 16:19:54', '2025-06-18 16:19:54');
 
 -- --------------------------------------------------------
 
@@ -763,22 +663,7 @@ INSERT INTO `subjects` (`subject_id`, `subject_name`, `subject_code`, `descripti
 ('105', 'COMP. SOCIAL STUDIES', 'SOC105', 'Compulsory Social Studies', 75.00, 25.00, 30.00, 10.00, 4.0, 0, 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
 ('106', 'COMP. HEALTH, POP & ENV EDU', 'HPE106', 'Compulsory Health, Population & Environment Education', 75.00, 25.00, 30.00, 10.00, 4.0, 0, 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
 ('107', 'OPT.I ECONOMICS', 'ECO107', 'Optional Economics', 80.00, 20.00, 32.00, 8.00, 4.0, 1, 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
-('108', 'OPT.II OFFICE MGMT & ACCOUNT', 'OMA108', 'Optional Office Management & Account', 70.00, 30.00, 28.00, 12.00, 4.0, 1, 1, '2025-03-28 04:26:17', '2025-05-02 08:30:00'),
 ('120', 'optinal Math', NULL, '', 100.00, 0.00, 40.00, 0.00, 1.0, 0, 1, '2025-05-03 14:14:33', '2025-05-03 14:14:33');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `system_settings`
---
-
-CREATE TABLE `system_settings` (
-  `id` int(11) NOT NULL,
-  `setting_key` varchar(255) NOT NULL,
-  `setting_value` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -833,69 +718,9 @@ INSERT INTO `teachersubjects` (`id`, `teacher_id`, `subject_id`, `class_id`, `is
 (9, 23, 107, 3, 1, '2025-05-19 03:05:05', '2025-05-19 03:05:05'),
 (10, 27, 103, 3, 1, '2025-05-19 03:12:01', '2025-05-19 03:12:01'),
 (11, 27, 106, 5, 1, '2025-05-19 03:12:10', '2025-05-19 03:12:10'),
-(12, 27, 120, 5, 1, '2025-05-19 03:23:07', '2025-05-19 03:23:07');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `teacher_activities`
---
-
-CREATE TABLE `teacher_activities` (
-  `activity_id` int(11) NOT NULL,
-  `teacher_id` int(11) NOT NULL,
-  `activity_type` enum('login','logout','marks_update','view_performance','print_report','other') NOT NULL,
-  `description` text NOT NULL,
-  `related_id` int(11) DEFAULT NULL COMMENT 'ID of related entity (exam_id, result_id, etc.)',
-  `ip_address` varchar(45) DEFAULT NULL,
-  `timestamp` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `teacher_activities`
---
-
-INSERT INTO `teacher_activities` (`activity_id`, `teacher_id`, `activity_type`, `description`, `related_id`, `ip_address`, `timestamp`) VALUES
-(1, 4, 'login', 'Logged into the system', NULL, NULL, '2025-05-09 08:37:24'),
-(2, 4, '', 'Viewed dashboard', NULL, NULL, '2025-05-09 08:37:24'),
-(3, 4, 'login', 'Logged into the system', NULL, NULL, '2025-05-09 08:38:50'),
-(4, 4, '', 'Viewed dashboard', NULL, NULL, '2025-05-09 08:38:50'),
-(5, 4, 'login', 'Logged into the system', NULL, NULL, '2025-05-09 08:39:24'),
-(6, 4, '', 'Viewed dashboard', NULL, NULL, '2025-05-09 08:39:24'),
-(7, 4, 'login', 'Logged into the system', NULL, NULL, '2025-05-09 09:55:35'),
-(8, 4, '', 'Viewed dashboard', NULL, NULL, '2025-05-09 09:55:35'),
-(9, 4, 'login', 'Logged into the system', NULL, NULL, '2025-05-09 09:57:42'),
-(10, 4, '', 'Viewed dashboard', NULL, NULL, '2025-05-09 09:57:42'),
-(11, 4, 'login', 'Logged into the system', NULL, NULL, '2025-05-09 09:57:50'),
-(12, 4, '', 'Viewed dashboard', NULL, NULL, '2025-05-09 09:57:50'),
-(13, 4, 'login', 'Logged into the system', NULL, NULL, '2025-05-09 10:10:34'),
-(14, 4, '', 'Viewed dashboard', NULL, NULL, '2025-05-09 10:10:34'),
-(15, 4, 'login', 'Logged into the system', NULL, NULL, '2025-05-09 10:10:40'),
-(16, 4, '', 'Viewed dashboard', NULL, NULL, '2025-05-09 10:10:40'),
-(17, 4, 'login', 'Logged into the system', NULL, NULL, '2025-05-09 16:08:10'),
-(18, 4, '', 'Viewed dashboard', NULL, NULL, '2025-05-09 16:08:10'),
-(19, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 16:46:07'),
-(20, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 16:46:52'),
-(21, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 16:47:13'),
-(22, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 16:48:49'),
-(23, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 16:51:06'),
-(24, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 16:59:54'),
-(25, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 17:00:06'),
-(26, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 17:00:55'),
-(27, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 17:12:03'),
-(28, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 17:12:04'),
-(29, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 17:13:01'),
-(30, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 17:14:33'),
-(31, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 17:14:46'),
-(32, 4, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-09 17:18:38'),
-(33, 25, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-18 10:32:19'),
-(34, 25, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-18 16:29:18'),
-(35, 25, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-18 20:01:50'),
-(36, 25, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-18 20:04:01'),
-(37, 25, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-18 20:04:26'),
-(38, 25, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-18 20:05:18'),
-(39, 25, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-18 20:27:03'),
-(40, 25, 'login', 'Accessed teacher dashboard', NULL, NULL, '2025-05-18 20:39:35');
+(12, 27, 120, 5, 1, '2025-05-19 03:23:07', '2025-05-19 03:23:07'),
+(13, 27, 106, 8, 1, '2025-05-20 13:27:22', '2025-05-20 13:27:22'),
+(14, 27, 120, 8, 1, '2025-05-20 13:30:40', '2025-05-20 13:30:40');
 
 -- --------------------------------------------------------
 
@@ -933,7 +758,8 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`user_id`, `username`, `password`, `full_name`, `email`, `gender`, `role`, `status`, `profile_image`, `last_login`, `failed_login_attempts`, `last_failed_login`, `password_reset_token`, `password_reset_expires`, `email_verified`, `email_verification_token`, `created_at`, `updated_at`, `phone`, `address`) VALUES
 (1, 'admin', '$2y$10$HEpg59r5H32OQeDScuRh.eJxniPZbKV0Wzlh.ij/Pg4mZn6zvL7oi', '', 'admin@example.com', NULL, 'admin', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-15 03:41:06', '2025-05-15 03:41:06', NULL, NULL),
 (83, 'ayushkhadka', '$2y$10$D8UfBrs9hyfrnTuU5DzmPeeZ13DdTvMocYxxew//nN4q4.nr3UFn6', 'Ayush Khadka', 'ayush@mailinator.com', NULL, 'student', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-16 15:23:03', '2025-05-17 00:22:56', '9846837536', 'biratchowk'),
-(87, 'ashish', '$2y$10$.CddIPQckYn.45cOJVeGKuYru2v3wTyfWuMUCUUM5ykt7hf6/dwfu', 'Ashish Khadka', 'ashish@mailinator.com', NULL, 'teacher', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-19 03:11:44', '2025-05-19 03:11:44', '+1 (392) 208-4575', NULL);
+(87, 'ashish', '$2y$10$.CddIPQckYn.45cOJVeGKuYru2v3wTyfWuMUCUUM5ykt7hf6/dwfu', 'Ashish Khadka', 'ashish@mailinator.com', NULL, 'teacher', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-05-19 03:11:44', '2025-05-19 03:11:44', '+1 (392) 208-4575', NULL),
+(91, 'telobuquri', '$2y$10$pA0cdvI2N1ITW6r2Zer3l.eE0kR6T7ChXEhSE0JmE.oUZl4aaNG1a', 'telobuquri', 'xusu@mailinator.com', NULL, 'student', 'active', NULL, NULL, 0, NULL, NULL, NULL, 0, NULL, '2025-06-17 18:26:11', '2025-06-17 18:28:39', '+1 (948) 703-8936', 'Labore harum dolor c');
 
 -- --------------------------------------------------------
 
@@ -1011,26 +837,6 @@ ALTER TABLE `grading_system`
   ADD UNIQUE KEY `grade` (`grade`);
 
 --
--- Indexes for table `loginlogs`
---
-ALTER TABLE `loginlogs`
-  ADD PRIMARY KEY (`log_id`),
-  ADD KEY `user_id` (`user_id`),
-  ADD KEY `idx_loginlogs_login_time` (`login_time`),
-  ADD KEY `idx_loginlogs_status` (`status`);
-
---
--- Indexes for table `notifications`
---
--- ALTER TABLE `notifications`
---   ADD PRIMARY KEY (`notification_id`),
---   ADD KEY `sender_id` (`sender_id`),
---   ADD KEY `idx_notifications_user` (`user_id`,`is_read`),
---   ADD KEY `idx_notifications_created` (`created_at`),
---   ADD KEY `idx_notifications_type` (`notification_type`),
---   ADD KEY `idx_notifications_expires` (`expires_at`);
-
---
 -- Indexes for table `resultdetails`
 --
 ALTER TABLE `resultdetails`
@@ -1063,17 +869,6 @@ ALTER TABLE `results`
   ADD KEY `idx_results_published` (`is_published`);
 
 --
--- Indexes for table `result_history`
---
-ALTER TABLE `result_history`
-  ADD PRIMARY KEY (`history_id`),
-  ADD KEY `result_id` (`result_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `subject_id` (`subject_id`),
-  ADD KEY `exam_id` (`exam_id`),
-  ADD KEY `changed_by` (`changed_by`);
-
---
 -- Indexes for table `result_uploads`
 --
 ALTER TABLE `result_uploads`
@@ -1093,14 +888,6 @@ ALTER TABLE `sections`
   ADD UNIQUE KEY `class_section_unique` (`class_id`,`section_name`),
   ADD KEY `teacher_id` (`teacher_id`),
   ADD KEY `idx_sections_active` (`is_active`);
-
---
--- Indexes for table `settings`
---
-ALTER TABLE `settings`
-  ADD PRIMARY KEY (`setting_id`),
-  ADD UNIQUE KEY `setting_key` (`setting_key`),
-  ADD KEY `idx_settings_public` (`is_public`);
 
 --
 -- Indexes for table `students`
@@ -1135,13 +922,6 @@ ALTER TABLE `subjects`
   ADD KEY `idx_subjects_optional` (`is_optional`);
 
 --
--- Indexes for table `system_settings`
---
-ALTER TABLE `system_settings`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `setting_key` (`setting_key`);
-
---
 -- Indexes for table `teachers`
 --
 ALTER TABLE `teachers`
@@ -1159,16 +939,6 @@ ALTER TABLE `teachersubjects`
   ADD KEY `teacher_id` (`teacher_id`),
   ADD KEY `subject_id` (`subject_id`),
   ADD KEY `class_id` (`class_id`);
-
---
--- Indexes for table `teacher_activities`
---
-ALTER TABLE `teacher_activities`
-  ADD PRIMARY KEY (`activity_id`),
-  ADD KEY `teacher_id` (`teacher_id`),
-  ADD KEY `idx_activities_type` (`activity_type`),
-  ADD KEY `idx_activities_timestamp` (`timestamp`),
-  ADD KEY `idx_activities_related` (`related_id`);
 
 --
 -- Indexes for table `users`
@@ -1195,7 +965,7 @@ ALTER TABLE `academic_years`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=62;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=67;
 
 --
 -- AUTO_INCREMENT for table `batch_operations`
@@ -1207,7 +977,7 @@ ALTER TABLE `batch_operations`
 -- AUTO_INCREMENT for table `classes`
 --
 ALTER TABLE `classes`
-  MODIFY `class_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `class_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `classsubjects`
@@ -1228,88 +998,52 @@ ALTER TABLE `grading_system`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
--- AUTO_INCREMENT for table `loginlogs`
---
-ALTER TABLE `loginlogs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=119;
-
---
--- AUTO_INCREMENT for table `notifications`
---
--- ALTER TABLE `notifications`
---   MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
-
---
 -- AUTO_INCREMENT for table `resultdetails`
 --
 ALTER TABLE `resultdetails`
-  MODIFY `detail_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=145;
+  MODIFY `detail_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=160;
 
 --
 -- AUTO_INCREMENT for table `results`
 --
 ALTER TABLE `results`
-  MODIFY `result_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=109;
-
---
--- AUTO_INCREMENT for table `result_history`
---
-ALTER TABLE `result_history`
-  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `result_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=116;
 
 --
 -- AUTO_INCREMENT for table `result_uploads`
 --
 ALTER TABLE `result_uploads`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
 
 --
 -- AUTO_INCREMENT for table `sections`
 --
 ALTER TABLE `sections`
-  MODIFY `section_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
-
---
--- AUTO_INCREMENT for table `settings`
---
-ALTER TABLE `settings`
-  MODIFY `setting_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `section_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `student_performance`
 --
 ALTER TABLE `student_performance`
-  MODIFY `performance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=70;
-
---
--- AUTO_INCREMENT for table `system_settings`
---
-ALTER TABLE `system_settings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `performance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=77;
 
 --
 -- AUTO_INCREMENT for table `teachers`
 --
 ALTER TABLE `teachers`
-  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT for table `teachersubjects`
 --
 ALTER TABLE `teachersubjects`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
-
---
--- AUTO_INCREMENT for table `teacher_activities`
---
-ALTER TABLE `teacher_activities`
-  MODIFY `activity_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=88;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=92;
 
 --
 -- Constraints for dumped tables
@@ -1350,19 +1084,6 @@ ALTER TABLE `exams`
   ADD CONSTRAINT `exams_ibfk_1` FOREIGN KEY (`class_id`) REFERENCES `classes` (`class_id`) ON DELETE SET NULL;
 
 --
--- Constraints for table `loginlogs`
---
-ALTER TABLE `loginlogs`
-  ADD CONSTRAINT `loginlogs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
-
---
--- Constraints for table `notifications`
---
--- ALTER TABLE `notifications`
---   ADD CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
---   ADD CONSTRAINT `notifications_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
-
---
 -- Constraints for table `results`
 --
 ALTER TABLE `results`
@@ -1374,15 +1095,6 @@ ALTER TABLE `results`
   ADD CONSTRAINT `results_ibfk_6` FOREIGN KEY (`updated_by`) REFERENCES `users` (`user_id`) ON DELETE SET NULL,
   ADD CONSTRAINT `results_ibfk_7` FOREIGN KEY (`status_changed_by`) REFERENCES `users` (`user_id`) ON DELETE SET NULL,
   ADD CONSTRAINT `results_ibfk_8` FOREIGN KEY (`batch_id`) REFERENCES `batch_operations` (`batch_id`) ON DELETE SET NULL;
-
---
--- Constraints for table `result_history`
---
-ALTER TABLE `result_history`
-  ADD CONSTRAINT `result_history_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `result_history_ibfk_2` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`subject_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `result_history_ibfk_3` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`exam_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `result_history_ibfk_4` FOREIGN KEY (`changed_by`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `result_uploads`

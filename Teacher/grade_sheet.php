@@ -332,14 +332,6 @@ function getRemarks($grade)
     }
 }
 
-// Get school settings
-$settings = [];
-$settings_result = $conn->query("SELECT setting_key, setting_value FROM settings");
-while ($row = $settings_result->fetch_assoc()) {
-    $settings[$row['setting_key']] = $row['setting_value'];
-}
-
-$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -630,7 +622,6 @@ $conn->close();
 </head>
 
 <body class="bg-gray-100">
-    <?php include 'includes/teacher_topbar.php'; ?>
     
     <div class="flex">
         <?php include 'includes/teacher_sidebar.php'; ?>

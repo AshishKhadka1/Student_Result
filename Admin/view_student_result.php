@@ -982,16 +982,7 @@ $conn->close();
                 closeEditSubjectMarksModal();
             }
         }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            // Dark mode toggle
-            const darkModeToggle = document.getElementById('dark-mode-toggle');
-            if (darkModeToggle) {
-                darkModeToggle.addEventListener('click', function() {
-                    document.getElementById('body').classList.toggle('dark-mode');
-                });
-            }
-        });
+
 
         function confirmDeleteSubject(subjectName) {
             return Swal.fire({

@@ -140,22 +140,22 @@ function getRecentResults($conn, $student_id) {
 }
 
 // Get notifications with error handling
-function getNotifications($conn, $user_id) {
-    $notifications = [];
-    try {
-        $stmt = $conn->prepare("SELECT * FROM notifications WHERE user_id = ? OR user_id IS NULL ORDER BY created_at DESC LIMIT 5");
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $notifications[] = $row;
-        }
-        $stmt->close();
-    } catch (Exception $e) {
-        error_log("Error fetching notifications: " . $e->getMessage());
-    }
-    return $notifications;
-}
+// function getNotifications($conn, $user_id) {
+//     $notifications = [];
+//     try {
+//         $stmt = $conn->prepare("SELECT * FROM notifications WHERE user_id = ? OR user_id IS NULL ORDER BY created_at DESC LIMIT 5");
+//         $stmt->bind_param("i", $user_id);
+//         $stmt->execute();
+//         $result = $stmt->get_result();
+//         while ($row = $result->fetch_assoc()) {
+//             $notifications[] = $row;
+//         }
+//         $stmt->close();
+//     } catch (Exception $e) {
+//         error_log("Error fetching notifications: " . $e->getMessage());
+//     }
+//     return $notifications;
+// }
 
 // Get subject performance data with error handling
 function getSubjectPerformance($conn, $student_id) {
@@ -296,7 +296,7 @@ if (!$student) {
 $subjects = getSubjects($conn, $student['academic_year']);
 $upcoming_exams = getUpcomingExams($conn, $student['class_id']);
 $recent_results = getRecentResults($conn, $student['student_id']);
-$notifications = getNotifications($conn, $user_id);
+// $notifications = getNotifications($conn, $user_id);
 $subject_performance = getSubjectPerformance($conn, $student['student_id']);
 $gpa_data = getGPATrend($conn, $student['student_id']);
 $overall_performance = calculateOverallPerformance($recent_results);
@@ -801,46 +801,6 @@ $conn->close();
         document.getElementById('user-menu-button').addEventListener('click', function() {
             document.getElementById('user-menu').classList.toggle('hidden');
         });
-
-        // Notification dropdown toggle
-        document.getElementById('notification-button').addEventListener('click', function() {
-            document.getElementById('notification-dropdown').classList.toggle('hidden');
-        });
-
-        // Dark mode toggle
-        const darkModeToggle = document.getElementById('dark-mode-toggle');
-        const darkModeToggleDot = document.getElementById('dark-mode-toggle-dot');
-        const mobileDarkModeToggle = document.getElementById('mobile-dark-mode-toggle');
-        const body = document.getElementById('body');
-
-        function toggleDarkMode() {
-            if (body.classList.contains('dark-mode')) {
-                body.classList.remove('dark-mode');
-                darkModeToggleDot.classList.remove('translate-x-5');
-                darkModeToggleDot.classList.add('translate-x-0.5');
-                localStorage.setItem('darkMode', 'false');
-            } else {
-                body.classList.add('dark-mode');
-                darkModeToggleDot.classList.remove('translate-x-0.5');
-                darkModeToggleDot.classList.add('translate-x-5');
-                localStorage.setItem('darkMode', 'true');
-            }
-        }
-
-        // Check for saved dark mode preference
-        if (localStorage.getItem('darkMode') === 'true') {
-            body.classList.add('dark-mode');
-            darkModeToggleDot.classList.remove('translate-x-0.5');
-            darkModeToggleDot.classList.add('translate-x-5');
-        }
-
-        if (darkModeToggle) {
-            darkModeToggle.addEventListener('click', toggleDarkMode);
-        }
-        
-        if (mobileDarkModeToggle) {
-            mobileDarkModeToggle.addEventListener('click', toggleDarkMode);
-        }
 
         // Close dropdowns when clicking outside
         document.addEventListener('click', function(event) {

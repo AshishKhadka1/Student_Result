@@ -52,23 +52,23 @@ function getDashboardCounts($conn)
 }
 
 // Get notifications with prepared statement
-function getNotifications($conn, $user_id, $limit = 5)
-{
-    $notifications = [];
-    try {
-        $stmt = $conn->prepare("SELECT * FROM notifications WHERE user_id = ? OR user_id IS NULL ORDER BY created_at DESC LIMIT ?");
-        $stmt->bind_param("ii", $user_id, $limit);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $notifications[] = $row;
-        }
-        $stmt->close();
-    } catch (Exception $e) {
-        error_log("Error fetching notifications: " . $e->getMessage());
-    }
-    return $notifications;
-}
+// function getNotifications($conn, $user_id, $limit = 5)
+// {
+//     $notifications = [];
+//     try {
+//         $stmt = $conn->prepare("SELECT * FROM notifications WHERE user_id = ? OR user_id IS NULL ORDER BY created_at DESC LIMIT ?");
+//         $stmt->bind_param("ii", $user_id, $limit);
+//         $stmt->execute();
+//         $result = $stmt->get_result();
+//         while ($row = $result->fetch_assoc()) {
+//             $notifications[] = $row;
+//         }
+//         $stmt->close();
+//     } catch (Exception $e) {
+//         error_log("Error fetching notifications: " . $e->getMessage());
+//     }
+//     return $notifications;
+// }
 
 // Get recent users with error handling
 function getRecentUsers($conn, $limit = 5)
@@ -366,7 +366,7 @@ function getSystemHealth($conn)
 
 // Fetch all data using the functions
 $counts = getDashboardCounts($conn);
-$notifications = getNotifications($conn, $_SESSION['user_id']);
+// $notifications = getNotifications($conn, $_SESSION['user_id']);
 $recent_users = getRecentUsers($conn);
 $upcoming_exams = getUpcomingExams($conn);
 $class_toppers = getClassToppers($conn);
@@ -1077,35 +1077,6 @@ $conn->close();
                 }, 500);
             });
 
-            // Dark mode toggle
-            const darkModeToggle = document.getElementById('dark-mode-toggle');
-            const darkModeToggleDot = document.getElementById('dark-mode-toggle-dot');
-            const mobileDarkModeToggle = document.getElementById('mobile-dark-mode-toggle');
-            const body = document.getElementById('body');
-
-            function toggleDarkMode() {
-                if (body.classList.contains('dark-mode')) {
-                    body.classList.remove('dark-mode');
-                    darkModeToggleDot.classList.remove('translate-x-5');
-                    darkModeToggleDot.classList.add('translate-x-0.5');
-                    localStorage.setItem('darkMode', 'false');
-                } else {
-                    body.classList.add('dark-mode');
-                    darkModeToggleDot.classList.remove('translate-x-0.5');
-                    darkModeToggleDot.classList.add('translate-x-5');
-                    localStorage.setItem('darkMode', 'true');
-                }
-            }
-
-            // Check for saved dark mode preference
-            if (localStorage.getItem('darkMode') === 'true') {
-                body.classList.add('dark-mode');
-                darkModeToggleDot.classList.remove('translate-x-0.5');
-                darkModeToggleDot.classList.add('translate-x-5');
-            }
-
-            darkModeToggle.addEventListener('click', toggleDarkMode);
-            mobileDarkModeToggle.addEventListener('click', toggleDarkMode);
 
             // Close dropdowns when clicking outside
             document.addEventListener('click', function(event) {

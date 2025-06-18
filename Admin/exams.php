@@ -866,33 +866,7 @@ $conn->close();
                 });
             }
 
-            // Dark mode toggle
-            const darkModeToggle = document.getElementById('dark-mode-toggle');
-            const darkModeToggleDot = document.getElementById('dark-mode-toggle-dot');
-            const body = document.getElementById('body');
 
-            if (darkModeToggle && darkModeToggleDot && body) {
-                // Check for saved dark mode preference
-                if (localStorage.getItem('darkMode') === 'true') {
-                    body.classList.add('dark-mode');
-                    darkModeToggleDot.classList.remove('translate-x-0.5');
-                    darkModeToggleDot.classList.add('translate-x-5');
-                }
-
-                darkModeToggle.addEventListener('click', function() {
-                    if (body.classList.contains('dark-mode')) {
-                        body.classList.remove('dark-mode');
-                        darkModeToggleDot.classList.remove('translate-x-5');
-                        darkModeToggleDot.classList.add('translate-x-0.5');
-                        localStorage.setItem('darkMode', 'false');
-                    } else {
-                        body.classList.add('dark-mode');
-                        darkModeToggleDot.classList.remove('translate-x-0.5');
-                        darkModeToggleDot.classList.add('translate-x-5');
-                        localStorage.setItem('darkMode', 'true');
-                    }
-                });
-            }
         });
 
         // Add Exam Modal

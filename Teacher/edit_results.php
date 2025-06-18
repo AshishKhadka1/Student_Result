@@ -678,7 +678,6 @@ $issue_date = date('Y-m-d');
     </style>
 </head>
 <body class="bg-gray-100">
-    <?php include 'includes/teacher_topbar.php'; ?>
     
     <div class="flex">
         <?php include 'includes/teacher_sidebar.php'; ?>

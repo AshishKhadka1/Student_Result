@@ -1339,35 +1339,7 @@ $conn->close();
             // Redirect to the new URL
             window.location.href = url.toString();
         }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            // Dark mode toggle
-            const darkModeToggle = document.getElementById('dark-mode-toggle');
-            if (darkModeToggle) {
-                darkModeToggle.addEventListener('click', function() {
-                    document.getElementById('body').classList.toggle('dark-mode');
-                });
-            }
-            
-            // Reset filters button
-            const resetButton = document.getElementById('reset-filters');
-            if (resetButton) {
-                resetButton.addEventListener('click', function() {
-                    window.location.href = 'result.php';
-                });
-            }
-            
-            // Prevent form submission on enter key in the search field
-            const searchInput = document.getElementById('student_name');
-            if (searchInput) {
-                searchInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        document.getElementById('filter-form').submit();
-                    }
-                });
-            }
-        });
+      
     </script>
 </body>
 </html>

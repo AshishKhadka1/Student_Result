@@ -257,21 +257,7 @@ $conn->close();
                            </div>
                        </div>
                        
-                       <!-- Notification Messages -->
-                       <?php if(isset($_SESSION['success'])): ?>
-                       <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
-                           <div class="flex">
-                               <div class="flex-shrink-0">
-                                   <i class="fas fa-check-circle text-green-500"></i>
-                               </div>
-                               <div class="ml-3">
-                                   <p class="text-sm text-green-700">
-                                       <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
-                                   </p>
-                               </div>
-                           </div>
-                       </div>
-                       <?php endif; ?>
+                     
 
                        <?php if(isset($_SESSION['error'])): ?>
                        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">

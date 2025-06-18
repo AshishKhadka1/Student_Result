@@ -325,14 +325,7 @@ function calculateGPA($percentage, $conn)
     else return 0.0; // Not Graded
 }
 
-// Get school settings
-$settings = [];
-$result = $conn->query("SELECT setting_key, setting_value FROM settings");
-while ($row = $result->fetch_assoc()) {
-    $settings[$row['setting_key']] = $row['setting_value'];
-}
 
-$conn->close();
 ?>
 
 <!DOCTYPE html>

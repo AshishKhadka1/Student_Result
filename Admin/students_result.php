@@ -306,13 +306,6 @@ function getRemarks($grade)
     }
 }
 
-// Get school settings
-$settings = [];
-$settings_result = $conn->query("SELECT setting_key, setting_value FROM settings");
-while ($row = $settings_result->fetch_assoc()) {
-    $settings[$row['setting_key']] = $row['setting_value'];
-}
-
 // Add a heading to show we're filtering by upload
 if ($upload_filter) {
     echo '<div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
