@@ -283,19 +283,19 @@ INSERT INTO `loginlogs` (`log_id`, `user_id`, `ip_address`, `user_agent`, `login
 -- Table structure for table `notifications`
 --
 
-CREATE TABLE `notifications` (
-  `notification_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `sender_id` int(11) DEFAULT NULL COMMENT 'User who triggered the notification',
-  `title` varchar(255) NOT NULL,
-  `message` text NOT NULL,
-  `notification_type` enum('system','result','exam','announcement','other') NOT NULL,
-  `related_id` int(11) DEFAULT NULL COMMENT 'ID of related entity (exam_id, result_id, etc.)',
-  `is_read` tinyint(1) DEFAULT 0,
-  `priority` enum('low','medium','high') DEFAULT 'medium',
-  `expires_at` datetime DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- CREATE TABLE `notifications` (
+--   `notification_id` int(11) NOT NULL,
+--   `user_id` int(11) NOT NULL,
+--   `sender_id` int(11) DEFAULT NULL COMMENT 'User who triggered the notification',
+--   `title` varchar(255) NOT NULL,
+--   `message` text NOT NULL,
+--   `notification_type` enum('system','result','exam','announcement','other') NOT NULL,
+--   `related_id` int(11) DEFAULT NULL COMMENT 'ID of related entity (exam_id, result_id, etc.)',
+--   `is_read` tinyint(1) DEFAULT 0,
+--   `priority` enum('low','medium','high') DEFAULT 'medium',
+--   `expires_at` datetime DEFAULT NULL,
+--   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -1022,13 +1022,13 @@ ALTER TABLE `loginlogs`
 --
 -- Indexes for table `notifications`
 --
-ALTER TABLE `notifications`
-  ADD PRIMARY KEY (`notification_id`),
-  ADD KEY `sender_id` (`sender_id`),
-  ADD KEY `idx_notifications_user` (`user_id`,`is_read`),
-  ADD KEY `idx_notifications_created` (`created_at`),
-  ADD KEY `idx_notifications_type` (`notification_type`),
-  ADD KEY `idx_notifications_expires` (`expires_at`);
+-- ALTER TABLE `notifications`
+--   ADD PRIMARY KEY (`notification_id`),
+--   ADD KEY `sender_id` (`sender_id`),
+--   ADD KEY `idx_notifications_user` (`user_id`,`is_read`),
+--   ADD KEY `idx_notifications_created` (`created_at`),
+--   ADD KEY `idx_notifications_type` (`notification_type`),
+--   ADD KEY `idx_notifications_expires` (`expires_at`);
 
 --
 -- Indexes for table `resultdetails`
@@ -1236,8 +1236,8 @@ ALTER TABLE `loginlogs`
 --
 -- AUTO_INCREMENT for table `notifications`
 --
-ALTER TABLE `notifications`
-  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+-- ALTER TABLE `notifications`
+--   MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `resultdetails`
@@ -1358,9 +1358,9 @@ ALTER TABLE `loginlogs`
 --
 -- Constraints for table `notifications`
 --
-ALTER TABLE `notifications`
-  ADD CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `notifications_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `notifications`
+--   ADD CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
+--   ADD CONSTRAINT `notifications_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `results`

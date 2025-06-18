@@ -20,16 +20,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="admin_dashboard.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'admin_dashboard.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-tachometer-alt"></i> Dashboard
             </a>
+              <a href="users.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'users.php') ? 'bg-gray-700' : '' ?>">
+                <i class="fas fa-users"></i> Users
+            </a>
+                        <div class="mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wide">Result</div>
+
             <a href="result.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'result.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-clipboard-list"></i> Results
             </a>
             <a href="manage_results.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'manage_results.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-upload"></i> Manage Results
             </a>
-            <a href="users.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'users.php') ? 'bg-gray-700' : '' ?>">
-                <i class="fas fa-users"></i> Users
-            </a>
-
+        
             <!-- Academic Section -->
             <div class="mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wide">Academic</div>
             
@@ -52,9 +54,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="exams.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'exams.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-calendar-alt"></i> Exams
             </a>
-            <a href="settings.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'settings.php') ? 'bg-gray-700' : '' ?>">
+            <!-- <a href="settings.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'settings.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-cog"></i> Settings
-            </a>
+            </a> -->
         </nav>
 
         <!-- Logout -->

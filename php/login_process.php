@@ -45,26 +45,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             setcookie('remember_role', $role, $cookie_expiry, '/');
         }
         
-        // Try to log login activity if the table exists
-        try {
-            // Check if LoginLogs table exists
-            $tableExists = false;
-            $checkTable = $conn->query("SHOW TABLES LIKE 'LoginLogs'");
-            if ($checkTable->num_rows > 0) {
-                $tableExists = true;
-            }
-            
-            if ($tableExists) {
-                $ip_address = $_SERVER['REMOTE_ADDR'];
-                $user_agent = $_SERVER['HTTP_USER_AGENT'];
-                $log_stmt = $conn->prepare("INSERT INTO LoginLogs (user_id, ip_address, user_agent, login_time) VALUES (?, ?, ?, NOW())");
-                $log_stmt->bind_param("iss", $_SESSION['user_id'], $ip_address, $user_agent);
-                $log_stmt->execute();
-            }
-        } catch (Exception $e) {
-            // Silently continue if logging fails
-        }
-        
         // Redirect to admin dashboard
         header("Location: ../Admin/admin_dashboard.php");
         exit();
@@ -107,26 +87,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $cookie_expiry = time() + (30 * 24 * 60 * 60); // 30 days
                 setcookie('remember_user', $username, $cookie_expiry, '/');
                 setcookie('remember_role', $role, $cookie_expiry, '/');
-            }
-            
-            // Try to log login activity if the table exists
-            try {
-                // Check if LoginLogs table exists
-                $tableExists = false;
-                $checkTable = $conn->query("SHOW TABLES LIKE 'LoginLogs'");
-                if ($checkTable->num_rows > 0) {
-                    $tableExists = true;
-                }
-                
-                if ($tableExists) {
-                    $ip_address = $_SERVER['REMOTE_ADDR'];
-                    $user_agent = $_SERVER['HTTP_USER_AGENT'];
-                    $log_stmt = $conn->prepare("INSERT INTO LoginLogs (user_id, ip_address, user_agent, login_time) VALUES (?, ?, ?, NOW())");
-                    $log_stmt->bind_param("iss", $user['user_id'], $ip_address, $user_agent);
-                    $log_stmt->execute();
-                }
-            } catch (Exception $e) {
-                // Silently continue if logging fails
             }
             
             // Redirect based on role

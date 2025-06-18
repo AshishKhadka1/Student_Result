@@ -414,7 +414,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                     <h4 class="text-md font-medium text-gray-700 mb-3">Subject Marks</h4>
 
                                                     <div id="subjectsContainer">
-                                                        <div class="subject-row grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-9 mb-4 pb-4 border-b border-gray-200">
+                                                        <div class="subject-row grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-10 mb-4 pb-4 border-b border-gray-200">
                                                             <div class="sm:col-span-4">
                                                                 <label class="block text-sm font-medium text-gray-700">Subject</label>
                                                                 <select name="subject_id[]" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
@@ -433,12 +433,26 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                                 </select>
                                                             </div>
                                                             <div class="sm:col-span-2">
-                                                                <label class="block text-sm font-medium text-gray-700">Theory Marks</label>
-                                                                <input type="number" name="theory_marks[]" min="0" max="100" step="0.01" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                                                <label class="block text-sm font-medium text-gray-700">
+                                                                    Theory Marks 
+                                                                    <span class="theory-max-marks text-xs text-gray-500">(Max: 100)</span>
+                                                                </label>
+                                                                <input type="number" name="theory_marks[]" min="0" max="100" step="0.01" 
+                                                                       class="theory-marks mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                                                       onchange="updateMarksDistribution(this)">
                                                             </div>
                                                             <div class="sm:col-span-2">
-                                                                <label class="block text-sm font-medium text-gray-700">Practical Marks</label>
-                                                                <input type="number" name="practical_marks[]" min="0" max="100" step="0.01" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                                                <label class="block text-sm font-medium text-gray-700">
+                                                                    Practical Marks 
+                                                                    <span class="practical-max-marks text-xs text-gray-500">(Max: 0)</span>
+                                                                </label>
+                                                                <input type="number" name="practical_marks[]" min="0" max="100" step="0.01" 
+                                                                       class="practical-marks mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                                                       onchange="updateMarksDistribution(this)">
+                                                            </div>
+                                                            <div class="sm:col-span-1">
+                                                                <label class="block text-sm font-medium text-gray-700">Total</label>
+                                                                <input type="text" class="total-marks mt-1 bg-gray-100 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" readonly>
                                                             </div>
                                                             <div class="sm:col-span-1 flex items-end">
                                                                 <button type="button" class="remove-subject mt-1 text-red-600 hover:text-red-800">
@@ -457,6 +471,25 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                             </svg>
                                                             Add Subject
                                                         </button>
+                                                    </div>
+
+                                                    <!-- Marks Distribution Info -->
+                                                    <div class="mt-4 bg-blue-50 border-l-4 border-blue-400 p-4">
+                                                        <div class="flex">
+                                                            <div class="flex-shrink-0">
+                                                                <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                                                </svg>
+                                                            </div>
+                                                            <div class="ml-3">
+                                                                <p class="text-sm text-blue-700">
+                                                                    <strong>Marks Distribution:</strong><br>
+                                                                    • If both Theory and Practical marks are provided: Theory (75 marks) + Practical (25 marks) = 100 marks<br>
+                                                                    • If only Theory marks are provided: Theory (100 marks) = 100 marks<br>
+                                                                    • Practical marks can be left blank if not applicable
+                                                                </p>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -594,9 +627,14 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                             </th>
                                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                                 Theory Marks
+                                                                <span class="batch-theory-max text-xs text-gray-400 block">(Max: 100)</span>
                                                             </th>
                                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                                 Practical Marks
+                                                                <span class="batch-practical-max text-xs text-gray-400 block">(Max: 0)</span>
+                                                            </th>
+                                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                Total
                                                             </th>
                                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                                 Action
@@ -620,10 +658,19 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                                 </select>
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                                <input type="number" name="students[0][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
+                                                                <input type="number" name="students[0][theory_marks]" 
+                                                                       class="batch-theory-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                                       min="0" max="100" step="0.01" required
+                                                                       onchange="updateBatchMarksDistribution(this)">
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                                <input type="number" name="students[0][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
+                                                                <input type="number" name="students[0][practical_marks]" 
+                                                                       class="batch-practical-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                                       min="0" max="100" step="0.01"
+                                                                       onchange="updateBatchMarksDistribution(this)">
+                                                            </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                                <input type="text" class="batch-total-marks w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md" readonly>
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap">
                                                                 <button type="button" class="delete-student-row text-red-600 hover:text-red-800">
@@ -643,6 +690,25 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                     </svg>
                                                     Add Another Student
                                                 </button>
+                                            </div>
+
+                                            <!-- Batch Marks Distribution Info -->
+                                            <div class="mt-4 bg-green-50 border-l-4 border-green-400 p-4">
+                                                <div class="flex">
+                                                    <div class="flex-shrink-0">
+                                                        <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                                        </svg>
+                                                    </div>
+                                                    <div class="ml-3">
+                                                        <p class="text-sm text-green-700">
+                                                            <strong>Batch Entry Marks Distribution:</strong><br>
+                                                            • Theory + Practical: Theory (75 marks) + Practical (25 marks) = 100 marks<br>
+                                                            • Theory Only: Theory (100 marks) = 100 marks<br>
+                                                            • Practical marks can be left blank if not applicable
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -929,19 +995,18 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                             gradePoint = 0.0;
                         }
 
-                        // Create table row
+                        // Create table row - show blank for practical if empty
+                        const practicalDisplay = practicalInput.value === '' ? '' : practical;
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${subjectName}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${theory}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${practical}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${practicalDisplay}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${total}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${percentage >= 35 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-  ${gradePoint.toFixed(1)}
-</span>
-
+                                    ${gradePoint.toFixed(1)}
+                                </span>
                             </td>
                         `;
 
@@ -984,7 +1049,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                         if (data.length === 0) {
                             container.innerHTML = `
                                 <tr>
-                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">
                                         No students found in this class.
                                     </td>
                                 </tr>
@@ -1005,6 +1070,9 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <input type="number" name="students[${index}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="text" class="batch-total-marks w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md" readonly>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <button type="button" class="delete-student-row text-red-600 hover:text-red-800">
@@ -1053,7 +1121,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                 if (e.target.closest('.delete-student-row')) {
                     const row = e.target.closest('tr');
                     const container = document.getElementById('batch-students-container');
-
+                    
                     // Only delete if there's more than one row
                     if (container.querySelectorAll('tr').length > 1) {
                         row.remove();
@@ -1064,12 +1132,250 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             });
         });
     </script>
+    
+    <script>
+        // Function to update marks distribution for manual entry
+        function updateMarksDistribution(input) {
+            const row = input.closest('.subject-row');
+            const theoryInput = row.querySelector('.theory-marks');
+            const practicalInput = row.querySelector('.practical-marks');
+            const totalInput = row.querySelector('.total-marks');
+            const theoryMaxSpan = row.querySelector('.theory-max-marks');
+            const practicalMaxSpan = row.querySelector('.practical-max-marks');
+            
+            const theoryValue = parseFloat(theoryInput.value) || 0;
+            const practicalValue = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
+            
+            // Determine marks distribution
+            if (theoryValue > 0 && practicalInput.value !== '' && practicalValue > 0) {
+                // Both theory and practical provided - distribute as 75:25
+                theoryInput.max = 75;
+                practicalInput.max = 25;
+                theoryMaxSpan.textContent = '(Max: 75)';
+                practicalMaxSpan.textContent = '(Max: 25)';
+                
+                // Validate current values
+                if (theoryValue > 75) {
+                    theoryInput.value = 75;
+                    alert('Theory marks cannot exceed 75 when practical marks are provided.');
+                }
+                if (practicalValue > 25) {
+                    practicalInput.value = 25;
+                    alert('Practical marks cannot exceed 25 when theory marks are provided.');
+                }
+            } else if (theoryValue > 0 && (practicalInput.value === '' || practicalValue === 0)) {
+                // Only theory provided or practical is blank - allow up to 100 for theory
+                theoryInput.max = 100;
+                practicalInput.max = 0;
+                theoryMaxSpan.textContent = '(Max: 100)';
+                practicalMaxSpan.textContent = '(Max: 0)';
+                // Don't clear practical marks if user left it blank intentionally
+            } else if (theoryValue === 0 && practicalValue > 0) {
+                // Only practical provided - not allowed, reset
+                alert('Practical marks cannot be entered without theory marks.');
+                practicalInput.value = '';
+                return;
+            } else {
+                // Reset to default
+                theoryInput.max = 100;
+                practicalInput.max = 100;
+                theoryMaxSpan.textContent = '(Max: 100)';
+                practicalMaxSpan.textContent = '(Max: 0)';
+            }
+            
+            // Calculate total - treat blank practical as 0 for calculation
+            const finalTheory = parseFloat(theoryInput.value) || 0;
+            const finalPractical = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
+            totalInput.value = finalTheory + finalPractical;
+        }
+
+        // Function to update marks distribution for batch entry
+        function updateBatchMarksDistribution(input) {
+            const row = input.closest('tr');
+            const theoryInput = row.querySelector('.batch-theory-marks');
+            const practicalInput = row.querySelector('.batch-practical-marks');
+            const totalInput = row.querySelector('.batch-total-marks');
+            
+            const theoryValue = parseFloat(theoryInput.value) || 0;
+            const practicalValue = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
+            
+            // Update header max values
+            const theoryMaxSpan = document.querySelector('.batch-theory-max');
+            const practicalMaxSpan = document.querySelector('.batch-practical-max');
+            
+            // Determine marks distribution
+            if (theoryValue > 0 && practicalInput.value !== '' && practicalValue > 0) {
+                // Both theory and practical provided - distribute as 75:25
+                theoryInput.max = 75;
+                practicalInput.max = 25;
+                theoryMaxSpan.textContent = '(Max: 75)';
+                practicalMaxSpan.textContent = '(Max: 25)';
+                
+                // Validate current values
+                if (theoryValue > 75) {
+                    theoryInput.value = 75;
+                    alert('Theory marks cannot exceed 75 when practical marks are provided.');
+                }
+                if (practicalValue > 25) {
+                    practicalInput.value = 25;
+                    alert('Practical marks cannot exceed 25 when theory marks are provided.');
+                }
+            } else if (theoryValue > 0 && (practicalInput.value === '' || practicalValue === 0)) {
+                // Only theory provided or practical is blank - allow up to 100 for theory
+                theoryInput.max = 100;
+                practicalInput.max = 0;
+                theoryMaxSpan.textContent = '(Max: 100)';
+                practicalMaxSpan.textContent = '(Max: 0)';
+                // Don't clear practical marks if user left it blank intentionally
+            } else if (theoryValue === 0 && practicalValue > 0) {
+                // Only practical provided - not allowed, reset
+                alert('Practical marks cannot be entered without theory marks.');
+                practicalInput.value = '';
+                return;
+            } else {
+                // Reset to default
+                theoryInput.max = 100;
+                practicalInput.max = 100;
+                theoryMaxSpan.textContent = '(Max: 100)';
+                practicalMaxSpan.textContent = '(Max: 0)';
+            }
+            
+            // Calculate total - treat blank practical as 0 for calculation
+            const finalTheory = parseFloat(theoryInput.value) || 0;
+            const finalPractical = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
+            totalInput.value = finalTheory + finalPractical;
+            
+            // Update all other rows in batch entry to maintain consistency
+            updateAllBatchRows();
+        }
+
+        // Function to update all batch entry rows with consistent max values
+        function updateAllBatchRows() {
+            const container = document.getElementById('batch-students-container');
+            const rows = container.querySelectorAll('tr');
+            const theoryMaxSpan = document.querySelector('.batch-theory-max');
+            const practicalMaxSpan = document.querySelector('.batch-practical-max');
+            
+            // Get max values from header
+            const theoryMax = theoryMaxSpan.textContent.includes('75') ? 75 : 100;
+            const practicalMax = practicalMaxSpan.textContent.includes('25') ? 25 : 0;
+            
+            rows.forEach(row => {
+                const theoryInput = row.querySelector('.batch-theory-marks');
+                const practicalInput = row.querySelector('.batch-practical-marks');
+                
+                if (theoryInput && practicalInput) {
+                    theoryInput.max = theoryMax;
+                    practicalInput.max = practicalMax;
+                    
+                    if (practicalMax === 0) {
+                        // Don't clear the value, just disable if max is 0
+                        practicalInput.disabled = true;
+                    } else {
+                        practicalInput.disabled = false;
+                    }
+                }
+            });
+        }
+    </script>
+    
+    <script>
+        // Add Subject Row (updated version)
+        document.getElementById('addSubject').addEventListener('click', function() {
+            const container = document.getElementById('subjectsContainer');
+            const subjectRow = document.querySelector('.subject-row').cloneNode(true);
+
+            // Clear input values
+            subjectRow.querySelectorAll('input').forEach(input => {
+                input.value = '';
+            });
+
+            // Reset select
+            subjectRow.querySelector('select').selectedIndex = 0;
+            
+            // Reset max marks display
+            subjectRow.querySelector('.theory-max-marks').textContent = '(Max: 100)';
+            subjectRow.querySelector('.practical-max-marks').textContent = '(Max: 0)';
+            subjectRow.querySelector('.theory-marks').max = 100;
+            subjectRow.querySelector('.practical-marks').max = 100;
+
+            // Add event listeners for marks distribution
+            subjectRow.querySelector('.theory-marks').addEventListener('change', function() {
+                updateMarksDistribution(this);
+            });
+            
+            subjectRow.querySelector('.practical-marks').addEventListener('change', function() {
+                updateMarksDistribution(this);
+            });
+
+            // Add event listener to remove button
+            subjectRow.querySelector('.remove-subject').addEventListener('click', function() {
+                if (container.children.length > 1) {
+                    this.closest('.subject-row').remove();
+                }
+            });
+
+            container.appendChild(subjectRow);
+        });
+    </script>
+    
+    <script>
+        // Add student row in batch entry (updated version)
+        // studentRowCount is already declared above
+        document.getElementById('add-student-row').addEventListener('click', function() {
+            const container = document.getElementById('batch-students-container');
+            const newRow = document.createElement('tr');
+
+            // Get the HTML content of the first student row
+            const firstRow = container.querySelector('tr');
+            const studentSelectHTML = firstRow.querySelector('td:first-child select').outerHTML;
+
+            // Replace the name attribute to use the new index
+            const updatedStudentSelectHTML = studentSelectHTML.replace(/students\[0\]/g, `students[${studentRowCount}]`);
+
+            // Get current max values
+            const theoryMaxSpan = document.querySelector('.batch-theory-max');
+            const practicalMaxSpan = document.querySelector('.batch-practical-max');
+            const theoryMax = theoryMaxSpan.textContent.includes('75') ? 75 : 100;
+            const practicalMax = practicalMaxSpan.textContent.includes('25') ? 25 : 0;
+
+            newRow.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">
+                    ${updatedStudentSelectHTML}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <input type="number" name="students[${studentRowCount}][theory_marks]" 
+                           class="batch-theory-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                           min="0" max="${theoryMax}" step="0.01" required
+                           onchange="updateBatchMarksDistribution(this)">
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <input type="number" name="students[${studentRowCount}][practical_marks]" 
+                           class="batch-practical-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                           min="0" max="${practicalMax}" step="0.01" ${practicalMax === 0 ? 'disabled' : ''}
+                           onchange="updateBatchMarksDistribution(this)">
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <input type="text" class="batch-total-marks w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md" readonly>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <button type="button" class="delete-student-row text-red-600 hover:text-red-800">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </td>
+            `;
+
+            container.appendChild(newRow);
+            studentRowCount++;
+        });
+    </script>
 </body>
 
 </html>
 <?php
-function studentHasResults($conn, $student_id, $exam_id)
-{
+function studentHasResults($conn, $student_id, $exam_id) {
     $stmt = $conn->prepare("SELECT COUNT(*) as count FROM results WHERE student_id = ? AND exam_id = ?");
     $stmt->bind_param("si", $student_id, $exam_id);
     $stmt->execute();

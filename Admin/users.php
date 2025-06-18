@@ -646,9 +646,7 @@ $conn->close();
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo date('M d, Y', strtotime($user['created_at'])); ?></td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                        <a href="edit_user.php?user_id=<?php echo $user['user_id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">
-                                                            <i class="fas fa-edit"></i>
-                                                        </a>
+                                                       
                                                         <a href="users.php?toggle_status=1&user_id=<?php echo $user['user_id']; ?>&current_status=<?php echo $user['status']; ?>" class="text-yellow-600 hover:text-yellow-900 mr-3" title="Toggle status">
                                                             <i class="fas fa-toggle-<?php echo $user['status'] == 'active' ? 'on' : 'off'; ?>"></i>
                                                         </a>
