@@ -80,6 +80,18 @@ $stmt->bind_param("i", $upload_id);
 $stmt->execute();
 $total_subjects = $stmt->get_result()->fetch_assoc()['total_subjects'];
 $stmt->close();
+
+// Function to get grade and grade point from percentage
+function getGradeInfo($percentage) {
+    if ($percentage >= 90) return ['grade' => 'A+', 'point' => 4.0, 'class' => 'bg-green-100 text-green-800'];
+    elseif ($percentage >= 80) return ['grade' => 'A', 'point' => 3.6, 'class' => 'bg-green-100 text-green-800'];
+    elseif ($percentage >= 70) return ['grade' => 'B+', 'point' => 3.2, 'class' => 'bg-green-100 text-green-800'];
+    elseif ($percentage >= 60) return ['grade' => 'B', 'point' => 2.8, 'class' => 'bg-green-100 text-green-800'];
+    elseif ($percentage >= 50) return ['grade' => 'C+', 'point' => 2.4, 'class' => 'bg-yellow-100 text-yellow-800'];
+    elseif ($percentage >= 40) return ['grade' => 'C', 'point' => 2.0, 'class' => 'bg-yellow-100 text-yellow-800'];
+    elseif ($percentage >= 35) return ['grade' => 'D', 'point' => 1.6, 'class' => 'bg-orange-100 text-orange-800'];
+    else return ['grade' => 'NG', 'point' => 0.0, 'class' => 'bg-red-100 text-red-800'];
+}
 ?>
 
 <!DOCTYPE html>
@@ -217,6 +229,41 @@ $stmt->close();
                             </div>
                         </div>
 
+                        <!-- Grading Scale Reference -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <h4 class="text-sm font-medium text-blue-900 mb-2">Grading Scale Reference</h4>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="font-medium">A+ (4.0):</span> 90-100%
+                                </div>
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="font-medium">A (3.6):</span> 80-89%
+                                </div>
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="font-medium">B+ (3.2):</span> 70-79%
+                                </div>
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="font-medium">B (2.8):</span> 60-69%
+                                </div>
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="font-medium">C+ (2.4):</span> 50-59%
+                                </div>
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="font-medium">C (2.0):</span> 40-49%
+                                </div>
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="font-medium">D (1.6):</span> 35-39%
+                                </div>
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="font-medium text-red-600">NG (0.0):</span> Below 35%
+                                </div>
+                            </div>
+                            <div class="mt-2 text-xs text-blue-700">
+                                <strong>Note:</strong> If either Theory or Practical is below 35%, the final grade becomes NG (Not Graded).
+                                <br><strong>GPA Formula:</strong> [(Theory Grade Point × Theory Full Marks) + (Practical Grade Point × Practical Full Marks)] / Total Marks
+                            </div>
+                        </div>
+
                         <!-- Results Table -->
                         <div class="bg-white shadow overflow-hidden sm:rounded-lg">
                             <div class="px-4 py-5 sm:px-6 bg-gray-50 flex justify-between items-center">
@@ -235,57 +282,122 @@ $stmt->close();
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll Number</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Theory</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Practical</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <div class="flex flex-col">
+                                                    <span>Theory</span>
+                                                    <span class="text-xs font-normal text-gray-400">Marks/% /Grade</span>
+                                                </div>
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <div class="flex flex-col">
+                                                    <span>Practical</span>
+                                                    <span class="text-xs font-normal text-gray-400">Marks/% /Grade</span>
+                                                </div>
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <div class="flex flex-col">
+                                                    <span>Total</span>
+                                                    <span class="text-xs font-normal text-gray-400">Marks/%</span>
+                                                </div>
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <div class="flex flex-col">
+                                                    <span>Final Grade</span>
+                                                    <span class="text-xs font-normal text-gray-400">& GPA</span>
+                                                </div>
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200" id="resultsTableBody">
                                         <?php if ($results && $results->num_rows > 0): ?>
                                             <?php while ($row = $results->fetch_assoc()): ?>
                                                 <?php 
-                                                $total = $row['theory_marks'] + $row['practical_marks'];
-                                                $percentage = ($total / 100) * 100; // Assuming max marks is 100
+                                                // Determine full marks based on whether practical marks exist
+                                                $has_practical = $row['practical_marks'] > 0;
+                                                $theory_full_marks = $has_practical ? 75 : 100;
+                                                $practical_full_marks = $has_practical ? 25 : 0;
+                                                $total_full_marks = 100;
                                                 
-                                                // Calculate grade
-                                                if ($percentage >= 90) {
-                                                    $grade = 'A+';
-                                                    $gradeClass = 'bg-green-100 text-green-800';
-                                                } elseif ($percentage >= 80) {
-                                                    $grade = 'A';
-                                                    $gradeClass = 'bg-green-100 text-green-800';
-                                                } elseif ($percentage >= 70) {
-                                                    $grade = 'B+';
-                                                    $gradeClass = 'bg-green-100 text-green-800';
-                                                } elseif ($percentage >= 60) {
-                                                    $grade = 'B';
-                                                    $gradeClass = 'bg-green-100 text-green-800';
-                                                } elseif ($percentage >= 50) {
-                                                    $grade = 'C+';
-                                                    $gradeClass = 'bg-green-100 text-green-800';
-                                                } elseif ($percentage >= 40) {
-                                                    $grade = 'C';
-                                                    $gradeClass = 'bg-green-100 text-green-800';
-                                                } elseif ($percentage >= 33) {
-                                                    $grade = 'D';
-                                                    $gradeClass = 'bg-yellow-100 text-yellow-800';
+                                                // Calculate percentages
+                                                $theory_percentage = ($row['theory_marks'] / $theory_full_marks) * 100;
+                                                $practical_percentage = $has_practical ? ($row['practical_marks'] / $practical_full_marks) * 100 : 0;
+                                                
+                                                // Get grade info for theory and practical
+                                                $theory_grade_info = getGradeInfo($theory_percentage);
+                                                $practical_grade_info = $has_practical ? getGradeInfo($practical_percentage) : ['grade' => 'N/A', 'point' => 0, 'class' => 'bg-gray-100 text-gray-800'];
+                                                
+                                                // Check for failure condition (either theory or practical below 35%)
+                                                $is_failed = ($theory_percentage < 35) || ($has_practical && $practical_percentage < 35);
+                                                
+                                                // Calculate final GPA
+                                                if ($is_failed) {
+                                                    $final_gpa = 0.0;
+                                                    $final_grade = 'NG';
+                                                    $final_grade_class = 'bg-red-100 text-red-800';
                                                 } else {
-                                                    $grade = 'F';
-                                                    $gradeClass = 'bg-red-100 text-red-800';
+                                                    if ($has_practical) {
+                                                        $final_gpa = (($theory_grade_info['point'] * $theory_full_marks) + ($practical_grade_info['point'] * $practical_full_marks)) / $total_full_marks;
+                                                    } else {
+                                                        $final_gpa = $theory_grade_info['point'];
+                                                    }
+                                                    
+                                                    // Determine final grade based on GPA
+                                                    if ($final_gpa >= 3.8) $final_grade = 'A+';
+                                                    elseif ($final_gpa >= 3.4) $final_grade = 'A';
+                                                    elseif ($final_gpa >= 3.0) $final_grade = 'B+';
+                                                    elseif ($final_gpa >= 2.6) $final_grade = 'B';
+                                                    elseif ($final_gpa >= 2.2) $final_grade = 'C+';
+                                                    elseif ($final_gpa >= 1.8) $final_grade = 'C';
+                                                    elseif ($final_gpa >= 1.4) $final_grade = 'D';
+                                                    else $final_grade = 'NG';
+                                                    
+                                                    $final_grade_class = $final_grade == 'NG' ? 'bg-red-100 text-red-800' : 
+                                                                       ($final_gpa >= 3.0 ? 'bg-green-100 text-green-800' : 
+                                                                       ($final_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
                                                 }
+                                                
+                                                $total_marks = $row['theory_marks'] + $row['practical_marks'];
+                                                $overall_percentage = ($total_marks / $total_full_marks) * 100;
                                                 ?>
                                                 <tr class="result-row">
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?php echo htmlspecialchars($row['student_name']); ?></td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($row['roll_number']); ?></td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($row['subject_name']); ?></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo number_format($row['theory_marks'], 2); ?></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo number_format($row['practical_marks'], 2); ?></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo number_format($total, 2); ?></td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $gradeClass; ?>">
-                                                            <?php echo $grade; ?>
-                                                        </span>
+                                                        <div class="flex flex-col">
+                                                            <span><?php echo number_format($row['theory_marks'], 1); ?>/<?php echo $theory_full_marks; ?></span>
+                                                            <span class="text-xs text-gray-400"><?php echo number_format($theory_percentage, 1); ?>%</span>
+                                                            <span class="px-1 inline-flex text-xs leading-4 font-semibold rounded <?php echo $theory_grade_info['class']; ?>">
+                                                                <?php echo $theory_grade_info['grade']; ?>
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <?php if ($has_practical): ?>
+                                                            <div class="flex flex-col">
+                                                                <span><?php echo number_format($row['practical_marks'], 1); ?>/<?php echo $practical_full_marks; ?></span>
+                                                                <span class="text-xs text-gray-400"><?php echo number_format($practical_percentage, 1); ?>%</span>
+                                                                <span class="px-1 inline-flex text-xs leading-4 font-semibold rounded <?php echo $practical_grade_info['class']; ?>">
+                                                                    <?php echo $practical_grade_info['grade']; ?>
+                                                                </span>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <span class="text-gray-400">N/A</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <div class="flex flex-col">
+                                                            <span class="font-medium"><?php echo number_format($total_marks, 1); ?>/100</span>
+                                                            <span class="text-xs text-gray-400"><?php echo number_format($overall_percentage, 1); ?>%</span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <div class="flex flex-col">
+                                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $final_grade_class; ?>">
+                                                                <?php echo $final_grade; ?>
+                                                            </span>
+                                                            <span class="text-xs text-gray-400 mt-1">GPA: <?php echo number_format($final_gpa, 2); ?></span>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             <?php endwhile; ?>

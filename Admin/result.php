@@ -176,54 +176,6 @@ if (isset($_POST['action'])) {
         header("Location: result.php");
         exit();
     }
-    elseif ($_POST['action'] == 'update_marks' && isset($_POST['result_id'])) {
-        $result_id = intval($_POST['result_id']);
-        $marks_obtained = floatval($_POST['marks_obtained']);
-        $total_marks = floatval($_POST['total_marks']);
-        
-        // Calculate percentage
-        $percentage = ($marks_obtained / $total_marks) * 100;
-        
-        // Determine grade based on percentage
-        $grade = '';
-        $is_pass = 0;
-        
-        if ($percentage >= 90) {
-            $grade = 'A+';
-            $is_pass = 1;
-        } elseif ($percentage >= 80) {
-            $grade = 'A';
-            $is_pass = 1;
-        } elseif ($percentage >= 70) {
-            $grade = 'B+';
-            $is_pass = 1;
-        } elseif ($percentage >= 60) {
-            $grade = 'B';
-            $is_pass = 1;
-        } elseif ($percentage >= 50) {
-            $grade = 'C+';
-            $is_pass = 1;
-        } elseif ($percentage >= 40) {
-            $grade = 'C';
-            $is_pass = 1;
-        } elseif ($percentage >= 33) {
-            $grade = 'D';
-            $is_pass = 1;
-        } else {
-            $grade = 'F';
-            $is_pass = 0;
-        }
-        
-        // Update the result
-        $stmt = $conn->prepare("UPDATE Results SET marks_obtained = ?, total_marks = ?, percentage = ?, grade = ?, is_pass = ? WHERE result_id = ?");
-        $stmt->bind_param("dddsii", $marks_obtained, $total_marks, $percentage, $grade, $is_pass, $result_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        $_SESSION['success'] = "Marks updated successfully.";
-        header("Location: result.php");
-        exit();
-    }
 }
 
 // Get all classes for dropdown
@@ -352,9 +304,8 @@ try {
     if (!empty($students)) {
         $student_ids = array_keys($students);
         
-        $query = "SELECT r.result_id, r.student_id, r.exam_id, r.total_marks, r.marks_obtained, 
-                        r.percentage, r.grade, r.is_pass, r.is_published, r.created_at,
-                        e.exam_name, e.exam_type, e.exam_date, e.academic_year
+        $query = "SELECT r.result_id, r.student_id, r.exam_id, r.grade,
+                        e.exam_name, e.exam_type, e.exam_date, e.academic_year, r.is_published
                   FROM Results r
                   JOIN Exams e ON r.exam_id = e.exam_id
                   WHERE r.student_id IN (" . implode(',', array_fill(0, count($student_ids), '?')) . ")";
@@ -391,13 +342,8 @@ try {
                 'exam_type' => $row['exam_type'],
                 'exam_date' => $row['exam_date'],
                 'academic_year' => $row['academic_year'],
-                'total_marks' => $row['total_marks'],
-                'marks_obtained' => $row['marks_obtained'],
-                'percentage' => $row['percentage'],
-                'grade' => $row['grade'],
-                'is_pass' => $row['is_pass'],
                 'is_published' => $row['is_published'],
-                'created_at' => $row['created_at']
+                'grade' => $row['grade'] ?? 'N/A'
             ];
         }
         
@@ -1126,13 +1072,8 @@ $conn->close();
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No.</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marks</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-    Upload Status
-</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
@@ -1175,15 +1116,10 @@ $conn->close();
                                                             <div class="text-sm text-gray-500"><?php echo htmlspecialchars($exam['exam_type']); ?></div>
                                                         </td>
                                                         <td class="px-6 py-4 whitespace-nowrap">
-                                                            <div class="text-sm text-gray-900"><?php echo htmlspecialchars($exam['marks_obtained'] . '/' . $exam['total_marks']); ?></div>
-                                                        </td>
-                                                        <td class="px-6 py-4 whitespace-nowrap">
-                                                            <div class="text-sm text-gray-900"><?php echo htmlspecialchars(number_format($exam['percentage'], 2)); ?>%</div>
-                                                        </td>
-                                                        <td class="px-6 py-4 whitespace-nowrap">
                                                             <?php
+                                                            $grade = $exam['grade'] ?? 'N/A';
                                                             $grade_class = '';
-                                                            switch ($exam['grade']) {
+                                                            switch ($grade) {
                                                                 case 'A+': $grade_class = 'bg-green-100 text-green-800'; break;
                                                                 case 'A': $grade_class = 'bg-green-100 text-green-800'; break;
                                                                 case 'B+': $grade_class = 'bg-blue-100 text-blue-800'; break;
@@ -1191,12 +1127,13 @@ $conn->close();
                                                                 case 'C+': $grade_class = 'bg-yellow-100 text-yellow-800'; break;
                                                                 case 'C': $grade_class = 'bg-yellow-100 text-yellow-800'; break;
                                                                 case 'D': $grade_class = 'bg-orange-100 text-orange-800'; break;
+                                                                case 'NG': $grade_class = 'bg-red-100 text-red-800'; break;
                                                                 case 'F': $grade_class = 'bg-red-100 text-red-800'; break;
                                                                 default: $grade_class = 'bg-gray-100 text-gray-800';
                                                             }
                                                             ?>
                                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $grade_class; ?>">
-                                                                <?php echo htmlspecialchars($exam['grade']); ?>
+                                                                <?php echo htmlspecialchars($grade); ?>
                                                             </span>
                                                         </td>
                                                         <td class="px-6 py-4 whitespace-nowrap">
@@ -1210,15 +1147,6 @@ $conn->close();
                                                             </span>
                                                             <?php endif; ?>
                                                         </td>
-                                                        <td class="px-6 py-4 whitespace-nowrap">
-    <?php if (!empty($row['upload_status'])): ?>
-        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['upload_status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['upload_status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
-            <?php echo htmlspecialchars($row['upload_status']); ?>
-        </span>
-    <?php else: ?>
-        <span class="text-gray-400">Not from upload</span>
-    <?php endif; ?>
-</td>
                                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                             <div class="flex space-x-2">
                                                                 <a href="view_student_result.php?result_id=<?php echo $exam['result_id']; ?>" class="text-indigo-600 hover:text-indigo-900" title="View Result">
@@ -1242,10 +1170,6 @@ $conn->close();
                                                                     </button>
                                                                 </form>
                                                                 <?php endif; ?>
-                                                                
-                                                                <button type="button" onclick="openEditMarksModal('<?php echo $exam['result_id']; ?>', '<?php echo $exam['marks_obtained']; ?>', '<?php echo $exam['total_marks']; ?>')" class="text-blue-600 hover:text-blue-900" title="Edit Marks">
-                                                                    <i class="fas fa-edit"></i>
-                                                                </button>
                                                                 
                                                                 <form method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete this result? This action cannot be undone.');">
                                                                     <input type="hidden" name="result_id" value="<?php echo $exam['result_id']; ?>">
@@ -1271,58 +1195,7 @@ $conn->close();
         </div>
     </div>
 
-    <!-- Edit Marks Modal -->
-    <div id="editMarksModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeEditMarksModal()">&times;</span>
-            <h2 class="text-xl font-semibold mb-4">Update Marks</h2>
-            <form id="editMarksForm" method="POST" class="space-y-4">
-                <input type="hidden" name="action" value="update_marks">
-                <input type="hidden" id="edit_result_id" name="result_id" value="">
-                
-                <div>
-                    <label for="marks_obtained" class="block text-sm font-medium text-gray-700 mb-1">Marks Obtained</label>
-                    <input type="number" id="marks_obtained" name="marks_obtained" step="0.01" min="0" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" required>
-                </div>
-                
-                <div>
-                    <label for="total_marks" class="block text-sm font-medium text-gray-700 mb-1">Total Marks</label>
-                    <input type="number" id="total_marks" name="total_marks" step="0.01" min="0.01" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" required>
-                </div>
-                
-                <div class="flex justify-end">
-                    <button type="button" onclick="closeEditMarksModal()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-2">
-                        Cancel
-                    </button>
-                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Update
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <script>
-        // Modal functions
-        function openEditMarksModal(resultId, marksObtained, totalMarks) {
-            document.getElementById('edit_result_id').value = resultId;
-            document.getElementById('marks_obtained').value = marksObtained;
-            document.getElementById('total_marks').value = totalMarks;
-            document.getElementById('editMarksModal').style.display = 'block';
-        }
-        
-        function closeEditMarksModal() {
-            document.getElementById('editMarksModal').style.display = 'none';
-        }
-        
-        // Close modal when clicking outside of it
-        window.onclick = function(event) {
-            const modal = document.getElementById('editMarksModal');
-            if (event.target == modal) {
-                closeEditMarksModal();
-            }
-        }
-        
         // Remove a specific filter
         function removeFilter(filterName) {
             // Create a new URL object
