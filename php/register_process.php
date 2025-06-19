@@ -41,7 +41,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     
     // Connect to database
-    $conn = new mysqli('localhost', 'root', '', 'result_management');
+    require_once '../includes/db_connetc.php';
     
     // Check connection
     if ($conn->connect_error) {
@@ -51,7 +51,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     
     // Check if username already exists
-    $stmt = $conn->prepare("SELECT * FROM Users WHERE username=?");
+    $stmt = $conn->prepare("SELECT user_id FROM Users WHERE username = ?");
+    if (!$stmt) {
+        $_SESSION['error'] = "Database error: " . $conn->error;
+        header("Location: ../register.php");
+        exit();
+    }
+    
     $stmt->bind_param("s", $username);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -61,9 +67,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         header("Location: ../register.php");
         exit();
     }
+    $stmt->close();
     
     // Check if email already exists
-    $stmt = $conn->prepare("SELECT * FROM Users WHERE email=?");
+    $stmt = $conn->prepare("SELECT user_id FROM Users WHERE email = ?");
+    if (!$stmt) {
+        $_SESSION['error'] = "Database error: " . $conn->error;
+        header("Location: ../register.php");
+        exit();
+    }
+    
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -73,6 +86,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         header("Location: ../register.php");
         exit();
     }
+    $stmt->close();
     
     // Hash password
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
@@ -82,11 +96,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     try {
         // Insert into Users table
-        $status = ($role == 'admin') ? 'pending' : 'active'; // Admin accounts need approval
-        $stmt = $conn->prepare("INSERT INTO Users (username, password, email, full_name, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->bind_param("ssssss", $username, $hashed_password, $email, $full_name, $role, $status);
-        $stmt->execute();
+        $status = ($role == 'admin') ? 'pending' : 'active';
+        $created_at = date('Y-m-d H:i:s');
+        
+        $stmt = $conn->prepare("INSERT INTO Users (username, password, email, full_name, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        if (!$stmt) {
+            throw new Exception("Database error: " . $conn->error);
+        }
+        
+        $stmt->bind_param("sssssss", $username, $hashed_password, $email, $full_name, $role, $status, $created_at);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error creating user: " . $stmt->error);
+        }
+        
         $user_id = $conn->insert_id;
+        $stmt->close();
         
         // Role-specific data
         if ($role == 'student') {
@@ -98,9 +123,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 throw new Exception("All student fields are required");
             }
             
-            $stmt = $conn->prepare("INSERT INTO Students (user_id, roll_number, class_id, batch_year, created_at) VALUES (?, ?, ?, ?, NOW())");
-            $stmt->bind_param("isss", $user_id, $roll_number, $class_id, $batch_year);
-            $stmt->execute();
+            // Check if roll number already exists
+            $check_stmt = $conn->prepare("SELECT student_id FROM Students WHERE roll_number = ?");
+            if (!$check_stmt) {
+                throw new Exception("Database error: " . $conn->error);
+            }
+            
+            $check_stmt->bind_param("s", $roll_number);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if ($check_result->num_rows > 0) {
+                throw new Exception("Roll number already exists");
+            }
+            $check_stmt->close();
+            
+            $stmt = $conn->prepare("INSERT INTO Students (user_id, roll_number, class_id, batch_year, created_at) VALUES (?, ?, ?, ?, ?)");
+            if (!$stmt) {
+                throw new Exception("Database error: " . $conn->error);
+            }
+            
+            $stmt->bind_param("issss", $user_id, $roll_number, $class_id, $batch_year, $created_at);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Error creating student record: " . $stmt->error);
+            }
+            $stmt->close();
             
         } elseif ($role == 'teacher') {
             $employee_id = $_POST['employee_id'] ?? '';
@@ -111,43 +159,58 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 throw new Exception("All teacher fields are required");
             }
             
-            $stmt = $conn->prepare("INSERT INTO Teachers (user_id, employee_id, department, qualification, joining_date, created_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
-            $stmt->bind_param("isss", $user_id, $employee_id, $department, $qualification);
-            $stmt->execute();
+            // Check if employee ID already exists
+            $check_stmt = $conn->prepare("SELECT teacher_id FROM Teachers WHERE employee_id = ?");
+            if (!$check_stmt) {
+                throw new Exception("Database error: " . $conn->error);
+            }
+            
+            $check_stmt->bind_param("s", $employee_id);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if ($check_result->num_rows > 0) {
+                throw new Exception("Employee ID already exists");
+            }
+            $check_stmt->close();
+            
+            $stmt = $conn->prepare("INSERT INTO Teachers (user_id, employee_id, department, qualification, joining_date, created_at) VALUES (?, ?, ?, ?, ?, ?)");
+            if (!$stmt) {
+                throw new Exception("Database error: " . $conn->error);
+            }
+            
+            $stmt->bind_param("isssss", $user_id, $employee_id, $department, $qualification, $created_at, $created_at);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Error creating teacher record: " . $stmt->error);
+            }
+            $stmt->close();
             
         } elseif ($role == 'admin') {
             $admin_code = $_POST['admin_code'] ?? '';
             
             // Verify admin registration code
-            $admin_registration_code = "ADMIN123"; // This should be stored securely, not hardcoded
+            $admin_registration_code = "ADMIN123";
             
             if ($admin_code !== $admin_registration_code) {
                 throw new Exception("Invalid admin registration code");
             }
-            
-            // Create notification for existing admins about new admin registration
-            $notification_title = "New Admin Registration";
-            $notification_message = "A new admin account has been registered by $full_name ($username) and is pending approval.";
-            
-            $stmt = $conn->prepare("SELECT user_id FROM Users WHERE role='admin' AND status='active'");
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
-            while ($admin = $result->fetch_assoc()) {
-                $admin_id = $admin['user_id'];
-                $notify_stmt = $conn->prepare("INSERT INTO Notifications (user_id, title, message, type, created_at) VALUES (?, ?, ?, 'info', NOW())");
-                $notify_stmt->bind_param("iss", $admin_id, $notification_title, $notification_message);
-                $notify_stmt->execute();
-            }
         }
         
-        // Create welcome notification for the new user
-        $welcome_title = "Welcome to Result Management System";
-        $welcome_message = "Thank you for registering. We're excited to have you on board!";
-        
-        $notify_stmt = $conn->prepare("INSERT INTO Notifications (user_id, title, message, type, created_at) VALUES (?, ?, ?, 'success', NOW())");
-        $notify_stmt->bind_param("iss", $user_id, $welcome_title, $welcome_message);
-        $notify_stmt->execute();
+        // Try to create notification (optional - won't fail if Notifications table doesn't exist)
+        try {
+            $welcome_title = "Welcome to Result Management System";
+            $welcome_message = "Thank you for registering. We're excited to have you on board!";
+            
+            $notify_stmt = $conn->prepare("INSERT INTO Notifications (user_id, title, message, type, created_at) VALUES (?, ?, ?, 'success', ?)");
+            if ($notify_stmt) {
+                $notify_stmt->bind_param("isss", $user_id, $welcome_title, $welcome_message, $created_at);
+                $notify_stmt->execute();
+                $notify_stmt->close();
+            }
+        } catch (Exception $e) {
+            // Ignore notification errors - they're not critical
+        }
         
         // Commit transaction
         $conn->commit();
@@ -155,17 +218,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Set success message and handle redirection based on role
         if ($role == 'admin') {
             $_SESSION['success'] = "Registration successful! Your admin account is pending approval.";
-            // Admin accounts need approval, so redirect to login
             header("Location: ../login.php");
         } else {
-            // For students and teachers, automatically log them in and redirect to dashboard
+            // For students and teachers, automatically log them in
             $_SESSION['user_id'] = $user_id;
             $_SESSION['username'] = $username;
             $_SESSION['role'] = $role;
             $_SESSION['full_name'] = $full_name;
-            
-            // Set a welcome message for the dashboard
-            $_SESSION['welcome_message'] = "Welcome to the Result Management System! Your account has been created successfully.";
+            $_SESSION['success'] = "Registration successful! Welcome to the Result Management System.";
             
             // Redirect based on role
             if ($role == 'student') {
@@ -185,5 +245,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     
     $conn->close();
+} else {
+    // If not POST request, redirect to register page
+    header("Location: ../register.php");
+    exit();
 }
 ?>

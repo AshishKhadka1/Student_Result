@@ -176,7 +176,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user']) && isset($_
 
         <!-- Footer -->
         <div class="mt-6 text-center text-sm text-slate-500">
-            <p>Need an account? <a href="register.php" class="font-medium text-blue-900 hover:text-blue-800 transition">Register here</a></p>
+            <p>Need an account? <a href="register.php" class="font-medium text-blue-900 hover:text-blue-800 transition cursor-pointer">Register here</a></p>
         </div>
     </div>
 </body>

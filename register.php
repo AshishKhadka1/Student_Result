@@ -2,12 +2,11 @@
 // Start session at the very beginning
 session_start();
 
-// Redirect if already logged in
-if (isset($_SESSION['user_id'])) {
+// Only redirect non-admin users if they're already logged in
+// Admins can access registration to create accounts for others
+if (isset($_SESSION['user_id']) && $_SESSION['role'] !== 'admin') {
     $role = $_SESSION['role'];
-    if ($role == 'admin') {
-        header("Location: Admin/admin_dashboard.php");
-    } elseif ($role == 'teacher') {
+    if ($role == 'teacher') {
         header("Location: Teacher/teacher_dashboard.php");
     } elseif ($role == 'student') {
         header("Location: Student/student_dashboard.php");
@@ -138,9 +137,9 @@ $conn->close();
             <button type="button" class="role-tab flex-1 py-3 px-4 text-center font-medium" data-role="teacher">
                 <i class="fas fa-chalkboard-teacher mr-2"></i>Teacher
             </button>
-            <button type="button" class="role-tab flex-1 py-3 px-4 text-center font-medium" data-role="admin">
+            <!-- <button type="button" class="role-tab flex-1 py-3 px-4 text-center font-medium" data-role="admin">
                 <i class="fas fa-user-shield mr-2"></i>Admin
-            </button>
+            </button> -->
         </div>
         
         <!-- Registration Form -->
@@ -269,11 +268,11 @@ $conn->close();
                             <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                                 <svg class="w-5 h-5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                                </svg>
+                                    </svg>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
                 
                 <!-- Teacher-specific fields -->
                 <div id="teacher-fields" class="space-y-3 hidden">
@@ -488,6 +487,26 @@ $conn->close();
                 }
             });
         });
+    
+// Add click handler for register link in login page
+document.addEventListener('DOMContentLoaded', function() {
+    // Existing code...
+    
+    // Add form validation feedback
+    const form = document.getElementById('registrationForm');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    form.addEventListener('submit', function(event) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating Account...';
+        
+        // Re-enable button after 5 seconds in case of issues
+        setTimeout(function() {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Create Account';
+        }, 5000);
+    });
+});
     </script>
 </body>
 </html>
