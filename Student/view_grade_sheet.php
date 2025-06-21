@@ -158,6 +158,7 @@ try {
         FROM results r
         JOIN subjects s ON r.subject_id = s.subject_id
         WHERE r.student_id = ? AND r.exam_id = ?
+        ORDER BY s.subject_id
     ");
     if ($stmt === false) {
         throw new Exception("Failed to prepare results statement: " . $conn->error);
@@ -178,22 +179,20 @@ try {
         $theory_marks = $row['theory_marks'] ?? 0;
         $practical_marks = $row['practical_marks'] ?? 0;
         $total_subject_marks = $theory_marks + $practical_marks;
-        $subject_max_marks = $row['full_marks_theory'] + $row['full_marks_practical'];
+        $subject_max_marks = ($row['full_marks_theory'] ?? 100) + ($row['full_marks_practical'] ?? 0);
         $credit_hours = $row['credit_hours'] ?? 1;
         
-        // Calculate grade point for this subject
+        // Calculate grade point based on total marks percentage
+        $total_percentage = $subject_max_marks > 0 ? ($total_subject_marks / $subject_max_marks) * 100 : 0;
         $grade_point = 0;
-        switch ($row['grade']) {
-            case 'A+': $grade_point = 4.0; break;
-            case 'A': $grade_point = 3.7; break;
-            case 'B+': $grade_point = 3.3; break;
-            case 'B': $grade_point = 3.0; break;
-            case 'C+': $grade_point = 2.7; break;
-            case 'C': $grade_point = 2.3; break;
-            case 'D': $grade_point = 2.0; break;
-            case 'F': $grade_point = 0.0; break;
-            default: $grade_point = 0.0;
-        }
+        if ($total_percentage >= 91) $grade_point = 3.8;
+        elseif ($total_percentage >= 81) $grade_point = 3.4;
+        elseif ($total_percentage >= 71) $grade_point = 3.0;
+        elseif ($total_percentage >= 61) $grade_point = 2.7;
+        elseif ($total_percentage >= 51) $grade_point = 2.4;
+        elseif ($total_percentage >= 41) $grade_point = 1.9;
+        elseif ($total_percentage >= 35) $grade_point = 1.6;
+        else $grade_point = 0.0;
         
         $total_grade_points += ($grade_point * $credit_hours);
         $total_credit_hours += $credit_hours;
@@ -207,7 +206,9 @@ try {
             'total_marks' => $total_subject_marks,
             'grade' => $row['grade'],
             'grade_point' => $grade_point,
-            'remarks' => $row['remarks'] ?? ''
+            'remarks' => $row['remarks'] ?? '',
+            'full_marks_theory' => $row['full_marks_theory'] ?? 100,
+            'full_marks_practical' => $row['full_marks_practical'] ?? 0
         ];
 
         $total_marks += $total_subject_marks;
@@ -904,12 +905,10 @@ $conn->close();
                                         <th>SUBJECT CODE</th>
                                         <th>SUBJECTS</th>
                                         <th>CREDIT HOUR</th>
-                                        <th>THEORY MARKS</th>
-                                        <th>PRACTICAL MARKS</th>
-                                        <th>TOTAL MARKS</th>
-                                        <th>GRADE</th>
+                                        <th>THEORY GRADE</th>
+                                        <th>PRACTICAL GRADE</th>
+                                        <th>FINAL GRADE</th>
                                         <th>GRADE POINT</th>
-                                        <th>REMARKS</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -918,12 +917,34 @@ $conn->close();
                                             <td><?php echo htmlspecialchars($subject['code']); ?></td>
                                             <td><?php echo htmlspecialchars($subject['name']); ?></td>
                                             <td><?php echo htmlspecialchars($subject['credit_hour']); ?></td>
-                                            <td><?php echo htmlspecialchars($subject['theory_marks']); ?></td>
-                                            <td><?php echo htmlspecialchars($subject['practical_marks']); ?></td>
-                                            <td><?php echo htmlspecialchars($subject['total_marks']); ?></td>
+                                            <td><?php 
+    $theory_percentage = $subject['full_marks_theory'] > 0 ? ($subject['theory_marks'] / $subject['full_marks_theory']) * 100 : 0;
+    if ($theory_percentage >= 90) echo 'A+';
+    elseif ($theory_percentage >= 80) echo 'A';
+    elseif ($theory_percentage >= 70) echo 'B+';
+    elseif ($theory_percentage >= 60) echo 'B';
+    elseif ($theory_percentage >= 50) echo 'C+';
+    elseif ($theory_percentage >= 40) echo 'C';
+    elseif ($theory_percentage >= 33) echo 'D';
+    else echo 'F';
+?></td>
+                                            <td><?php 
+    if ($subject['full_marks_practical'] > 0) {
+        $practical_percentage = ($subject['practical_marks'] / $subject['full_marks_practical']) * 100;
+        if ($practical_percentage >= 90) echo 'A+';
+        elseif ($practical_percentage >= 80) echo 'A';
+        elseif ($practical_percentage >= 70) echo 'B+';
+        elseif ($practical_percentage >= 60) echo 'B';
+        elseif ($practical_percentage >= 50) echo 'C+';
+        elseif ($practical_percentage >= 40) echo 'C';
+        elseif ($practical_percentage >= 33) echo 'D';
+        else echo 'F';
+    } else {
+        echo 'N/A';
+    }
+?></td>
                                             <td><?php echo htmlspecialchars($subject['grade']); ?></td>
                                             <td><?php echo number_format($subject['grade_point'], 2); ?></td>
-                                            <td><?php echo htmlspecialchars($subject['remarks']); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>

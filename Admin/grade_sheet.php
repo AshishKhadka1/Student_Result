@@ -801,6 +801,86 @@ function calculateGPA($percentage, $conn)
             color: #4a5568;
             cursor: pointer;
         }
+
+        /* Simple Overall Result Summary styles */
+        .simple-summary {
+            margin: 20px 0;
+            position: relative;
+            z-index: 1;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            padding: 20px;
+        }
+
+        .simple-summary h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .simple-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .simple-summary-item {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .simple-summary-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .simple-summary-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .simple-additional-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .simple-info-item {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .simple-info-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .simple-info-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .simple-info-value.pass {
+            color: #28a745;
+        }
+
+        .simple-info-value.fail {
+            color: #dc3545;
+        }
     </style>
 </head>
 
@@ -1183,26 +1263,95 @@ function calculateGPA($percentage, $conn)
                                     </tbody>
                                 </table>
 
-                                <div class="summary">
-                                    <div class="summary-item">
-                                        <div class="summary-label">GRADE POINT AVERAGE</div>
-                                        <div class="summary-value"><?php echo number_format($gpa, 2); ?></div>
+                                <!-- Simple Overall Result Summary -->
+                                <?php
+                                // Check if any subject has NG grade
+                                $has_ng_grade = false;
+                                $failed_subjects = 0;
+                                
+                                foreach ($subjects as $subject) {
+                                    $theory_marks = $subject['theory_marks'] ?? 0;
+                                    $practical_marks = $subject['practical_marks'] ?? 0;
+                                    $has_practical = !is_null($subject['practical_marks']) && $subject['practical_marks'] > 0;
+                                    
+                                    $theory_full_marks = $has_practical ? 75 : 100;
+                                    $practical_full_marks = $has_practical ? 25 : 0;
+                                    
+                                    $theory_percentage = $theory_full_marks > 0 ? ($theory_marks / $theory_full_marks) * 100 : 0;
+                                    $practical_percentage = $practical_full_marks > 0 ? ($practical_marks / $practical_full_marks) * 100 : 0;
+                                    
+                                    // Check for failure (35% rule)
+                                    $theory_failed = $theory_percentage < 35;
+                                    $practical_failed = $has_practical && $practical_percentage < 35;
+                                    
+                                    if ($theory_failed || $practical_failed) {
+                                        $has_ng_grade = true;
+                                        $failed_subjects++;
+                                    }
+                                }
+                                
+                                $is_pass = ($failed_subjects == 0 && $percentage >= 35);
+                                ?>
+
+                                <div class="simple-summary">
+                                    <h2>Overall Result Summary</h2>
+                                    
+                                    <!-- Summary Cards -->
+                                    <div class="simple-summary-grid">
+                                        <div class="simple-summary-item">
+                                            <div class="simple-summary-label">Total Marks</div>
+                                            <div class="simple-summary-value">
+                                                <?php echo number_format($total_marks, 0); ?> / <?php echo number_format($max_marks, 0); ?>
+                                            </div>
+                                        </div>
+                                        <div class="simple-summary-item">
+                                            <div class="simple-summary-label">Percentage</div>
+                                            <div class="simple-summary-value"><?php echo number_format($percentage, 2); ?>%</div>
+                                        </div>
+                                        <div class="simple-summary-item">
+                                            <div class="simple-summary-label">GPA</div>
+                                            <div class="simple-summary-value"><?php echo number_format($gpa, 2); ?> / 4.0</div>
+                                        </div>
+                                        <?php if (!$has_ng_grade): ?>
+                                        <div class="simple-summary-item">
+                                            <div class="simple-summary-label">Grade</div>
+                                            <div class="simple-summary-value">
+                                                <?php
+                                                // Calculate grade based on percentage
+                                                if ($percentage >= 90) echo 'A+';
+                                                elseif ($percentage >= 80) echo 'A';
+                                                elseif ($percentage >= 70) echo 'B+';
+                                                elseif ($percentage >= 60) echo 'B';
+                                                elseif ($percentage >= 50) echo 'C+';
+                                                elseif ($percentage >= 40) echo 'C';
+                                                elseif ($percentage >= 35) echo 'D';
+                                                else echo 'NG';
+                                                ?>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
                                     </div>
-                                    <div class="summary-item">
-                                        <div class="summary-label">PERCENTAGE</div>
-                                        <div class="summary-value"><?php echo number_format($percentage, 2); ?>%</div>
-                                    </div>
-                                    <div class="summary-item">
-                                        <div class="summary-label">GPA</div>
-                                        <div class="summary-value"><?php echo number_format($gpa, 2); ?></div>
-                                    </div>
-                                    <div class="summary-item">
-                                        <div class="summary-label">DIVISION</div>
-                                        <div class="summary-value"><?php echo $division; ?></div>
-                                    </div>
-                                    <div class="summary-item">
-                                        <div class="summary-label">RESULT</div>
-                                        <div class="summary-value"><?php echo $percentage >= 33 ? 'PASS' : 'FAIL'; ?></div>
+                                    
+                                    <!-- Additional Information -->
+                                    <div class="simple-additional-info">
+                                        <div class="simple-info-item">
+                                            <div class="simple-info-label">Result Status</div>
+                                            <div class="simple-info-value <?php echo $is_pass ? 'pass' : 'fail'; ?>">
+                                                <?php echo $is_pass ? 'PASS' : 'FAIL'; ?>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="simple-info-item">
+                                            <div class="simple-info-label">Division</div>
+                                            <div class="simple-info-value"><?php echo $division; ?></div>
+                                        </div>
+                                        
+                                        <div class="simple-info-item">
+                                            <div class="simple-info-label">Failed Subjects</div>
+                                            <div class="simple-info-value <?php echo $failed_subjects > 0 ? 'fail' : 'pass'; ?>">
+                                                <?php echo $failed_subjects; ?>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 

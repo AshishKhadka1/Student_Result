@@ -49,13 +49,10 @@ $gpa_trend = [];
 // Get available exams for teacher's subjects
 $exams_query = "SELECT DISTINCT e.exam_id, e.exam_name, e.exam_type, e.academic_year 
                 FROM exams e
-                JOIN results r ON e.exam_id = r.exam_id
-                JOIN teachersubjects ts ON r.subject_id = ts.subject_id
-                WHERE ts.teacher_id = ? AND e.is_active = 1 
+                WHERE e.is_active = 1 
                 ORDER BY e.created_at DESC";
 $stmt = $conn->prepare($exams_query);
 if ($stmt) {
-    $stmt->bind_param("i", $teacher_id);
     $stmt->execute();
     $exams_result = $stmt->get_result();
     while ($row = $exams_result->fetch_assoc()) {
@@ -96,14 +93,13 @@ if (isset($_GET['student_id'])) {
     
     // Get subjects taught by this teacher for this student
     $stmt = $conn->prepare("
-        SELECT DISTINCT s.subject_id, s.subject_name, s.subject_code, s.credit_hours
-        FROM subjects s
-        JOIN results r ON s.subject_id = r.subject_id
-        JOIN teachersubjects ts ON s.subject_id = ts.subject_id
-        WHERE r.student_id = ? AND ts.teacher_id = ?
-        ORDER BY s.subject_id
-    ");
-    $stmt->bind_param("si", $student_id, $teacher_id);
+    SELECT DISTINCT s.subject_id, s.subject_name, s.subject_code, s.credit_hours
+    FROM subjects s
+    JOIN results r ON s.subject_id = r.subject_id
+    WHERE r.student_id = ?
+    ORDER BY s.subject_id
+");
+    $stmt->bind_param("s", $student_id);
     $stmt->execute();
     $subjects_result = $stmt->get_result();
     
@@ -122,15 +118,14 @@ if (isset($_GET['student_id'])) {
     
     // Get results for all exams for this student (only for teacher's subjects)
     $query = "SELECT r.*, e.exam_name, e.exam_type, e.academic_year, s.subject_name
-        FROM results r
-        JOIN exams e ON r.exam_id = e.exam_id
-        JOIN subjects s ON r.subject_id = s.subject_id
-        JOIN teachersubjects ts ON s.subject_id = ts.subject_id
-        WHERE r.student_id = ? AND ts.teacher_id = ?
-        ORDER BY e.created_at DESC, s.subject_name ASC";
+    FROM results r
+    JOIN exams e ON r.exam_id = e.exam_id
+    JOIN subjects s ON r.subject_id = s.subject_id
+    WHERE r.student_id = ?
+    ORDER BY e.created_at DESC, s.subject_name ASC";
 
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("si", $student_id, $teacher_id);
+    $stmt->bind_param("s", $student_id);
     $stmt->execute();
     $results_data = $stmt->get_result();
     
@@ -202,82 +197,51 @@ if (isset($_GET['student_id'])) {
     // If we have a selected exam, get detailed results for it
     if ($selected_exam) {
         $stmt = $conn->prepare("
-            SELECT r.*, s.subject_name, s.subject_code, s.full_marks_theory, s.full_marks_practical
-            FROM results r
-            JOIN subjects s ON r.subject_id = s.subject_id
-            JOIN teachersubjects ts ON s.subject_id = ts.subject_id
-            WHERE r.student_id = ? AND r.exam_id = ? AND ts.teacher_id = ?
-            ORDER BY s.subject_id
-        ");
-        $stmt->bind_param("sii", $student_id, $selected_exam, $teacher_id);
+    SELECT DISTINCT r.*, s.subject_name, s.subject_code, s.full_marks_theory, s.full_marks_practical, s.credit_hours
+    FROM results r
+    JOIN subjects s ON r.subject_id = s.subject_id
+    WHERE r.student_id = ? AND r.exam_id = ?
+    GROUP BY r.subject_id
+    ORDER BY s.subject_name
+");
+        $stmt->bind_param("si", $student_id, $selected_exam);
         $stmt->execute();
         $current_results = $stmt->get_result();
         
         $results = [];
-        $total_marks = 0;
-        $total_max_marks = 0;
         
         while ($row = $current_results->fetch_assoc()) {
-            $theory_marks = $row['theory_marks'] ?? 0;
-            $practical_marks = $row['practical_marks'] ?? 0;
-            $total_subject_marks = $theory_marks + $practical_marks;
-            $max_marks = $row['full_marks_theory'] + $row['full_marks_practical'];
-            
             $results[] = [
                 'subject_id' => $row['subject_id'],
                 'subject_name' => $row['subject_name'],
                 'subject_code' => $row['subject_code'] ?? $row['subject_id'],
-                'credit_hours' => $row['credit_hours'],
-                'theory_marks' => $theory_marks,
-                'practical_marks' => $practical_marks,
-                'total_marks' => $total_subject_marks,
-                'max_marks' => $max_marks,
+                'credit_hours' => $row['credit_hours'] ?? 3,
+                'theory_marks' => $row['theory_marks'] ?? 0,
+                'practical_marks' => $row['practical_marks'] ?? 0,
                 'grade' => $row['grade'],
                 'gpa' => $row['gpa'],
                 'remarks' => $row['remarks'] ?? '',
-                'full_marks_theory' => $row['full_marks_theory'],
-                'full_marks_practical' => $row['full_marks_practical']
+                'full_marks_theory' => $row['full_marks_theory'] ?? 100,
+                'full_marks_practical' => $row['full_marks_practical'] ?? 0
             ];
-            
-            $total_marks += $total_subject_marks;
-            $total_max_marks += $max_marks;
         }
         $stmt->close();
-        
-        // Get overall performance for selected exam
-        $overall_performance = isset($performance_data[$selected_exam]) ? $performance_data[$selected_exam] : null;
-        
-        if (!$overall_performance) {
-            // Calculate basic performance metrics if not available
-            $percentage = $total_max_marks > 0 ? ($total_marks / $total_max_marks) * 100 : 0;
-            $gpa = calculateGPA($percentage, $conn);
-            
-            $overall_performance = [
-                'average_marks' => $percentage,
-                'gpa' => $gpa,
-                'rank' => 'N/A'
-            ];
-        }
     }
 } else {
     // If no specific student is requested, show a list of students to select
     $show_student_list = true;
     
     // Get students taught by this teacher
-    $students = [];
     $students_query = "
-        SELECT DISTINCT s.student_id, s.roll_number, u.full_name, c.class_name, c.section
-        FROM students s
-        JOIN users u ON s.user_id = u.user_id
-        JOIN classes c ON s.class_id = c.class_id
-        JOIN results r ON s.student_id = r.student_id
-        JOIN teachersubjects ts ON r.subject_id = ts.subject_id
-        WHERE ts.teacher_id = ?
-        ORDER BY c.class_name, c.section, s.roll_number
-    ";
+    SELECT DISTINCT s.student_id, s.roll_number, u.full_name, c.class_name, c.section
+    FROM students s
+    JOIN users u ON s.user_id = u.user_id
+    JOIN classes c ON s.class_id = c.class_id
+    JOIN results r ON s.student_id = r.student_id
+    ORDER BY c.class_name, c.section, s.roll_number
+";
     $stmt = $conn->prepare($students_query);
     if ($stmt) {
-        $stmt->bind_param("i", $teacher_id);
         $stmt->execute();
         $students_result = $stmt->get_result();
         
@@ -618,6 +582,181 @@ function getRemarks($grade)
             text-align: center;
             border: 1px solid #ddd;
         }
+
+        /* Simple Overall Result Summary styles */
+        .simple-summary {
+            margin: 20px 0;
+            position: relative;
+            z-index: 1;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            padding: 20px;
+        }
+
+        .simple-summary h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .simple-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .simple-summary-item {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .simple-summary-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .simple-summary-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .simple-additional-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .simple-info-item {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .simple-info-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .simple-info-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .simple-info-value.pass {
+            color: #28a745;
+        }
+
+        .simple-info-value.fail {
+            color: #dc3545;
+        }
+
+        /* Print-specific styles for summary */
+        @media print {
+            .simple-summary .simple-summary-grid {
+                display: grid !important;
+                grid-template-columns: repeat(4, 1fr) !important;
+                gap: 1rem !important;
+            }
+            
+            .simple-summary .simple-summary-item,
+            .simple-summary .simple-info-item {
+                background-color: #f8f9fa !important;
+                border: 1px solid #dee2e6 !important;
+                box-shadow: none !important;
+            }
+        }
+
+.grade-sheet-container {
+    width: 21cm;
+    min-height: 29.7cm;
+    padding: 1cm;
+    margin: 20px auto;
+    background-color: white;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    position: relative;
+    box-sizing: border-box;
+}
+
+.grade-sheet-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.grade-sheet-table,
+.grade-sheet-table th,
+.grade-sheet-table td {
+    border: 1px solid #bdc3c7;
+}
+
+.grade-sheet-table th,
+.grade-sheet-table td {
+    padding: 10px;
+    text-align: center;
+}
+
+.grade-sheet-table th {
+    background-color: #1a5276;
+    color: white;
+    font-weight: bold;
+}
+
+.grade-sheet-table tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.footer {
+    margin-top: 30px;
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.signature {
+    text-align: center;
+    margin-top: 50px;
+}
+
+.signature-line {
+    width: 80%;
+    margin: 50px auto 10px;
+    border-top: 1px solid #333;
+}
+
+.signature-title {
+    font-weight: bold;
+}
+
+.qr-code {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 80px;
+    height: 80px;
+    background-color: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #555;
+}
     </style>
 </head>
 
@@ -783,210 +922,392 @@ function getRemarks($grade)
 
                     <!-- Result Tab Content -->
                     <div id="result" class="tab-content active p-6">
-                        <?php if (isset($selected_exam) && !empty($results)): ?>
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">
-                                <?php echo $exams[array_search($selected_exam, array_column($exams, 'exam_id'))]['exam_name']; ?> Results
-                            </h3>
+    <?php if (isset($selected_exam) && !empty($results)): ?>
+        <!-- Grade Sheet Container with proper styling -->
+        <div class="grade-sheet-container">
+            <div class="watermark">OFFICIAL</div>
+
+            <div class="header">
+                <div class="logo">LOGO</div>
+                <div class="title"><?php echo isset($settings['school_name']) ? strtoupper($settings['school_name']) : 'GOVERNMENT OF NEPAL'; ?></div>
+                <div class="title"><?php echo isset($settings['result_header']) ? strtoupper($settings['result_header']) : 'NATIONAL EXAMINATION BOARD'; ?></div>
+                <div class="subtitle">SECONDARY EDUCATION EXAMINATION</div>
+                <div class="exam-title">GRADE SHEET</div>
+            </div>
+
+            <div class="student-info">
+                <div class="info-item">
+                    <span class="info-label">Student Name:</span>
+                    <span><?php echo $student['full_name']; ?></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Roll No:</span>
+                    <span><?php echo $student['roll_number']; ?></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Registration No:</span>
+                    <span><?php echo $student['registration_number']; ?></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Class:</span>
+                    <span><?php echo $student['class_name'] . ' ' . $student['section']; ?></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Examination:</span>
+                    <span><?php echo $exams[array_search($selected_exam, array_column($exams, 'exam_id'))]['exam_name']; ?></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Academic Year:</span>
+                    <span><?php echo $student['academic_year']; ?></span>
+                </div>
+                <?php if (!empty($exams[array_search($selected_exam, array_column($exams, 'exam_id'))]['exam_type'])): ?>
+                <div class="info-item">
+                    <span class="info-label">Exam Type:</span>
+                    <span><?php echo $exams[array_search($selected_exam, array_column($exams, 'exam_id'))]['exam_type']; ?></span>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <table class="grade-sheet-table">
+                <thead>
+                    <tr>
+                        <th>SUBJECT CODE</th>
+                        <th>SUBJECTS</th>
+                        <th>CREDIT HOUR</th>
+                        <th>THEORY GRADE</th>
+                        <th>PRACTICAL GRADE</th>
+                        <th>FINAL GRADE</th>
+                        <th>GRADE POINT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($results)): ?>
+                        <tr>
+                            <td colspan="7" class="text-center py-4">No results found for this student.</td>
+                        </tr>
+                    <?php else: ?>
+                        <?php 
+                        $total_marks = 0;
+                        $max_marks = 0;
+                        $total_subjects = 0;
+                        $total_grade_points = 0;
+                        
+                        foreach ($results as $result): 
+                            $theory_marks = $result['theory_marks'] ?? 0;
+                            $practical_marks = $result['practical_marks'] ?? 0;
+                            $total_subject_marks = $theory_marks + $practical_marks;
+                            $subject_max_marks = $result['full_marks_theory'] + $result['full_marks_practical'];
+
+                            // Enhanced subject processing with detailed grade calculations
+                            // Determine if subject has practical
+                            $has_practical = !is_null($result['practical_marks']) && $result['practical_marks'] > 0;
                             
-                            <table class="result-table min-w-full">
-                                <thead>
-                                    <tr>
-                                        <th>SUBJECT CODE</th>
-                                        <th>SUBJECTS</th>
-                                        <th>CREDIT HOUR</th>
-                                        <th>THEORY GRADE</th>
-                                        <th>PRACTICAL GRADE</th>
-                                        <th>FINAL GRADE</th>
-                                        <th>GRADE POINT</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($results as $result): ?>
-                                        <tr>
-                                            <td><?php echo $result['subject_code']; ?></td>
-                                            <td><?php echo $result['subject_name']; ?></td>
-                                            <td><?php echo $result['credit_hours']; ?></td>
-                                            <td>
-                                                <?php 
-                                                // Convert theory marks to grade format
-                                                $theory_marks = $result['theory_marks'];
-                                                $theory_full_marks = $result['full_marks_theory'] ?? 100;
-                                                if ($theory_marks > 0 && $theory_full_marks > 0) {
-                                                    $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
-                                                    if ($theory_percentage >= 91) echo 'A+';
-                                                    elseif ($theory_percentage >= 81) echo 'A';
-                                                    elseif ($theory_percentage >= 71) echo 'B+';
-                                                    elseif ($theory_percentage >= 61) echo 'B';
-                                                    elseif ($theory_percentage >= 51) echo 'C+';
-                                                    elseif ($theory_percentage >= 41) echo 'C';
-                                                    elseif ($theory_percentage >= 35) echo 'D+';
-                                                    else echo 'NG';
-                                                } else {
-                                                    echo 'N/A';
-                                                }
-                                                ?>
-                                            </td>
-                                            <td>
-                                                <?php 
-                                                // Convert practical marks to grade format
-                                                $practical_marks = $result['practical_marks'];
-                                                $practical_full_marks = $result['full_marks_practical'] ?? 0;
-                                                if ($practical_full_marks > 0) {
-                                                    if ($practical_marks > 0) {
-                                                        $practical_percentage = ($practical_marks / $practical_full_marks) * 100;
-                                                        if ($practical_percentage >= 91) echo 'A+';
-                                                        elseif ($practical_percentage >= 81) echo 'A';
-                                                        elseif ($practical_percentage >= 71) echo 'B+';
-                                                        elseif ($practical_percentage >= 61) echo 'B';
-                                                        elseif ($practical_percentage >= 51) echo 'C+';
-                                                        elseif ($practical_percentage >= 41) echo 'C';
-                                                        elseif ($practical_percentage >= 35) echo 'D+';
-                                                        else echo 'NG';
-                                                    } else {
-                                                        echo 'N/A';
-                                                    }
-                                                } else {
-                                                    echo 'N/A';
-                                                }
-                                                ?>
-                                            </td>
-                                            <td><?php echo $result['grade']; ?></td>
-                                            <td>
-                                                <?php 
-                                                // Calculate grade point based on total marks percentage
-                                                $total_marks = $result['total_marks'];
-                                                $total_full_marks = ($result['full_marks_theory'] ?? 100) + ($result['full_marks_practical'] ?? 0);
-                                                if ($total_marks > 0 && $total_full_marks > 0) {
-                                                    $total_percentage = ($total_marks / $total_full_marks) * 100;
-                                                    if ($total_percentage >= 91) echo '3.8';
-                                                    elseif ($total_percentage >= 81) echo '3.4';
-                                                    elseif ($total_percentage >= 71) echo '3.0';
-                                                    elseif ($total_percentage >= 61) echo '2.7';
-                                                    elseif ($total_percentage >= 51) echo '2.4';
-                                                    elseif ($total_percentage >= 41) echo '1.9';
-                                                    elseif ($total_percentage >= 35) echo '1.6';
-                                                    else echo '0.0';
-                                                } else {
-                                                    echo '0.0';
-                                                }
-                                                ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                            // Set full marks based on practical existence
+                            $theory_full_marks = $has_practical ? 75 : 100;
+                            $practical_full_marks = $has_practical ? 25 : 0;
+                            
+                            // Calculate theory and practical percentages
+                            $theory_percentage = $theory_full_marks > 0 ? 
+                                ($theory_marks / $theory_full_marks) * 100 : 0;
+                            $practical_percentage = $practical_full_marks > 0 ? 
+                                ($practical_marks / $practical_full_marks) * 100 : 0;
+                            
+                            // Calculate final grade and GPA
+                            $total_obtained = $theory_marks + $practical_marks;
+                            $total_full = $theory_full_marks + $practical_full_marks;
+                            $total_percentage = $total_full > 0 ? ($total_obtained / $total_full) * 100 : 0;
+                            
+                            // Check for failure (35% rule)
+                            $theory_failed = $theory_percentage < 35;
+                            $practical_failed = $has_practical && $practical_percentage < 35;
+                            
+                            if ($theory_failed || $practical_failed) {
+                                $calculated_grade = 'NG';
+                                $calculated_gpa = 0.0;
+                            } else {
+                                // Calculate grade based on total percentage
+                                if ($total_percentage >= 90) {
+                                    $calculated_grade = 'A+';
+                                    $calculated_gpa = 4.0;
+                                } elseif ($total_percentage >= 80) {
+                                    $calculated_grade = 'A';
+                                    $calculated_gpa = 3.6;
+                                } elseif ($total_percentage >= 70) {
+                                    $calculated_grade = 'B+';
+                                    $calculated_gpa = 3.2;
+                                } elseif ($total_percentage >= 60) {
+                                    $calculated_grade = 'B';
+                                    $calculated_gpa = 2.8;
+                                } elseif ($total_percentage >= 50) {
+                                    $calculated_grade = 'C+';
+                                    $calculated_gpa = 2.4;
+                                } elseif ($total_percentage >= 40) {
+                                    $calculated_grade = 'C';
+                                    $calculated_gpa = 2.0;
+                                } elseif ($total_percentage >= 35) {
+                                    $calculated_grade = 'D';
+                                    $calculated_gpa = 1.6;
+                                } else {
+                                    $calculated_grade = 'NG';
+                                    $calculated_gpa = 0.0;
+                                }
+                            }
 
-                            <!-- Result Summary -->
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                    <div class="text-sm font-medium text-gray-500 mb-1">GPA</div>
-                                    <div class="flex items-baseline">
-                                        <span class="text-3xl font-bold text-gray-900"><?php echo number_format($overall_performance['gpa'], 2); ?></span>
-                                        <span class="text-sm text-gray-500 ml-1">/ 4.0</span>
-                                    </div>
-                                    <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div class="h-full bg-blue-600 rounded-full" style="width: <?php echo ($overall_performance['gpa'] / 4) * 100; ?>%;"></div>
-                                    </div>
-                                </div>
-                                
-                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                    <div class="text-sm font-medium text-gray-500 mb-1">Percentage</div>
-                                    <div class="flex items-baseline">
-                                        <span class="text-3xl font-bold text-gray-900"><?php echo number_format($overall_performance['average_marks'], 2); ?></span>
-                                        <span class="text-sm text-gray-500 ml-1">%</span>
-                                    </div>
-                                    <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div class="h-full bg-green-600 rounded-full" style="width: <?php echo min(100, $overall_performance['average_marks']); ?>%;"></div>
-                                    </div>
-                                </div>
-                                
-                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                    <div class="text-sm font-medium text-gray-500 mb-1">Rank</div>
-                                    <div class="flex items-baseline">
-                                        <span class="text-3xl font-bold text-gray-900"><?php echo $overall_performance['rank']; ?></span>
-                                        <span class="text-sm text-gray-500 ml-1">in class</span>
-                                    </div>
-                                    <div class="mt-2 text-sm text-gray-500">
-                                        <?php 
-                                        $division = '';
-                                        $gpa = $overall_performance['gpa'];
-                                        if ($gpa >= 3.6) $division = 'Distinction';
-                                        elseif ($gpa >= 3.2) $division = 'First Division';
-                                        elseif ($gpa >= 2.8) $division = 'Second Division';
-                                        elseif ($gpa >= 2.0) $division = 'Third Division';
-                                        else $division = 'Fail';
-                                        
-                                        echo $division;
-                                        ?>
-                                    </div>
-                                </div>
-                            </div>
+                            $total_marks += $total_subject_marks;
+                            $total_subjects++;
+                            $max_marks += $subject_max_marks;
+                            $total_grade_points += $calculated_gpa;
+                        ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($result['subject_code'] ?? $result['subject_id']); ?></td>
+                                <td><?php echo htmlspecialchars($result['subject_name']); ?></td>
+                                <td><?php echo htmlspecialchars($result['credit_hours'] ?? 3); ?></td>
+                                <td>
+                                    <?php 
+                                    // Calculate theory grade from marks
+                                    if ($theory_full_marks > 0) {
+                                        if ($theory_percentage >= 90) echo 'A+';
+                                        elseif ($theory_percentage >= 80) echo 'A';
+                                        elseif ($theory_percentage >= 70) echo 'B+';
+                                        elseif ($theory_percentage >= 60) echo 'B';
+                                        elseif ($theory_percentage >= 50) echo 'C+';
+                                        elseif ($theory_percentage >= 40) echo 'C';
+                                        elseif ($theory_percentage >= 35) echo 'D';
+                                        else echo 'NG';
+                                    } else {
+                                        echo 'N/A';
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php 
+                                    // Calculate practical grade from marks
+                                    if ($has_practical && $practical_full_marks > 0) {
+                                        if ($practical_marks > 0) {
+                                            if ($practical_percentage >= 90) echo 'A+';
+                                            elseif ($practical_percentage >= 80) echo 'A';
+                                            elseif ($practical_percentage >= 70) echo 'B+';
+                                            elseif ($practical_percentage >= 60) echo 'B';
+                                            elseif ($practical_percentage >= 50) echo 'C+';
+                                            elseif ($practical_percentage >= 40) echo 'C';
+                                            elseif ($practical_percentage >= 35) echo 'D';
+                                            else echo 'NG';
+                                        } else {
+                                            echo 'N/A';
+                                        }
+                                    } else {
+                                        echo 'N/A';
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php 
+                                    // Use calculated grade or fall back to stored grade
+                                    echo htmlspecialchars($calculated_grade ?? $result['grade'] ?? 'N/A'); 
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php echo number_format($calculated_gpa, 1); ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
 
-                            <!-- Grade Scale Reference -->
-                            <div class="grade-scale mt-6 bg-gray-50 p-4 rounded-lg text-sm">
-                                <div class="grade-title font-medium text-gray-700 mb-2 text-center">GRADING SCALE</div>
-                                <table class="grade-table min-w-full border-collapse text-xs">
-                                    <tr>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">Grade</th>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">A+</th>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">A</th>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">B+</th>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">B</th>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">C+</th>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">C</th>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">D+</th>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">NG</th>
-                                    </tr>
-                                    <tr>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">Marks Range</th>
-                                        <td class="border border-gray-300 p-2 text-center">91-100</td>
-                                        <td class="border border-gray-300 p-2 text-center">81-90</td>
-                                        <td class="border border-gray-300 p-2 text-center">71-80</td>
-                                        <td class="border border-gray-300 p-2 text-center">61-70</td>
-                                        <td class="border border-gray-300 p-2 text-center">51-60</td>
-                                        <td class="border border-gray-300 p-2 text-center">41-50</td>
-                                        <td class="border border-gray-300 p-2 text-center">35-40</td>
-                                        <td class="border border-gray-300 p-2 text-center">Below 35</td>
-                                    </tr>
-                                    <tr>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">Grade Point</th>
-                                        <td class="border border-gray-300 p-2 text-center">3.6-4.0</td>
-                                        <td class="border border-gray-300 p-2 text-center">3.2-3.6</td>
-                                        <td class="border border-gray-300 p-2 text-center">2.8-3.2</td>
-                                        <td class="border border-gray-300 p-2 text-center">2.6-2.8</td>
-                                        <td class="border border-gray-300 p-2 text-center">2.2-2.6</td>
-                                        <td class="border border-gray-300 p-2 text-center">1.6-2.2</td>
-                                        <td class="border border-gray-300 p-2 text-center">1.6</td>
-                                        <td class="border border-gray-300 p-2 text-center">0.0</td>
-                                    </tr>
-                                    <tr>
-                                        <th class="border border-gray-300 p-2 bg-gray-100">Description</th>
-                                        <td class="border border-gray-300 p-2 text-center">Excellent</td>
-                                        <td class="border border-gray-300 p-2 text-center">Very Good</td>
-                                        <td class="border border-gray-300 p-2 text-center">Good</td>
-                                        <td class="border border-gray-300 p-2 text-center">Satisfactory</td>
-                                        <td class="border border-gray-300 p-2 text-center">Acceptable</td>
-                                        <td class="border border-gray-300 p-2 text-center">Partially Acceptable</td>
-                                        <td class="border border-gray-300 p-2 text-center">Borderline</td>
-                                        <td class="border border-gray-300 p-2 text-center">Not Graded</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-                                <div class="flex">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <p class="text-sm text-yellow-700">
-                                            No results found for this exam in your subjects. Please select another exam or contact your administrator.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endif; ?>
+            <!-- Simple Overall Result Summary -->
+            <?php
+            // Check if any subject has NG grade
+            $has_ng_grade = false;
+            $failed_subjects = 0;
+            
+            foreach ($results as $result) {
+                $theory_marks = $result['theory_marks'] ?? 0;
+                $practical_marks = $result['practical_marks'] ?? 0;
+                $has_practical = !is_null($result['practical_marks']) && $result['practical_marks'] > 0;
+                
+                $theory_full_marks = $has_practical ? 75 : 100;
+                $practical_full_marks = $has_practical ? 25 : 0;
+                
+                $theory_percentage = $theory_full_marks > 0 ? ($theory_marks / $theory_full_marks) * 100 : 0;
+                $practical_percentage = $practical_full_marks > 0 ? ($practical_marks / $practical_full_marks) * 100 : 0;
+                
+                // Check for failure (35% rule)
+                $theory_failed = $theory_percentage < 35;
+                $practical_failed = $has_practical && $practical_percentage < 35;
+                
+                if ($theory_failed || $practical_failed) {
+                    $has_ng_grade = true;
+                    $failed_subjects++;
+                }
+            }
+            
+            $percentage = $max_marks > 0 ? ($total_marks / $max_marks) * 100 : 0;
+            $gpa = $total_subjects > 0 ? ($total_grade_points / $total_subjects) : 0;
+            $is_pass = ($failed_subjects == 0 && $percentage >= 35);
+            ?>
+
+            <div class="simple-summary">
+                <h2>Overall Result Summary</h2>
+                
+                <!-- Summary Cards -->
+                <div class="simple-summary-grid">
+                    <div class="simple-summary-item">
+                        <div class="simple-summary-label">Total Marks</div>
+                        <div class="simple-summary-value">
+                            <?php echo number_format($total_marks, 0) . ' / ' . number_format($max_marks, 0); ?>
+                        </div>
                     </div>
+                    <div class="simple-summary-item">
+                        <div class="simple-summary-label">Percentage</div>
+                        <div class="simple-summary-value"><?php echo number_format($percentage, 2); ?>%</div>
+                    </div>
+                    <div class="simple-summary-item">
+                        <div class="simple-summary-label">GPA</div>
+                        <div class="simple-summary-value"><?php echo number_format($gpa, 2); ?> / 4.0</div>
+                    </div>
+                    <?php if (!$has_ng_grade): ?>
+                    <div class="simple-summary-item">
+                        <div class="simple-summary-label">Grade</div>
+                        <div class="simple-summary-value">
+                            <?php
+                            // Calculate grade based on percentage
+                            if ($percentage >= 90) echo 'A+';
+                            elseif ($percentage >= 80) echo 'A';
+                            elseif ($percentage >= 70) echo 'B+';
+                            elseif ($percentage >= 60) echo 'B';
+                            elseif ($percentage >= 50) echo 'C+';
+                            elseif ($percentage >= 40) echo 'C';
+                            elseif ($percentage >= 35) echo 'D';
+                            else echo 'NG';
+                            ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Additional Information -->
+                <div class="simple-additional-info">
+                    <div class="simple-info-item">
+                        <div class="simple-info-label">Result Status</div>
+                        <div class="simple-info-value <?php echo $is_pass ? 'pass' : 'fail'; ?>">
+                            <?php echo $is_pass ? 'PASS' : 'FAIL'; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="simple-info-item">
+                        <div class="simple-info-label">Division</div>
+                        <div class="simple-info-value">
+                            <?php 
+                            $division = '';
+                            if ($percentage >= 91) $division = 'Distinction (A+)';
+                            elseif ($percentage >= 81) $division = 'First Division (A)';
+                            elseif ($percentage >= 71) $division = 'Second Division (B+)';
+                            elseif ($percentage >= 61) $division = 'Second Division (B)';
+                            elseif ($percentage >= 51) $division = 'Third Division (C+)';
+                            elseif ($percentage >= 41) $division = 'Third Division (C)';
+                            elseif ($percentage >= 35) $division = 'Pass (D)';
+                            else $division = 'Not Graded (NG)';
+                            
+                            echo $division;
+                            ?>
+                        </div>
+                    </div>
+                    
+                    <div class="simple-info-item">
+                        <div class="simple-info-label">Failed Subjects</div>
+                        <div class="simple-info-value <?php echo $failed_subjects > 0 ? 'fail' : 'pass'; ?>">
+                            <?php echo $failed_subjects; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grade-scale">
+                <div class="grade-title">GRADING SCALE</div>
+                <table class="grade-table">
+                    <tr>
+                        <th>Grade</th>
+                        <th>A+</th>
+                        <th>A</th>
+                        <th>B+</th>
+                        <th>B</th>
+                        <th>C+</th>
+                        <th>C</th>
+                        <th>D+</th>
+                        <th>NG</th>
+                    </tr>
+                    <tr>
+                        <th>Marks Range</th>
+                        <td>91-100</td>
+                        <td>81-90</td>
+                        <td>71-80</td>
+                        <td>61-70</td>
+                        <td>51-60</td>
+                        <td>41-50</td>
+                        <td>35-40</td>
+                        <td>Below 35</td>
+                    </tr>
+                    <tr>
+                        <th>Grade Point</th>
+                        <td>3.6-4.0</td>
+                        <td>3.2-3.6</td>
+                        <td>2.8-3.2</td>
+                        <td>2.6-2.8</td>
+                        <td>2.2-2.6</td>
+                        <td>1.6-2.2</td>
+                        <td>1.6</td>
+                        <td>0.0</td>
+                    </tr>
+                    <tr>
+                        <th>Description</th>
+                        <td>Excellent</td>
+                        <td>Very Good</td>
+                        <td>Good</td>
+                        <td>Satisfactory</td>
+                        <td>Acceptable</td>
+                        <td>Partially Acceptable</td>
+                        <td>Borderline</td>
+                        <td>Not Graded</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="footer">
+                <div class="signature">
+                    <div class="signature-line"></div>
+                    <div class="signature-title">PREPARED BY</div>
+                    <div><?php echo $teacher_name; ?></div>
+                </div>
+                <div class="signature">
+                    <div class="signature-line"></div>
+                    <div class="signature-title">PRINCIPAL</div>
+                    <div>SCHOOL PRINCIPAL</div>
+                </div>
+            </div>
+
+            <div class="qr-code">QR CODE</div>
+
+            <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #777;">
+                <p><?php echo isset($settings['result_footer']) ? $settings['result_footer'] : 'This is a computer-generated document. No signature is required.'; ?></p>
+                <p>Issue Date: <?php echo date('d-m-Y'); ?></p>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                        No results found for this exam in your subjects. Please select another exam or contact your administrator.
+                    </p>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+</div>
 
                     <!-- Progress Tracking Tab -->
                     <div id="progress" class="tab-content p-6">
@@ -1262,6 +1583,7 @@ function getRemarks($grade)
             // Check if jsPDF is loaded
             if (typeof jsPDF === 'undefined') {
                 console.error('jsPDF library not loaded');
+                alert(' library not loaded');
                 alert('PDF generation library not loaded. Please refresh the page and try again.');
                 return;
             }
