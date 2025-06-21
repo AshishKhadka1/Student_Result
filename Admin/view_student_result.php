@@ -241,56 +241,84 @@ try {
     // Convert upload status to boolean for compatibility
     $result_data['is_published'] = ($result_data['upload_status'] == 'Published') ? 1 : 0;
     
-    // Get all subject results for this student and exam from the same upload
-    $query = "SELECT DISTINCT r.result_id, r.student_id, r.exam_id, r.subject_id, 
-                r.theory_marks, r.practical_marks, r.grade, r.gpa, r.upload_id,
-                s.subject_name, s.subject_code
-          FROM results r
-          JOIN subjects s ON r.subject_id = s.subject_id
-          WHERE r.student_id = ? AND r.exam_id = ? AND r.upload_id = ?
-          ORDER BY s.subject_name";
+    // Get all subject results for this student and exam - MATCHING view_upload.php LOGIC
+    $subject_results = [];
 
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("iii", $result_data['student_id'], $result_data['exam_id'], $result_data['upload_id']);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $subject_results = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    
-    // If no results found with upload_id, try without it
-    if (empty($subject_results)) {
-        $query = "SELECT DISTINCT r.result_id, r.student_id, r.exam_id, r.subject_id, 
-                    r.theory_marks, r.practical_marks, r.grade, r.gpa,
-                    s.subject_name, s.subject_code
+    // Use the same query structure as view_upload.php but filtered for specific student
+    $query = "SELECT r.*, s.subject_name, s.subject_code
               FROM results r
               JOIN subjects s ON r.subject_id = s.subject_id
-              WHERE r.student_id = ? AND r.exam_id = ?
-              GROUP BY r.subject_id
-              ORDER BY s.subject_name";
+              WHERE r.student_id = ? AND r.exam_id = ?";
+
+    $params = [$result_data['student_id'], $result_data['exam_id']];
+    $param_types = "ii";
+
+    // If we have an upload_id, add it to the query for more specific results
+    if (!empty($result_data['upload_id'])) {
+        $query .= " AND r.upload_id = ?";
+        $params[] = $result_data['upload_id'];
+        $param_types .= "i";
+    }
+
+    $query .= " ORDER BY s.subject_name, r.result_id DESC";
+
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param($param_types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    // Collect all results first
+    $all_results = [];
+    while ($row = $result->fetch_assoc()) {
+        $all_results[] = $row;
+    }
+    $stmt->close();
+
+    // Remove duplicates by keeping only the first (most recent) result for each subject
+    $seen_subjects = [];
+    foreach ($all_results as $row) {
+        $subject_key = $row['subject_id'];
+        if (!isset($seen_subjects[$subject_key])) {
+            $seen_subjects[$subject_key] = true;
+            $subject_results[] = $row;
+        }
+    }
+
+    // If no results found with upload_id, try without upload_id constraint
+    if (empty($subject_results) && !empty($result_data['upload_id'])) {
+        $query = "SELECT r.*, s.subject_name, s.subject_code
+                  FROM results r
+                  JOIN subjects s ON r.subject_id = s.subject_id
+                  WHERE r.student_id = ? AND r.exam_id = ?
+                  ORDER BY s.subject_name, r.result_id DESC";
 
         $stmt = $conn->prepare($query);
         $stmt->bind_param("ii", $result_data['student_id'], $result_data['exam_id']);
         $stmt->execute();
         $result = $stmt->get_result();
-        $subject_results = $result->fetch_all(MYSQLI_ASSOC);
+        
+        // Collect all results first
+        $all_results = [];
+        while ($row = $result->fetch_assoc()) {
+            $all_results[] = $row;
+        }
         $stmt->close();
-    }
-    
-    // Remove any remaining duplicates based on subject_id
-    $unique_subjects = [];
-    $seen_subjects = [];
-    
-    foreach ($subject_results as $subject) {
-        $subject_key = $subject['subject_id'] . '_' . $subject['subject_name'];
-        if (!in_array($subject_key, $seen_subjects)) {
-            $unique_subjects[] = $subject;
-            $seen_subjects[] = $subject_key;
+        
+        // Remove duplicates by keeping only the first (most recent) result for each subject
+        $seen_subjects = [];
+        foreach ($all_results as $row) {
+            $subject_key = $row['subject_id'];
+            if (!isset($seen_subjects[$subject_key])) {
+                $seen_subjects[$subject_key] = true;
+                $subject_results[] = $row;
+            }
         }
     }
+
+    // Debug: Log the number of unique subjects found
+    error_log("Found " . count($subject_results) . " unique subjects for student " . $result_data['student_id'] . " exam " . $result_data['exam_id']);
     
-    $subject_results = $unique_subjects;
-    
-    // Calculate overall result from subject results using the same logic as view_upload.php
+    // Calculate overall result from subject results using EXACT same logic as view_upload.php
     $total_marks_obtained = 0;
     $total_full_marks = 0;
     $total_subjects = count($subject_results);
@@ -298,13 +326,13 @@ try {
     $total_gpa_points = 0;
 
     foreach ($subject_results as &$subject) {
-        $theory_marks = $subject['theory_marks'] ?? 0;
-        $practical_marks = $subject['practical_marks'] ?? 0;
+        $theory_marks = floatval($subject['theory_marks'] ?? 0);
+        $practical_marks = floatval($subject['practical_marks'] ?? 0);
         
-        // Determine if subject has practical based on whether practical_marks is not null and > 0
-        $has_practical = !is_null($subject['practical_marks']) && $subject['practical_marks'] > 0;
+        // Determine if subject has practical based on whether practical_marks > 0
+        $has_practical = $practical_marks > 0;
         
-        // Determine full marks based on whether practical exists
+        // Determine full marks based on whether practical exists - EXACT same logic as view_upload.php
         $theory_full_marks = $has_practical ? 75 : 100;
         $practical_full_marks = $has_practical ? 25 : 0;
         $subject_full_marks = 100; // Total is always 100
@@ -314,7 +342,7 @@ try {
         $total_marks_obtained += $subject_total_obtained;
         $total_full_marks += $subject_full_marks;
         
-        // Calculate individual component percentages
+        // Calculate individual component percentages - EXACT same logic as view_upload.php
         $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
         $practical_percentage = $has_practical ? ($practical_marks / $practical_full_marks) * 100 : 0;
         
@@ -322,13 +350,14 @@ try {
         $theory_grade_info = getGradeInfo($theory_percentage);
         $practical_grade_info = $has_practical ? getGradeInfo($practical_percentage) : ['grade' => 'N/A', 'point' => 0, 'class' => 'bg-gray-100 text-gray-800'];
         
-        // Check for failure condition (either theory or practical below 35%)
+        // Check for failure condition (either theory or practical below 35%) - EXACT same logic as view_upload.php
         $is_failed = ($theory_percentage < 35) || ($has_practical && $practical_percentage < 35);
         
-        // Calculate final GPA for this subject using the same logic as view_upload.php
+        // Calculate final GPA for this subject using EXACT same logic as view_upload.php
         if ($is_failed) {
             $subject_gpa = 0.0;
             $subject_grade = 'NG';
+            $final_grade_class = 'bg-red-100 text-red-800';
         } else {
             if ($has_practical) {
                 $subject_gpa = (($theory_grade_info['point'] * $theory_full_marks) + ($practical_grade_info['point'] * $practical_full_marks)) / $subject_full_marks;
@@ -336,7 +365,7 @@ try {
                 $subject_gpa = $theory_grade_info['point'];
             }
             
-            // Determine subject grade based on GPA
+            // Determine subject grade based on GPA - EXACT same logic as view_upload.php
             if ($subject_gpa >= 3.8) $subject_grade = 'A+';
             elseif ($subject_gpa >= 3.4) $subject_grade = 'A';
             elseif ($subject_gpa >= 3.0) $subject_grade = 'B+';
@@ -345,13 +374,17 @@ try {
             elseif ($subject_gpa >= 1.8) $subject_grade = 'C';
             elseif ($subject_gpa >= 1.4) $subject_grade = 'D';
             else $subject_grade = 'NG';
+            
+            $final_grade_class = $subject_grade == 'NG' ? 'bg-red-100 text-red-800' : 
+                               ($subject_gpa >= 3.0 ? 'bg-green-100 text-green-800' : 
+                               ($subject_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
         }
         
         if ($is_failed) {
             $failed_subjects++;
         }
         
-        // Store calculated values
+        // Store calculated values - EXACT same structure as view_upload.php
         $subject['calculated_percentage'] = ($subject_total_obtained / $subject_full_marks) * 100;
         $subject['calculated_grade'] = $subject_grade;
         $subject['calculated_gpa'] = $subject_gpa;
@@ -363,24 +396,25 @@ try {
         $subject['practical_percentage'] = $practical_percentage;
         $subject['theory_grade_info'] = $theory_grade_info;
         $subject['practical_grade_info'] = $practical_grade_info;
+        $subject['final_grade_class'] = $final_grade_class;
         
         $total_gpa_points += $subject_gpa;
     }
 
-    // Calculate overall percentage using correct formula
+    // Calculate overall percentage and GPA - EXACT same logic as view_upload.php
     $overall_percentage = $total_full_marks > 0 ? ($total_marks_obtained / $total_full_marks) * 100 : 0;
     $overall_gpa = $total_subjects > 0 ? ($total_gpa_points / $total_subjects) : 0;
     $is_pass = ($failed_subjects == 0);
-    
-    // Determine overall grade
+
+    // Determine overall grade - EXACT same logic as view_upload.php
     if ($failed_subjects > 0) {
         $overall_grade = 'NG';
     } else {
         $grade_data = calculateGradeAndGPA($overall_percentage);
         $overall_grade = $grade_data['grade'];
     }
-    
-    // Determine division
+
+    // Determine division - EXACT same logic as view_upload.php
     $division = '';
     if ($failed_subjects > 0) {
         $division = 'Fail';
@@ -805,7 +839,7 @@ $conn->close();
                             
                             <!-- Subject-wise Results -->
                             <div class="p-6 border-b border-gray-200">
-                                <h2 class="text-xl font-semibold text-gray-900 mb-4">Subject-wise Results</h2>
+                                <h2 class="text-xl font-semibold text-gray-900 mb-4">Subject-wise Results (<?php echo count($subject_results); ?> subjects)</h2>
                                 <div class="overflow-x-auto">
                                     <table class="min-w-full divide-y divide-gray-200">
                                         <thead class="bg-gray-50">
@@ -841,13 +875,14 @@ $conn->close();
                                                 <tr>
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+                                                        <div class="text-xs text-gray-500">ID: <?php echo $subject['subject_id']; ?></div>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm text-gray-900"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+                                                        <div class="text-sm text-gray-900"><?php echo htmlspecialchars($subject['subject_code'] ?? 'N/A'); ?></div>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <div class="flex flex-col">
-                                                            <span><?php echo htmlspecialchars($subject['theory_marks']); ?> / <?php echo $subject['theory_full_marks']; ?></span>
+                                                            <span><?php echo number_format($subject['theory_marks'], 1); ?>/<?php echo $subject['theory_full_marks']; ?></span>
                                                             <span class="text-xs text-gray-400"><?php echo number_format($subject['theory_percentage'], 1); ?>%</span>
                                                             <span class="px-1 inline-flex text-xs leading-4 font-semibold rounded <?php echo $subject['theory_grade_info']['class']; ?>">
                                                                 <?php echo $subject['theory_grade_info']['grade']; ?>
@@ -857,7 +892,7 @@ $conn->close();
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <?php if ($subject['has_practical']): ?>
                                                             <div class="flex flex-col">
-                                                                <span><?php echo htmlspecialchars($subject['practical_marks'] ?? 0); ?> / <?php echo $subject['practical_full_marks']; ?></span>
+                                                                <span><?php echo number_format($subject['practical_marks'], 1); ?>/<?php echo $subject['practical_full_marks']; ?></span>
                                                                 <span class="text-xs text-gray-400"><?php echo number_format($subject['practical_percentage'], 1); ?>%</span>
                                                                 <span class="px-1 inline-flex text-xs leading-4 font-semibold rounded <?php echo $subject['practical_grade_info']['class']; ?>">
                                                                     <?php echo $subject['practical_grade_info']['grade']; ?>
@@ -868,11 +903,9 @@ $conn->close();
                                                         <?php endif; ?>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm font-semibold text-gray-900">
-                                                            <?php 
-                                                            $total_obtained = $subject['theory_marks'] + ($subject['practical_marks'] ?? 0);
-                                                            echo htmlspecialchars(number_format($total_obtained, 2)) . ' / ' . $subject['subject_full_marks']; 
-                                                            ?>
+                                                        <div class="flex flex-col">
+                                                            <span class="font-medium"><?php echo number_format($subject['theory_marks'] + $subject['practical_marks'], 1); ?>/100</span>
+                                                            <span class="text-xs text-gray-400"><?php echo number_format($subject['calculated_percentage'], 1); ?>%</span>
                                                         </div>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
@@ -882,37 +915,21 @@ $conn->close();
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <div class="flex flex-col">
-                                                            <?php
-                                                            $grade_class = '';
-                                                            switch ($subject['calculated_grade']) {
-                                                                case 'A+': $grade_class = 'bg-green-100 text-green-800'; break;
-                                                                case 'A': $grade_class = 'bg-green-100 text-green-800'; break;
-                                                                case 'B+': $grade_class = 'bg-green-100 text-green-800'; break;
-                                                                case 'B': $grade_class = 'bg-green-100 text-green-800'; break;
-                                                                case 'C+': $grade_class = 'bg-yellow-100 text-yellow-800'; break;
-                                                                case 'C': $grade_class = 'bg-yellow-100 text-yellow-800'; break;
-                                                                case 'D': $grade_class = 'bg-orange-100 text-orange-800'; break;
-                                                                case 'NG': $grade_class = 'bg-red-100 text-red-800'; break;
-                                                                default: $grade_class = 'bg-gray-100 text-gray-800';
-                                                            }
-                                                            ?>
-                                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $grade_class; ?>">
-                                                                <?php echo htmlspecialchars($subject['calculated_grade']); ?>
+                                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $subject['final_grade_class']; ?>">
+                                                                <?php echo $subject['calculated_grade']; ?>
                                                             </span>
                                                             <span class="text-xs text-gray-400 mt-1">GPA: <?php echo number_format($subject['calculated_gpa'], 2); ?></span>
                                                         </div>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
-                                                        <?php 
-                                                        $is_pass = ($subject['calculated_grade'] != 'NG');
-                                                        ?>
+                                                        <?php $is_pass = ($subject['calculated_grade'] != 'NG'); ?>
                                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $is_pass ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
                                                             <?php echo $is_pass ? 'Pass' : 'Fail'; ?>
                                                         </span>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium no-print">
                                                         <div class="flex space-x-3">
-                                                            <button type="button" onclick="openEditSubjectMarksModal('<?php echo $subject['result_id']; ?>', '<?php echo $subject['subject_name']; ?>', <?php echo $subject['theory_marks']; ?>, <?php echo $subject['practical_marks'] ?? 0; ?>, <?php echo $subject['has_practical'] ? 'true' : 'false'; ?>)" class="text-blue-600 hover:text-blue-900 transition-colors duration-200">
+                                                            <button type="button" onclick="openEditSubjectMarksModal('<?php echo $subject['result_id']; ?>', '<?php echo htmlspecialchars($subject['subject_name']); ?>', <?php echo $subject['theory_marks']; ?>, <?php echo $subject['practical_marks'] ?? 0; ?>, <?php echo $subject['has_practical'] ? 'true' : 'false'; ?>)" class="text-blue-600 hover:text-blue-900 transition-colors duration-200">
                                                                 <i class="fas fa-edit"></i> Edit
                                                             </button>
                                                         </div>
@@ -992,40 +1009,7 @@ $conn->close();
                                         </p>
                                     </div>
                                 </div>
-                                
-                                <!-- Grade Scale Reference -->
-                                <div class="mt-6 bg-gray-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-gray-700 mb-2">Grading Scale Reference</h4>
-                                    <div class="overflow-x-auto">
-                                        <table class="min-w-full text-xs">
-                                            <thead>
-                                                <tr class="bg-gray-100">
-                                                    <th class="px-2 py-1 text-left">Percentage Range</th>
-                                                    <th class="px-2 py-1 text-left">Grade</th>
-                                                    <th class="px-2 py-1 text-left">Grade Point</th>
-                                                    <th class="px-2 py-1 text-left">Description</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr><td class="px-2 py-1">90 – 100</td><td class="px-2 py-1 font-medium">A+</td><td class="px-2 py-1">4.0</td><td class="px-2 py-1">Outstanding</td></tr>
-                                                <tr><td class="px-2 py-1">80 – 89</td><td class="px-2 py-1 font-medium">A</td><td class="px-2 py-1">3.6</td><td class="px-2 py-1">Excellent</td></tr>
-                                                <tr><td class="px-2 py-1">70 – 79</td><td class="px-2 py-1 font-medium">B+</td><td class="px-2 py-1">3.2</td><td class="px-2 py-1">Very Good</td></tr>
-                                                <tr><td class="px-2 py-1">60 – 69</td><td class="px-2 py-1 font-medium">B</td><td class="px-2 py-1">2.8</td><td class="px-2 py-1">Good</td></tr>
-                                                <tr><td class="px-2 py-1">50 – 59</td><td class="px-2 py-1 font-medium">C+</td><td class="px-2 py-1">2.4</td><td class="px-2 py-1">Satisfactory</td></tr>
-                                                <tr><td class="px-2 py-1">40 – 49</td><td class="px-2 py-1 font-medium">C</td><td class="px-2 py-1">2.0</td><td class="px-2 py-1">Acceptable</td></tr>
-                                                <tr><td class="px-2 py-1">35 – 39</td><td class="px-2 py-1 font-medium">D</td><td class="px-2 py-1">1.6</td><td class="px-2 py-1">Needs Improvement</td></tr>
-                                                <tr><td class="px-2 py-1">Below 35</td><td class="px-2 py-1 font-medium text-red-600">NG</td><td class="px-2 py-1">0.0</td><td class="px-2 py-1">Not Graded</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div class="mt-3 text-xs text-gray-600">
-                                        <p><strong>Marking System:</strong></p>
-                                        <p>• If practical is included: Theory (75 marks) + Practical (25 marks) = 100 marks total</p>
-                                        <p>• If no practical: Theory only (100 marks) = 100 marks total</p>
-                                        <p><strong>Failure Condition:</strong> If either theory or practical component is below 35%, the result is NG (Not Graded)</p>
-                                        <p><strong>Example:</strong> Theory 30/75 (40%) + Practical 20/25 (80%) = 50/100 (50%) → Still NG because theory component failed</p>
-                                    </div>
-                                </div>
+                          
                                 
                                 <!-- Signature Section (visible only in print) -->
                                 <div class="hidden print:block mt-12">
@@ -1059,36 +1043,31 @@ $conn->close();
     <div id="editSubjectMarksModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeEditSubjectMarksModal()">&times;</span>
-            <h2 class="text-xl font-semibold mb-4">Update Subject Marks</h2>
-            <form id="editSubjectMarksForm" method="POST" class="space-y-4">
+            <h2 class="text-xl font-bold mb-4">Edit Subject Marks</h2>
+            <form method="POST" id="editSubjectMarksForm">
                 <input type="hidden" name="action" value="update_subject_marks">
-                <input type="hidden" id="edit_result_id" name="result_id" value="">
-                <input type="hidden" id="has_practical_hidden" name="has_practical" value="">
-            
-                <div>
-                    <label for="subject_name" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                    <input type="text" id="subject_name" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" readonly>
+                <input type="hidden" name="result_id" id="edit_result_id">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+                    <p id="edit_subject_name" class="text-lg font-semibold text-gray-900"></p>
                 </div>
-            
-                <div>
-                    <label for="theory_marks" class="block text-sm font-medium text-gray-700 mb-1">Theory Marks</label>
-                    <input type="number" id="theory_marks" name="theory_marks" step="0.01" min="0" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" required>
-                    <p id="theory_help" class="text-xs text-gray-500 mt-1">Enter marks between 0 and 100</p>
+                
+                <div class="mb-4">
+                    <label for="edit_theory_marks" class="block text-sm font-medium text-gray-700 mb-2">Theory Marks</label>
+                    <input type="number" name="theory_marks" id="edit_theory_marks" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <p class="text-xs text-gray-500 mt-1">Maximum: <span id="theory_max_marks"></span> marks</p>
                 </div>
-            
-                <div id="practical_section">
-                    <label for="practical_marks" class="block text-sm font-medium text-gray-700 mb-1">Practical Marks</label>
-                    <input type="number" id="practical_marks" name="practical_marks" step="0.01" min="0" max="25" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
-                    <p class="text-xs text-gray-500 mt-1">Enter marks between 0 and 25 (leave empty if no practical)</p>
+                
+                <div class="mb-4" id="practical_marks_section">
+                    <label for="edit_practical_marks" class="block text-sm font-medium text-gray-700 mb-2">Practical Marks</label>
+                    <input type="number" name="practical_marks" id="edit_practical_marks" step="0.01" min="0" max="25" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <p class="text-xs text-gray-500 mt-1">Maximum: 25 marks (leave empty if no practical)</p>
                 </div>
-            
-                <div class="flex justify-end">
-                    <button type="button" onclick="closeEditSubjectMarksModal()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-2">
-                        Cancel
-                    </button>
-                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Update Marks
-                    </button>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeEditSubjectMarksModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Update Marks</button>
                 </div>
             </form>
         </div>
@@ -1098,122 +1077,60 @@ $conn->close();
         // Modal functions
         function openEditSubjectMarksModal(resultId, subjectName, theoryMarks, practicalMarks, hasPractical) {
             document.getElementById('edit_result_id').value = resultId;
-            document.getElementById('subject_name').value = subjectName;
-            document.getElementById('theory_marks').value = theoryMarks;
-            document.getElementById('has_practical_hidden').value = hasPractical;
+            document.getElementById('edit_subject_name').textContent = subjectName;
+            document.getElementById('edit_theory_marks').value = theoryMarks;
             
-            const theoryInput = document.getElementById('theory_marks');
-            const practicalSection = document.getElementById('practical_section');
-            const theoryHelp = document.getElementById('theory_help');
-            
-            if (hasPractical === 'true' || hasPractical === true) {
-                // Subject has practical: Theory max 75, Practical max 25
-                theoryInput.max = 75;
-                theoryHelp.textContent = 'Enter marks between 0 and 75 (Theory component - 35% minimum required to pass)';
-                practicalSection.style.display = 'block';
-                document.getElementById('practical_marks').value = practicalMarks || '';
-                document.getElementById('practical_marks').required = true;
+            if (hasPractical) {
+                document.getElementById('edit_practical_marks').value = practicalMarks || '';
+                document.getElementById('practical_marks_section').style.display = 'block';
+                document.getElementById('theory_max_marks').textContent = '75';
+                document.getElementById('edit_theory_marks').max = '75';
             } else {
-                // Subject has no practical: Theory max 100
-                theoryInput.max = 100;
-                theoryHelp.textContent = 'Enter marks between 0 and 100 (Theory only - 35% minimum required to pass)';
-                practicalSection.style.display = 'none';
-                document.getElementById('practical_marks').value = '';
-                document.getElementById('practical_marks').required = false;
+                document.getElementById('edit_practical_marks').value = '';
+                document.getElementById('practical_marks_section').style.display = 'none';
+                document.getElementById('theory_max_marks').textContent = '100';
+                document.getElementById('edit_theory_marks').max = '100';
             }
             
             document.getElementById('editSubjectMarksModal').style.display = 'block';
         }
-        
+
         function closeEditSubjectMarksModal() {
             document.getElementById('editSubjectMarksModal').style.display = 'none';
         }
-        
-        // Close modal when clicking outside of it
+
+        // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('editSubjectMarksModal');
             if (event.target == modal) {
-                closeEditSubjectMarksModal();
+                modal.style.display = 'none';
             }
         }
 
         // Form validation
         document.getElementById('editSubjectMarksForm').addEventListener('submit', function(e) {
-            const theoryMarks = parseFloat(document.getElementById('theory_marks').value);
-            const practicalMarks = parseFloat(document.getElementById('practical_marks').value) || 0;
-            const hasPractical = document.getElementById('has_practical_hidden').value === 'true';
-            
-            const theoryMax = hasPractical ? 75 : 100;
-            const practicalMax = 25;
+            const theoryMarks = parseFloat(document.getElementById('edit_theory_marks').value);
+            const practicalMarks = parseFloat(document.getElementById('edit_practical_marks').value) || 0;
+            const theoryMax = parseFloat(document.getElementById('edit_theory_marks').max);
             
             if (theoryMarks > theoryMax) {
                 e.preventDefault();
-                alert(`Theory marks cannot exceed ${theoryMax}!`);
-                return false;
+                alert('Theory marks cannot exceed ' + theoryMax);
+                return;
             }
             
-            if (hasPractical && practicalMarks > practicalMax) {
+            if (practicalMarks > 25) {
                 e.preventDefault();
-                alert(`Practical marks cannot exceed ${practicalMax}!`);
-                return false;
+                alert('Practical marks cannot exceed 25');
+                return;
             }
             
-            if (theoryMarks < 0) {
+            if ((theoryMarks + practicalMarks) > 100) {
                 e.preventDefault();
-                alert('Theory marks cannot be negative!');
-                return false;
-            }
-            
-            if (practicalMarks < 0) {
-                e.preventDefault();
-                alert('Practical marks cannot be negative!');
-                return false;
-            }
-            
-            // Check total doesn't exceed 100
-            const total = theoryMarks + practicalMarks;
-            if (total > 100) {
-                e.preventDefault();
-                alert('Total marks (theory + practical) cannot exceed 100!');
-                return false;
-            }
-            
-            // Check 35% rule
-            const theoryPercentage = (theoryMarks / theoryMax) * 100;
-            if (theoryPercentage < 35) {
-                const proceed = confirm(`Warning: Theory percentage is ${theoryPercentage.toFixed(2)}% which is below 35%. This will result in NG (Not Graded). Do you want to continue?`);
-                if (!proceed) {
-                    e.preventDefault();
-                    return false;
-                }
-            }
-            
-            if (hasPractical) {
-                const practicalPercentage = (practicalMarks / practicalMax) * 100;
-                if (practicalPercentage < 35) {
-                    const proceed = confirm(`Warning: Practical percentage is ${practicalPercentage.toFixed(2)}% which is below 35%. This will result in NG (Not Graded). Do you want to continue?`);
-                    if (!proceed) {
-                        e.preventDefault();
-                        return false;
-                    }
-                }
+                alert('Total marks cannot exceed 100');
+                return;
             }
         });
-
-        function confirmDeleteSubject(subjectName) {
-            return Swal.fire({
-                title: 'Delete Subject Result',
-                html: `Are you sure you want to delete the result for <strong>${subjectName}</strong>?<br><br>This action cannot be undone.`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, delete it!',
-                cancelButtonText: 'Cancel'
-            }).then((result) => {
-                return result.isConfirmed;
-            });
-        }
     </script>
 </body>
 </html>
