@@ -168,6 +168,98 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             border-color: #4a5568 !important;
         }
     </style>
+    
+    <script>
+    // Function to check if results already exist for exam and class combination
+    async function checkExistingResults(examId, classId = null, studentId = null) {
+        try {
+            const params = new URLSearchParams({
+                action: 'check_existing',
+                exam_id: examId
+            });
+            
+            if (classId) params.append('class_id', classId);
+            if (studentId) params.append('student_id', studentId);
+            
+            const response = await fetch('check_existing_results.php?' + params);
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error checking existing results:', error);
+            return { exists: false, error: true };
+        }
+    }
+
+    // Function to validate manual entry before submission
+    async function validateManualEntry() {
+        const studentId = document.getElementById('student_id').value;
+        const examId = document.getElementById('exam_id').value;
+        
+        if (!studentId || !examId) {
+            return true; // Let normal validation handle empty fields
+        }
+        
+        const result = await checkExistingResults(examId, null, studentId);
+        
+        if (result.exists) {
+            const confirmed = await Swal.fire({
+                title: 'Results Already Exist!',
+                html: `Results for this student already exist for the selected exam:<br><br>
+                       <strong>Student:</strong> ${result.student_name}<br>
+                       <strong>Exam:</strong> ${result.exam_name}<br>
+                       <strong>Existing Subjects:</strong> ${result.subjects.join(', ')}<br><br>
+                       Do you want to update the existing results?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, Update Results',
+                cancelButtonText: 'Cancel'
+            });
+            
+            return confirmed.isConfirmed;
+        }
+        
+        return true;
+    }
+
+    // Function to validate batch entry before submission
+    async function validateBatchEntry() {
+        const examId = document.getElementById('batch_exam_id').value;
+        const classId = document.getElementById('batch_class_id').value;
+        const subjectId = document.getElementById('batch_subject_id').value;
+        
+        if (!examId || !subjectId) {
+            return true; // Let normal validation handle empty fields
+        }
+        
+        const result = await checkExistingResults(examId, classId);
+        
+        if (result.exists) {
+            const classInfo = classId ? ` for class ${result.class_name}` : '';
+            
+            const confirmed = await Swal.fire({
+                title: 'Results Already Exist!',
+                html: `Results already exist for the selected exam${classInfo}:<br><br>
+                       <strong>Exam:</strong> ${result.exam_name}<br>
+                       <strong>Subject:</strong> ${result.subject_name}<br>
+                       ${classId ? `<strong>Class:</strong> ${result.class_name}<br>` : ''}
+                       <strong>Affected Students:</strong> ${result.student_count}<br><br>
+                       Do you want to update the existing results?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, Update Results',
+                cancelButtonText: 'Cancel'
+            });
+            
+            return confirmed.isConfirmed;
+        }
+        
+        return true;
+    }
+    </script>
 </head>
 
 <body class="bg-gray-100" id="body">
@@ -776,55 +868,186 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                     </th>
                                                 </tr>
                                             </thead>
-                                            <tbody class="bg-white divide-y divide-gray-200">
-                                                <?php if ($uploads && $uploads->num_rows > 0): ?>
-                                                    <?php while ($row = $uploads->fetch_assoc()): ?>
-                                                        <tr>
-                                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                                <div class="flex items-center">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                                    </svg>
-                                                                    <span class="text-sm text-gray-900"><?php echo htmlspecialchars($row['file_name']); ?></span>
-                                                                </div>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                <?php echo htmlspecialchars($row['description'] ?? 'N/A'); ?>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                <?php echo date('F d, Y', strtotime($row['upload_date'])); ?>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                <?php echo number_format($row['student_count']); ?>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
-                                                                    <?php echo htmlspecialchars($row['status']); ?>
-                                                                </span>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                <a href="view_upload.php?id=<?php echo $row['id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
-                                                                <?php if ($row['status'] != 'Published'): ?>
-                                                                    <a href="publish_results.php?id=<?php echo $row['id']; ?>" class="text-green-600 hover:text-green-900 mr-3">Publish</a>
-                                                                <?php else: ?>
-                                                                    <a href="unpublish_results.php?id=<?php echo $row['id']; ?>" class="text-yellow-600 hover:text-yellow-900 mr-3">Unpublish</a>
-                                                                <?php endif; ?>
-                                                                <a href="delete_upload.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900 mr-3" onclick="return confirm('Are you sure you want to delete this upload? This will also delete all associated results.')">Delete</a>
-                                                                <a href="students_result.php?upload_id=<?php echo $row['id']; ?>" class="text-indigo-600 hover:text-indigo-900">Student Results</a>
-                                                            </td>
-                                                        </tr>
-                                                    <?php endwhile; ?>
-                                                <?php else: ?>
-                                                    <tr>
-                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" colspan="7">
-                                                            No result uploads found.
-                                                        </td>
-                                                    </tr>
-                                                <?php endif; ?>
-                                            </tbody>
+                                            
+<tbody class="bg-white divide-y divide-gray-200">
+    <?php if ($uploads && $uploads->num_rows > 0): ?>
+        <?php while ($row = $uploads->fetch_assoc()): ?>
+            <?php
+            // Get all students associated with this upload
+            $studentsInUpload = [];
+            $studentQuery = "SELECT DISTINCT r.student_id, u.full_name, s.roll_number 
+                           FROM results r 
+                           JOIN students s ON r.student_id = s.student_id 
+                           JOIN users u ON s.user_id = u.user_id 
+                           WHERE r.upload_id = ? 
+                           ORDER BY u.full_name";
+            $stmt = $conn->prepare($studentQuery);
+            $stmt->bind_param("i", $row['id']);
+            $stmt->execute();
+            $studentResult = $stmt->get_result();
+            
+            while ($student = $studentResult->fetch_assoc()) {
+                $studentsInUpload[] = $student;
+            }
+            $stmt->close();
+            
+            // If multiple students, we'll show multiple rows, one for each student
+            if (count($studentsInUpload) > 0):
+                foreach ($studentsInUpload as $index => $student):
+            ?>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span class="text-sm text-gray-900">
+                                    <?php 
+                                    // Generate unique file name for each student
+                                    $originalFileName = $row['file_name'] ?? 'result_upload';
+                                    $fileExtension = pathinfo($originalFileName, PATHINFO_EXTENSION);
+                                    $baseName = pathinfo($originalFileName, PATHINFO_FILENAME);
+                                    
+                                    // Create unique identifier using upload ID, student ID, and date
+                                    $uploadDate = date('Ymd', strtotime($row['upload_date']));
+                                    $uploadId = str_pad($row['id'], 4, '0', STR_PAD_LEFT);
+                                    
+                                    // Clean student name for filename (remove spaces and special characters)
+                                    $cleanStudentName = preg_replace('/[^A-Za-z0-9]/', '_', $student['full_name']);
+                                    $cleanStudentName = substr($cleanStudentName, 0, 20); // Limit length
+                                    
+                                    // Generate new file name format: basename_StudentName_StudentID_YYYYMMDD_UploadID.extension
+                                    $newFileName = $baseName . '_' . $cleanStudentName . '_' . $student['student_id'] . '_' . $uploadDate . '_' . $uploadId;
+                                    
+                                    if ($fileExtension) {
+                                        $newFileName .= '.' . $fileExtension;
+                                    } else {
+                                        $newFileName .= '.xlsx'; // Default extension for result files
+                                    }
+                                    
+                                    echo htmlspecialchars($newFileName);
+                                    ?>
+                                </span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <?php 
+                            $description = $row['description'] ?? 'N/A';
+                            // Add student info to description
+                            $studentInfo = "Student: " . $student['full_name'] . " (ID: " . $student['student_id'];
+                            if (!empty($student['roll_number'])) {
+                                $studentInfo .= ", Roll: " . $student['roll_number'];
+                            }
+                            $studentInfo .= ")";
+                            
+                            if ($description != 'N/A') {
+                                echo htmlspecialchars($description . " - " . $studentInfo);
+                            } else {
+                                echo htmlspecialchars($studentInfo);
+                            }
+                            ?>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <?php echo date('F d, Y', strtotime($row['upload_date'])); ?>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <?php 
+                            // Show individual student count (1) and total in parentheses
+                            echo "1 (" . count($studentsInUpload) . " total)";
+                            ?>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
+                                <?php echo htmlspecialchars($row['status']); ?>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <a href="view_upload.php?id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+                            <?php if ($index == 0): // Only show these actions for the first student row ?>
+                                <?php if ($row['status'] != 'Published'): ?>
+                                    <a href="publish_results.php?id=<?php echo $row['id']; ?>" class="text-green-600 hover:text-green-900 mr-3">Publish</a>
+                                <?php else: ?>
+                                    <a href="unpublish_results.php?id=<?php echo $row['id']; ?>" class="text-yellow-600 hover:text-yellow-900 mr-3">Unpublish</a>
+                                <?php endif; ?>
+                                <a href="delete_upload.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900 mr-3" onclick="return confirm('Are you sure you want to delete this upload? This will also delete all associated results.')">Delete</a>
+                            <?php endif; ?>
+                            <a href="students_result.php?upload_id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>" class="text-indigo-600 hover:text-indigo-900">Student Results</a>
+                        </td>
+                    </tr>
+            <?php 
+                endforeach;
+            else:
+                // Fallback for uploads with no associated students
+            ?>
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span class="text-sm text-gray-900">
+                                <?php 
+                                // Generate file name for upload without students
+                                $originalFileName = $row['file_name'] ?? 'result_upload';
+                                $fileExtension = pathinfo($originalFileName, PATHINFO_EXTENSION);
+                                $baseName = pathinfo($originalFileName, PATHINFO_FILENAME);
+                                
+                                $uploadDate = date('Ymd', strtotime($row['upload_date']));
+                                $uniqueId = str_pad($row['id'], 4, '0', STR_PAD_LEFT);
+                                
+                                $newFileName = $baseName . '_' . $uploadDate . '_' . $uniqueId;
+                                if ($fileExtension) {
+                                    $newFileName .= '.' . $fileExtension;
+                                } else {
+                                    $newFileName .= '.xlsx';
+                                }
+                                
+                                echo htmlspecialchars($newFileName);
+                                ?>
+                            </span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <?php echo htmlspecialchars($row['description'] ?? 'N/A'); ?>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <?php echo date('F d, Y', strtotime($row['upload_date'])); ?>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <?php echo number_format($row['student_count']); ?>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
+                            <?php echo htmlspecialchars($row['status']); ?>
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <a href="view_upload.php?id=<?php echo $row['id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+                        <?php if ($row['status'] != 'Published'): ?>
+                            <a href="publish_results.php?id=<?php echo $row['id']; ?>" class="text-green-600 hover:text-green-900 mr-3">Publish</a>
+                        <?php else: ?>
+                            <a href="unpublish_results.php?id=<?php echo $row['id']; ?>" class="text-yellow-600 hover:text-yellow-900 mr-3">Unpublish</a>
+                        <?php endif; ?>
+                        <a href="delete_upload.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900 mr-3" onclick="return confirm('Are you sure you want to delete this upload? This will also delete all associated results.')">Delete</a>
+                        <a href="students_result.php?upload_id=<?php echo $row['id']; ?>" class="text-indigo-600 hover:text-indigo-900">Student Results</a>
+                    </td>
+                </tr>
+            <?php endif; ?>
+        <?php endwhile; ?>
+    <?php else: ?>
+        <tr>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" colspan="7">
+                No result uploads found.
+            </td>
+        </tr>
+    <?php endif; ?>
+</tbody>
                                         </table>
                                     </div>
                                 </div>
@@ -877,10 +1100,13 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                     ${updatedStudentSelectHTML}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="number" name="students[${studentRowCount}][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
+                    <input type="number" name="students[${studentRowCount}][theory_marks]" class="batch-theory-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required onchange="updateBatchMarksDistribution(this)">
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="number" name="students[${studentRowCount}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
+                    <input type="number" name="students[${studentRowCount}][practical_marks]" class="batch-practical-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" onchange="updateBatchMarksDistribution(this)">
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <input type="text" class="batch-total-marks w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md" readonly>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <button type="button" class="delete-student-row text-red-600 hover:text-red-800">
@@ -907,6 +1133,21 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 
             // Reset select
             subjectRow.querySelector('select').selectedIndex = 0;
+            
+            // Reset max marks display
+            subjectRow.querySelector('.theory-max-marks').textContent = '(Max: 100)';
+            subjectRow.querySelector('.practical-max-marks').textContent = '(Max: 0)';
+            subjectRow.querySelector('.theory-marks').max = 100;
+            subjectRow.querySelector('.practical-marks').max = 100;
+
+            // Add event listeners for marks distribution
+            subjectRow.querySelector('.theory-marks').addEventListener('change', function() {
+                updateMarksDistribution(this);
+            });
+            
+            subjectRow.querySelector('.practical-marks').addEventListener('change', function() {
+                updateMarksDistribution(this);
+            });
 
             // Add event listener to remove button
             subjectRow.querySelector('.remove-subject').addEventListener('click', function() {
@@ -1066,10 +1307,10 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                     </select>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <input type="number" name="students[${index}][theory_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required>
+                                    <input type="number" name="students[${index}][theory_marks]" class="batch-theory-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" required onchange="updateBatchMarksDistribution(this)">
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <input type="number" name="students[${index}][practical_marks]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01">
+                                    <input type="number" name="students[${index}][practical_marks]" class="batch-practical-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100" step="0.01" onchange="updateBatchMarksDistribution(this)">
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <input type="text" class="batch-total-marks w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md" readonly>
@@ -1128,6 +1369,26 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                     } else {
                         alert('You must have at least one student row.');
                     }
+                }
+            });
+
+            // Form submission validation
+            document.getElementById('resultForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const isValid = await validateManualEntry();
+                if (isValid) {
+                    this.submit();
+                }
+            });
+
+            // Batch form submission validation
+            document.querySelector('#content-batch form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const isValid = await validateBatchEntry();
+                if (isValid) {
+                    this.submit();
                 }
             });
         });
@@ -1277,99 +1538,6 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                 }
             });
         }
-    </script>
-    
-    <script>
-        // Add Subject Row (updated version)
-        document.getElementById('addSubject').addEventListener('click', function() {
-            const container = document.getElementById('subjectsContainer');
-            const subjectRow = document.querySelector('.subject-row').cloneNode(true);
-
-            // Clear input values
-            subjectRow.querySelectorAll('input').forEach(input => {
-                input.value = '';
-            });
-
-            // Reset select
-            subjectRow.querySelector('select').selectedIndex = 0;
-            
-            // Reset max marks display
-            subjectRow.querySelector('.theory-max-marks').textContent = '(Max: 100)';
-            subjectRow.querySelector('.practical-max-marks').textContent = '(Max: 0)';
-            subjectRow.querySelector('.theory-marks').max = 100;
-            subjectRow.querySelector('.practical-marks').max = 100;
-
-            // Add event listeners for marks distribution
-            subjectRow.querySelector('.theory-marks').addEventListener('change', function() {
-                updateMarksDistribution(this);
-            });
-            
-            subjectRow.querySelector('.practical-marks').addEventListener('change', function() {
-                updateMarksDistribution(this);
-            });
-
-            // Add event listener to remove button
-            subjectRow.querySelector('.remove-subject').addEventListener('click', function() {
-                if (container.children.length > 1) {
-                    this.closest('.subject-row').remove();
-                }
-            });
-
-            container.appendChild(subjectRow);
-        });
-    </script>
-    
-    <script>
-        // Add student row in batch entry (updated version)
-        // studentRowCount is already declared above
-        document.getElementById('add-student-row').addEventListener('click', function() {
-            const container = document.getElementById('batch-students-container');
-            const newRow = document.createElement('tr');
-
-            // Get the HTML content of the first student row
-            const firstRow = container.querySelector('tr');
-            const studentSelectHTML = firstRow.querySelector('td:first-child select').outerHTML;
-
-            // Replace the name attribute to use the new index
-            const updatedStudentSelectHTML = studentSelectHTML.replace(/students\[0\]/g, `students[${studentRowCount}]`);
-
-            // Get current max values
-            const theoryMaxSpan = document.querySelector('.batch-theory-max');
-            const practicalMaxSpan = document.querySelector('.batch-practical-max');
-            const theoryMax = theoryMaxSpan.textContent.includes('75') ? 75 : 100;
-            const practicalMax = practicalMaxSpan.textContent.includes('25') ? 25 : 0;
-
-            newRow.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap">
-                    ${updatedStudentSelectHTML}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="number" name="students[${studentRowCount}][theory_marks]" 
-                           class="batch-theory-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                           min="0" max="${theoryMax}" step="0.01" required
-                           onchange="updateBatchMarksDistribution(this)">
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="number" name="students[${studentRowCount}][practical_marks]" 
-                           class="batch-practical-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                           min="0" max="${practicalMax}" step="0.01" ${practicalMax === 0 ? 'disabled' : ''}
-                           onchange="updateBatchMarksDistribution(this)">
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="text" class="batch-total-marks w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md" readonly>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <button type="button" class="delete-student-row text-red-600 hover:text-red-800">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </td>
-            `;
-
-            container.appendChild(newRow);
-            studentRowCount++;
-        });
     </script>
 </body>
 
