@@ -11,16 +11,58 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Function to get grade and grade point from percentage
+// Function to get grade and grade point from percentage - EXACT same as view_upload.php
 function getGradeInfo($percentage) {
     if ($percentage >= 90) return ['grade' => 'A+', 'point' => 4.0, 'class' => 'bg-green-100 text-green-800'];
-    elseif ($percentage >= 80) return ['grade' => 'A', 'point' => 3.6, 'class' => 'bg-green-100 text-green-800'];
-    elseif ($percentage >= 70) return ['grade' => 'B+', 'point' => 3.2, 'class' => 'bg-green-100 text-green-800'];
-    elseif ($percentage >= 60) return ['grade' => 'B', 'point' => 2.8, 'class' => 'bg-green-100 text-green-800'];
-    elseif ($percentage >= 50) return ['grade' => 'C+', 'point' => 2.4, 'class' => 'bg-yellow-100 text-yellow-800'];
-    elseif ($percentage >= 40) return ['grade' => 'C', 'point' => 2.0, 'class' => 'bg-yellow-100 text-yellow-800'];
-    elseif ($percentage >= 35) return ['grade' => 'D', 'point' => 1.6, 'class' => 'bg-orange-100 text-orange-800'];
-    else return ['grade' => 'NG', 'point' => 0.0, 'class' => 'bg-red-100 text-red-800'];
+    elseif ($percentage >= 80) return ['grade' => 'A', 'point' => 3.6, 'class' => 'bg-green-100 text-green-800']; // Changed
+    elseif ($percentage >= 70) return ['grade' => 'B+', 'point' => 3.2, 'class' => 'bg-green-100 text-green-800']; // Changed
+    elseif ($percentage >= 60) return ['grade' => 'B', 'point' => 2.8, 'class' => 'bg-green-100 text-green-800']; // Changed
+    elseif ($percentage >= 50) return ['grade' => 'C+', 'point' => 2.4, 'class' => 'bg-yellow-100 text-yellow-800']; // Changed
+    elseif ($percentage >= 40) return ['grade' => 'C', 'point' => 2.0, 'class' => 'bg-yellow-100 text-yellow-800']; // Changed
+    elseif ($percentage >= 33) return ['grade' => 'D', 'point' => 1.6, 'class' => 'bg-orange-100 text-orange-800']; // Changed
+    else return ['grade' => 'F', 'point' => 0.0, 'class' => 'bg-red-100 text-red-800'];
+}
+
+// Function to calculate grade and GPA based on percentage - EXACT same as view_upload.php
+function calculateGradeAndGPA($percentage) {
+    if ($percentage >= 90) {
+        return ['grade' => 'A+', 'gpa' => 4.0];
+    } elseif ($percentage >= 80) {
+        return ['grade' => 'A', 'gpa' => 3.6]; // Changed to match view_upload.php
+    } elseif ($percentage >= 70) {
+        return ['grade' => 'B+', 'gpa' => 3.2]; // Changed to match view_upload.php
+    } elseif ($percentage >= 60) {
+        return ['grade' => 'B', 'gpa' => 2.8]; // Changed to match view_upload.php
+    } elseif ($percentage >= 50) {
+        return ['grade' => 'C+', 'gpa' => 2.4]; // Changed to match view_upload.php
+    } elseif ($percentage >= 40) {
+        return ['grade' => 'C', 'gpa' => 2.0]; // Changed to match view_upload.php
+    } elseif ($percentage >= 33) {
+        return ['grade' => 'D', 'gpa' => 1.6]; // Changed to match view_upload.php
+    } else {
+        return ['grade' => 'F', 'gpa' => 0.0];
+    }
+}
+
+// Function to check if subject is failed - Updated to match view_upload.php (33% minimum)
+function isSubjectFailed($theory_marks, $practical_marks = null, $has_practical = false) {
+    // Check theory failure (below 33% of theory full marks)
+    $theory_full_marks = $has_practical ? 75 : 100;
+    $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
+    
+    if ($theory_percentage < 33) {
+        return true;
+    }
+    
+    // Check practical failure if practical exists (below 33%)
+    if ($has_practical && $practical_marks !== null) {
+        $practical_percentage = ($practical_marks / 25) * 100;
+        if ($practical_percentage < 33) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 // Check if result_id is provided
@@ -31,48 +73,6 @@ if (!isset($_GET['result_id']) || empty($_GET['result_id'])) {
 }
 
 $result_id = intval($_GET['result_id']);
-
-// Function to calculate grade and GPA based on percentage
-function calculateGradeAndGPA($percentage) {
-    if ($percentage >= 90) {
-        return ['grade' => 'A+', 'gpa' => 4.0];
-    } elseif ($percentage >= 80) {
-        return ['grade' => 'A', 'gpa' => 3.6];
-    } elseif ($percentage >= 70) {
-        return ['grade' => 'B+', 'gpa' => 3.2];
-    } elseif ($percentage >= 60) {
-        return ['grade' => 'B', 'gpa' => 2.8];
-    } elseif ($percentage >= 50) {
-        return ['grade' => 'C+', 'gpa' => 2.4];
-    } elseif ($percentage >= 40) {
-        return ['grade' => 'C', 'gpa' => 2.0];
-    } elseif ($percentage >= 35) {
-        return ['grade' => 'D', 'gpa' => 1.6];
-    } else {
-        return ['grade' => 'NG', 'gpa' => 0.0];
-    }
-}
-
-// Function to check if subject is failed
-function isSubjectFailed($theory_marks, $practical_marks = null, $has_practical = false) {
-    // Check theory failure (below 35% of theory full marks)
-    $theory_full_marks = $has_practical ? 75 : 100;
-    $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
-    
-    if ($theory_percentage < 35) {
-        return true;
-    }
-    
-    // Check practical failure if practical exists
-    if ($has_practical && $practical_marks !== null) {
-        $practical_percentage = ($practical_marks / 25) * 100;
-        if ($practical_percentage < 35) {
-            return true;
-        }
-    }
-    
-    return false;
-}
 
 // Process actions
 if (isset($_POST['action'])) {
@@ -148,12 +148,12 @@ if (isset($_POST['action'])) {
         $total_full_marks = $theory_full_marks + $practical_full_marks;
         $percentage = ($total_marks_obtained / $total_full_marks) * 100;
         
-        // Check if subject is failed using 35% rule
+        // Check if subject is failed using 33% rule
         $is_failed = isSubjectFailed($theory_marks, $practical_marks, $has_practical);
         
         // Calculate grade and GPA
         if ($is_failed) {
-            $grade = 'NG';
+            $grade = 'F';
             $gpa = 0.0;
         } else {
             $grade_data = calculateGradeAndGPA($percentage);
@@ -241,17 +241,17 @@ try {
     // Convert upload status to boolean for compatibility
     $result_data['is_published'] = ($result_data['upload_status'] == 'Published') ? 1 : 0;
     
-    // Get all subject results for this student and exam - MATCHING view_upload.php LOGIC
+    // Get all subject results for this student and exam - EXACT same logic as view_upload.php
     $subject_results = [];
 
-    // Use the same query structure as view_upload.php but filtered for specific student
+    // Use the exact same query structure as view_upload.php
     $query = "SELECT r.*, s.subject_name, s.subject_code
-              FROM results r
-              JOIN subjects s ON r.subject_id = s.subject_id
-              WHERE r.student_id = ? AND r.exam_id = ?";
+          FROM results r
+          JOIN subjects s ON r.subject_id = s.subject_id
+          WHERE r.student_id = ? AND r.exam_id = ?";
 
     $params = [$result_data['student_id'], $result_data['exam_id']];
-    $param_types = "ii";
+    $param_types = "ii"; // Changed to string types to match view_upload.php
 
     // If we have an upload_id, add it to the query for more specific results
     if (!empty($result_data['upload_id'])) {
@@ -267,307 +267,206 @@ try {
     $stmt->execute();
     $result = $stmt->get_result();
 
-    // Collect all results first
+    // Collect all results first - EXACT same as view_upload.php
     $all_results = [];
     while ($row = $result->fetch_assoc()) {
         $all_results[] = $row;
     }
     $stmt->close();
 
-    // Remove duplicates by keeping only the first (most recent) result for each subject
-    $seen_subjects = [];
+    // Process results using EXACT same logic as view_upload.php
+    $student_results = [];
+
+    // Group by student first (even though we only have one student)
+    $results_by_student = [];
     foreach ($all_results as $row) {
-        $subject_key = $row['subject_id'];
-        if (!isset($seen_subjects[$subject_key])) {
-            $seen_subjects[$subject_key] = true;
-            $subject_results[] = $row;
+        $student_id = $row['student_id'];
+        if (!isset($results_by_student[$student_id])) {
+            $results_by_student[$student_id] = [];
         }
+        $results_by_student[$student_id][] = $row;
     }
 
-    // If no results found with upload_id, try without upload_id constraint
-    if (empty($subject_results) && !empty($result_data['upload_id'])) {
-        $query = "SELECT r.*, s.subject_name, s.subject_code
-                  FROM results r
-                  JOIN subjects s ON r.subject_id = s.subject_id
-                  WHERE r.student_id = ? AND r.exam_id = ?
-                  ORDER BY s.subject_name, r.result_id DESC";
-
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("ii", $result_data['student_id'], $result_data['exam_id']);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        // Collect all results first
-        $all_results = [];
-        while ($row = $result->fetch_assoc()) {
-            $all_results[] = $row;
-        }
-        $stmt->close();
-        
+    // Process each student's results (we only have one)
+    foreach ($results_by_student as $student_id => $student_subjects) {
         // Remove duplicates by keeping only the first (most recent) result for each subject
         $seen_subjects = [];
-        foreach ($all_results as $row) {
+        $unique_subjects = [];
+        
+        foreach ($student_subjects as $row) {
             $subject_key = $row['subject_id'];
             if (!isset($seen_subjects[$subject_key])) {
                 $seen_subjects[$subject_key] = true;
-                $subject_results[] = $row;
+                $unique_subjects[] = $row;
             }
         }
-    }
-
-    // Debug: Log the number of unique subjects found
-    error_log("Found " . count($subject_results) . " unique subjects for student " . $result_data['student_id'] . " exam " . $result_data['exam_id']);
-    
-    // Calculate overall result from subject results using EXACT same logic as view_upload.php
-    $total_marks_obtained = 0;
-    $total_full_marks = 0;
-    $total_subjects = count($subject_results);
-    $failed_subjects = 0;
-    $total_gpa_points = 0;
-
-    foreach ($subject_results as &$subject) {
-        $theory_marks = floatval($subject['theory_marks'] ?? 0);
-        $practical_marks = floatval($subject['practical_marks'] ?? 0);
         
-        // Determine if subject has practical based on whether practical_marks > 0
-        $has_practical = $practical_marks > 0;
-        
-        // Determine full marks based on whether practical exists - EXACT same logic as view_upload.php
-        $theory_full_marks = $has_practical ? 75 : 100;
-        $practical_full_marks = $has_practical ? 25 : 0;
-        $subject_full_marks = 100; // Total is always 100
-        
-        $subject_total_obtained = $theory_marks + $practical_marks;
-        
-        $total_marks_obtained += $subject_total_obtained;
-        $total_full_marks += $subject_full_marks;
-        
-        // Calculate individual component percentages - EXACT same logic as view_upload.php
-        $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
-        $practical_percentage = $has_practical ? ($practical_marks / $practical_full_marks) * 100 : 0;
-        
-        // Get grade info for theory and practical using the same function as view_upload.php
-        $theory_grade_info = getGradeInfo($theory_percentage);
-        $practical_grade_info = $has_practical ? getGradeInfo($practical_percentage) : ['grade' => 'N/A', 'point' => 0, 'class' => 'bg-gray-100 text-gray-800'];
-        
-        // Check for failure condition (either theory or practical below 35%) - EXACT same logic as view_upload.php
-        $is_failed = ($theory_percentage < 35) || ($has_practical && $practical_percentage < 35);
-        
-        // Calculate final GPA for this subject using EXACT same logic as view_upload.php
-        if ($is_failed) {
-            $subject_gpa = 0.0;
-            $subject_grade = 'NG';
-            $final_grade_class = 'bg-red-100 text-red-800';
-        } else {
-            if ($has_practical) {
-                $subject_gpa = (($theory_grade_info['point'] * $theory_full_marks) + ($practical_grade_info['point'] * $practical_full_marks)) / $subject_full_marks;
-            } else {
-                $subject_gpa = $theory_grade_info['point'];
-            }
+        // Process each unique subject with EXACT same calculation as view_upload.php
+        foreach ($unique_subjects as $row) {
+            $theory_marks = floatval($row['theory_marks'] ?? 0);
+            $practical_marks = floatval($row['practical_marks'] ?? 0);
             
-            // Determine subject grade based on GPA - EXACT same logic as view_upload.php
-            if ($subject_gpa >= 3.8) $subject_grade = 'A+';
-            elseif ($subject_gpa >= 3.4) $subject_grade = 'A';
-            elseif ($subject_gpa >= 3.0) $subject_grade = 'B+';
-            elseif ($subject_gpa >= 2.6) $subject_grade = 'B';
-            elseif ($subject_gpa >= 2.2) $subject_grade = 'C+';
-            elseif ($subject_gpa >= 1.8) $subject_grade = 'C';
-            elseif ($subject_gpa >= 1.4) $subject_grade = 'D';
-            else $subject_grade = 'NG';
+            // Determine if subject has practical based on whether practical_marks > 0 - EXACT same logic
+            $has_practical = $practical_marks > 0;
             
-            $final_grade_class = $subject_grade == 'NG' ? 'bg-red-100 text-red-800' : 
-                               ($subject_gpa >= 3.0 ? 'bg-green-100 text-green-800' : 
-                               ($subject_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
-        }
-        
-        if ($is_failed) {
-            $failed_subjects++;
-        }
-        
-        // Store calculated values - EXACT same structure as view_upload.php
-        $subject['calculated_percentage'] = ($subject_total_obtained / $subject_full_marks) * 100;
-        $subject['calculated_grade'] = $subject_grade;
-        $subject['calculated_gpa'] = $subject_gpa;
-        $subject['theory_full_marks'] = $theory_full_marks;
-        $subject['practical_full_marks'] = $practical_full_marks;
-        $subject['subject_full_marks'] = $subject_full_marks;
-        $subject['has_practical'] = $has_practical;
-        $subject['theory_percentage'] = $theory_percentage;
-        $subject['practical_percentage'] = $practical_percentage;
-        $subject['theory_grade_info'] = $theory_grade_info;
-        $subject['practical_grade_info'] = $practical_grade_info;
-        $subject['final_grade_class'] = $final_grade_class;
-        
-        $total_gpa_points += $subject_gpa;
-    }
-
-    // Calculate overall percentage and GPA - EXACT same logic as view_upload.php
-    $overall_percentage = $total_full_marks > 0 ? ($total_marks_obtained / $total_full_marks) * 100 : 0;
-    $overall_gpa = $total_subjects > 0 ? ($total_gpa_points / $total_subjects) : 0;
-    $is_pass = ($failed_subjects == 0);
-
-    // Determine overall grade - EXACT same logic as view_upload.php
-    if ($failed_subjects > 0) {
-        $overall_grade = 'NG';
-    } else {
-        $grade_data = calculateGradeAndGPA($overall_percentage);
-        $overall_grade = $grade_data['grade'];
-    }
-
-    // Determine division - EXACT same logic as view_upload.php
-    $division = '';
-    if ($failed_subjects > 0) {
-        $division = 'Fail';
-    } elseif ($overall_percentage >= 80) {
-        $division = 'Distinction';
-    } elseif ($overall_percentage >= 60) {
-        $division = 'First Division';
-    } elseif ($overall_percentage >= 45) {
-        $division = 'Second Division';
-    } elseif ($overall_percentage >= 35) {
-        $division = 'Third Division';
-    } else {
-        $division = 'Fail';
-    }
-    
-    // Update result_data with calculated values
-    $result_data['calculated_total_marks'] = $total_full_marks;
-    $result_data['calculated_marks_obtained'] = $total_marks_obtained;
-    $result_data['calculated_percentage'] = $overall_percentage;
-    $result_data['calculated_grade'] = $overall_grade;
-    $result_data['calculated_gpa'] = $overall_gpa;
-    $result_data['calculated_is_pass'] = $is_pass;
-    $result_data['calculated_division'] = $division;
-    $result_data['failed_subjects'] = $failed_subjects;
-    
-    // If no subject results found, generate sample data that matches view_upload.php structure
-    if (empty($subject_results)) {
-        // Sample subjects with mixed practical/theory only - same as view_upload.php
-        $sample_subjects = [
-            ['subject_id' => 1, 'subject_name' => 'Mathematics', 'subject_code' => 'MATH101', 'has_practical' => false],
-            ['subject_id' => 2, 'subject_name' => 'Physics', 'subject_code' => 'PHY101', 'has_practical' => true],
-            ['subject_id' => 3, 'subject_name' => 'Chemistry', 'subject_code' => 'CHEM101', 'has_practical' => true],
-            ['subject_id' => 4, 'subject_name' => 'English', 'subject_code' => 'ENG101', 'has_practical' => false],
-            ['subject_id' => 5, 'subject_name' => 'Computer Science', 'subject_code' => 'CS101', 'has_practical' => true]
-        ];
-        
-        // Clear any existing results to avoid mixing real and sample data
-        $subject_results = [];
-        
-        foreach ($sample_subjects as $subject) {
-            $has_practical = $subject['has_practical'];
+            // Determine full marks based on whether practical exists - EXACT same logic
             $theory_full_marks = $has_practical ? 75 : 100;
             $practical_full_marks = $has_practical ? 25 : 0;
+            $subject_full_marks = 100; // Total is always 100
             
-            // Generate realistic marks ensuring some pass and some might fail
-            $theory_marks = rand(25, $theory_full_marks);
-            $practical_marks = $has_practical ? rand(20, $practical_full_marks) : 0;
-            $total_obtained = $theory_marks + $practical_marks;
+            $subject_total_obtained = $theory_marks + $practical_marks;
             
-            // Calculate percentages
+            // Calculate individual component percentages - EXACT same logic
             $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
             $practical_percentage = $has_practical ? ($practical_marks / $practical_full_marks) * 100 : 0;
             
-            // Get grade info
+            // Get grade info for theory and practical using the same function
             $theory_grade_info = getGradeInfo($theory_percentage);
             $practical_grade_info = $has_practical ? getGradeInfo($practical_percentage) : ['grade' => 'N/A', 'point' => 0, 'class' => 'bg-gray-100 text-gray-800'];
             
-            // Check if failed using 35% rule
-            $is_failed = ($theory_percentage < 35) || ($has_practical && $practical_percentage < 35);
-            
+            // Check for failure condition (either theory or practical below 33%)
+            $is_failed = ($theory_percentage < 33) || ($has_practical && $practical_percentage < 33);
+
+            // Calculate final GPA for this subject using EXACT same logic as view_upload.php
             if ($is_failed) {
-                $grade = 'NG';
-                $gpa = 0.0;
+                $subject_gpa = 0.0;
+                $subject_grade = 'F';
+                $final_grade_class = 'bg-red-100 text-red-800';
             } else {
-                if ($has_practical) {
-                    $gpa = (($theory_grade_info['point'] * $theory_full_marks) + ($practical_grade_info['point'] * $practical_full_marks)) / 100;
-                } else {
-                    $gpa = $theory_grade_info['point'];
-                }
+                // Calculate subject GPA based on total percentage - EXACT same as view_upload.php
+                $subject_total_percentage = ($subject_total_obtained / $subject_full_marks) * 100;
                 
-                // Determine grade based on GPA
-                if ($gpa >= 3.8) $grade = 'A+';
-                elseif ($gpa >= 3.4) $grade = 'A';
-                elseif ($gpa >= 3.0) $grade = 'B+';
-                elseif ($gpa >= 2.6) $grade = 'B';
-                elseif ($gpa >= 2.2) $grade = 'C+';
-                elseif ($gpa >= 1.8) $grade = 'C';
-                elseif ($gpa >= 1.4) $grade = 'D';
-                else $grade = 'NG';
-            }
-            
-            $subject_results[] = [
-                'result_id' => $result_id,
-                'subject_id' => $subject['subject_id'],
-                'subject_name' => $subject['subject_name'],
-                'subject_code' => $subject['subject_code'],
-                'theory_marks' => $theory_marks,
-                'practical_marks' => $has_practical ? $practical_marks : null,
-                'grade' => $grade,
-                'gpa' => $gpa,
-                'calculated_grade' => $grade,
-                'calculated_gpa' => $gpa,
-                'calculated_percentage' => ($total_obtained / 100) * 100,
-                'theory_full_marks' => $theory_full_marks,
-                'practical_full_marks' => $practical_full_marks,
-                'subject_full_marks' => 100,
-                'has_practical' => $has_practical,
-                'theory_percentage' => $theory_percentage,
-                'practical_percentage' => $practical_percentage,
-                'theory_grade_info' => $theory_grade_info,
-                'practical_grade_info' => $practical_grade_info
-            ];
-        }
-    
-        // Recalculate overall metrics with sample data
-        $total_marks_obtained = 0;
-        $total_full_marks = 0;
-        $failed_subjects = 0;
-        $total_gpa_points = 0;
-        
-        foreach ($subject_results as $subject) {
-            $total_marks_obtained += $subject['theory_marks'] + ($subject['practical_marks'] ?? 0);
-            $total_full_marks += $subject['subject_full_marks'];
-            $total_gpa_points += $subject['calculated_gpa'];
-            if ($subject['calculated_grade'] == 'NG') {
-                $failed_subjects++;
-            }
-        }
-        
-        $overall_percentage = ($total_marks_obtained / $total_full_marks) * 100;
-        $overall_gpa = count($subject_results) > 0 ? ($total_gpa_points / count($subject_results)) : 0;
-        $is_pass = ($failed_subjects == 0);
-        
-        if ($failed_subjects > 0) {
-            $overall_grade = 'NG';
-            $division = 'Fail';
-        } else {
-            $grade_data = calculateGradeAndGPA($overall_percentage);
-            $overall_grade = $grade_data['grade'];
-            
-            if ($overall_percentage >= 80) {
-                $division = 'Distinction';
-            } elseif ($overall_percentage >= 60) {
-                $division = 'First Division';
-            } elseif ($overall_percentage >= 45) {
-                $division = 'Second Division';
-            } elseif ($overall_percentage >= 35) {
-                $division = 'Third Division';
+                // Use EXACT same grading scale as view_upload.php
+                if ($subject_total_percentage >= 90) {
+                    $subject_gpa = 4.0;
+                    $subject_grade = 'A+';
+                } elseif ($subject_total_percentage >= 80) {
+                    $subject_gpa = 3.6; // Changed to match view_upload.php exactly
+                    $subject_grade = 'A';
+                } elseif ($subject_total_percentage >= 70) {
+                    $subject_gpa = 3.2; // Changed to match view_upload.php exactly
+            $subject_grade = 'B+';
+            } elseif ($subject_total_percentage >= 60) {
+                $subject_gpa = 2.8; // Changed to match view_upload.php exactly
+                $subject_grade = 'B';
+            } elseif ($subject_total_percentage >= 50) {
+                $subject_gpa = 2.4; // Changed to match view_upload.php exactly
+                $subject_grade = 'C+';
+            } elseif ($subject_total_percentage >= 40) {
+                $subject_gpa = 2.0; // Changed to match view_upload.php exactly
+                $subject_grade = 'C';
+            } elseif ($subject_total_percentage >= 33) {
+                $subject_gpa = 1.6; // Changed to match view_upload.php exactly
+                $subject_grade = 'D';
             } else {
-                $division = 'Fail';
+                $subject_gpa = 0.0;
+                $subject_grade = 'F';
             }
+            
+            $final_grade_class = $subject_grade == 'F' ? 'bg-red-100 text-red-800' : 
+                       ($subject_gpa >= 3.0 ? 'bg-green-100 text-green-800' : 
+                       ($subject_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
         }
         
-        // Update calculated values
-        $result_data['calculated_total_marks'] = $total_full_marks;
-        $result_data['calculated_marks_obtained'] = $total_marks_obtained;
-        $result_data['calculated_percentage'] = $overall_percentage;
-        $result_data['calculated_grade'] = $overall_grade;
-        $result_data['calculated_gpa'] = $overall_gpa;
-        $result_data['calculated_is_pass'] = $is_pass;
-        $result_data['calculated_division'] = $division;
-        $result_data['failed_subjects'] = $failed_subjects;
+        // Store calculated values - EXACT same structure as view_upload.php
+        $subject_results[] = [
+            'result_id' => $row['result_id'],
+            'subject_id' => $row['subject_id'],
+            'subject_name' => $row['subject_name'],
+            'subject_code' => $row['subject_code'],
+            'theory_marks' => $theory_marks,
+            'practical_marks' => $has_practical ? $practical_marks : null,
+            'grade' => $row['grade'], // Keep original grade from DB
+            'gpa' => $row['gpa'], // Keep original GPA from DB
+            'calculated_grade' => $subject_grade,
+            'calculated_gpa' => $subject_gpa,
+            'calculated_percentage' => ($subject_total_obtained / $subject_full_marks) * 100,
+            'theory_full_marks' => $theory_full_marks,
+            'practical_full_marks' => $practical_full_marks,
+            'subject_full_marks' => $subject_full_marks,
+            'has_practical' => $has_practical,
+            'theory_percentage' => $theory_percentage,
+            'practical_percentage' => $practical_percentage,
+            'theory_grade_info' => $theory_grade_info,
+            'practical_grade_info' => $practical_grade_info,
+            'final_grade_class' => $final_grade_class,
+            'is_failed' => $is_failed
+        ];
     }
+}
+
+// Calculate overall result from subject results using EXACT same logic as view_upload.php
+$total_marks_obtained = 0;
+$total_full_marks = 0;
+$total_subjects = count($subject_results);
+$failed_subjects = 0;
+$total_gpa_points = 0;
+
+foreach ($subject_results as $subject) {
+    $subject_total_obtained = $subject['theory_marks'] + ($subject['practical_marks'] ?? 0);
+    $total_marks_obtained += $subject_total_obtained;
+    $total_full_marks += $subject['subject_full_marks'];
+    $total_gpa_points += $subject['calculated_gpa'];
+    
+    if ($subject['is_failed']) {
+        $failed_subjects++;
+    }
+}
+
+// Calculate overall percentage and GPA - EXACT same logic as view_upload.php
+$overall_percentage = $total_full_marks > 0 ? ($total_marks_obtained / $total_full_marks) * 100 : 0;
+$overall_gpa = $total_subjects > 0 ? ($total_gpa_points / $total_subjects) : 0;
+$is_pass = ($failed_subjects == 0);
+
+// Determine overall grade - EXACT same logic as view_upload.php
+if ($failed_subjects > 0) {
+    $overall_grade = 'F';
+} else {
+    // Use EXACT same grading scale as view_upload.php
+    if ($overall_percentage >= 90) {
+        $overall_grade = 'A+';
+    } elseif ($overall_percentage >= 80) {
+        $overall_grade = 'A';
+    } elseif ($overall_percentage >= 70) {
+        $overall_grade = 'B+';
+    } elseif ($overall_percentage >= 60) {
+        $overall_grade = 'B';
+    } elseif ($overall_percentage >= 50) {
+        $overall_grade = 'C+';
+    } elseif ($overall_percentage >= 40) {
+        $overall_grade = 'C';
+    } elseif ($overall_percentage >= 33) {
+        $overall_grade = 'D';
+    } else {
+        $overall_grade = 'F';
+    }
+}
+
+// Determine division - EXACT same logic as view_upload.php
+$division = '';
+if ($failed_subjects > 0) {
+    $division = 'Fail';
+} elseif ($overall_percentage >= 80) {
+    $division = 'Distinction';
+} elseif ($overall_percentage >= 60) {
+    $division = 'First Division';
+} elseif ($overall_percentage >= 45) {
+    $division = 'Second Division';
+} elseif ($overall_percentage >= 33) {
+    $division = 'Third Division';
+} else {
+    $division = 'Fail';
+}
+
+// Update result_data with calculated values
+$result_data['calculated_total_marks'] = $total_full_marks;
+$result_data['calculated_marks_obtained'] = $total_marks_obtained;
+$result_data['calculated_percentage'] = $overall_percentage;
+$result_data['calculated_grade'] = $overall_grade;
+$result_data['calculated_gpa'] = $overall_gpa;
+$result_data['calculated_is_pass'] = $is_pass;
+$result_data['calculated_division'] = $division;
+$result_data['failed_subjects'] = $failed_subjects;
     
 } catch (Exception $e) {
     $_SESSION['error'] = "Error loading result: " . $e->getMessage();
@@ -922,7 +821,7 @@ $conn->close();
                                                         </div>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
-                                                        <?php $is_pass = ($subject['calculated_grade'] != 'NG'); ?>
+                                                        <?php $is_pass = ($subject['calculated_grade'] != 'F'); ?>
                                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $is_pass ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
                                                             <?php echo $is_pass ? 'Pass' : 'Fail'; ?>
                                                         </span>
@@ -974,7 +873,7 @@ $conn->close();
                                             case 'C+': $grade_class = 'text-yellow-700'; break;
                                             case 'C': $grade_class = 'text-yellow-600'; break;
                                             case 'D': $grade_class = 'text-orange-700'; break;
-                                            case 'NG': $grade_class = 'text-red-700'; break;
+                                            case 'F': $grade_class = 'text-red-700'; break;
                                             default: $grade_class = 'text-gray-700';
                                         }
                                         ?>
@@ -1009,7 +908,7 @@ $conn->close();
                                         </p>
                                     </div>
                                 </div>
-                          
+                         
                                 
                                 <!-- Signature Section (visible only in print) -->
                                 <div class="hidden print:block mt-12">

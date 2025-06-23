@@ -182,16 +182,16 @@ try {
         $subject_max_marks = ($row['full_marks_theory'] ?? 100) + ($row['full_marks_practical'] ?? 0);
         $credit_hours = $row['credit_hours'] ?? 1;
         
-        // Calculate grade point based on total marks percentage
+        // Calculate grade point based on total marks percentage - Updated to match Admin grading system
         $total_percentage = $subject_max_marks > 0 ? ($total_subject_marks / $subject_max_marks) * 100 : 0;
         $grade_point = 0;
-        if ($total_percentage >= 91) $grade_point = 3.8;
-        elseif ($total_percentage >= 81) $grade_point = 3.4;
-        elseif ($total_percentage >= 71) $grade_point = 3.0;
-        elseif ($total_percentage >= 61) $grade_point = 2.7;
-        elseif ($total_percentage >= 51) $grade_point = 2.4;
-        elseif ($total_percentage >= 41) $grade_point = 1.9;
-        elseif ($total_percentage >= 35) $grade_point = 1.6;
+        if ($total_percentage >= 90) $grade_point = 4.0;
+        elseif ($total_percentage >= 80) $grade_point = 3.7;
+        elseif ($total_percentage >= 70) $grade_point = 3.3;
+        elseif ($total_percentage >= 60) $grade_point = 3.0;
+        elseif ($total_percentage >= 50) $grade_point = 2.7;
+        elseif ($total_percentage >= 40) $grade_point = 2.3;
+        elseif ($total_percentage >= 33) $grade_point = 1.0;
         else $grade_point = 0.0;
         
         $total_grade_points += ($grade_point * $credit_hours);
@@ -220,6 +220,17 @@ try {
     
     // Calculate GPA
     $gpa = $total_credit_hours > 0 ? ($total_grade_points / $total_credit_hours) : 0;
+    
+    // Determine grade based on GPA - Updated to match Admin grading system
+    $grade = 'F';
+    if ($gpa >= 4.0) $grade = 'A+';
+    elseif ($gpa >= 3.7) $grade = 'A';
+    elseif ($gpa >= 3.3) $grade = 'B+';
+    elseif ($gpa >= 3.0) $grade = 'B';
+    elseif ($gpa >= 2.7) $grade = 'C+';
+    elseif ($gpa >= 2.3) $grade = 'C';
+    elseif ($gpa >= 1.0) $grade = 'D';
+    else $grade = 'F';
     
     // Calculate percentage
     $percentage = $max_marks > 0 ? ($total_marks / $max_marks) * 100 : 0;
@@ -919,6 +930,7 @@ $conn->close();
                                             <td><?php echo htmlspecialchars($subject['credit_hour']); ?></td>
                                             <td><?php 
     $theory_percentage = $subject['full_marks_theory'] > 0 ? ($subject['theory_marks'] / $subject['full_marks_theory']) * 100 : 0;
+    // Theory Grade
     if ($theory_percentage >= 90) echo 'A+';
     elseif ($theory_percentage >= 80) echo 'A';
     elseif ($theory_percentage >= 70) echo 'B+';
@@ -931,6 +943,7 @@ $conn->close();
                                             <td><?php 
     if ($subject['full_marks_practical'] > 0) {
         $practical_percentage = ($subject['practical_marks'] / $subject['full_marks_practical']) * 100;
+        // Practical Grade
         if ($practical_percentage >= 90) echo 'A+';
         elseif ($practical_percentage >= 80) echo 'A';
         elseif ($practical_percentage >= 70) echo 'B+';

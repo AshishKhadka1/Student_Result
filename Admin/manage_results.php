@@ -818,246 +818,239 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                         </div>
 
                         <!-- Manage Uploads Tab Content -->
-                        <div id="content-manage" class="tab-content <?php echo $activeTab == 'manage' ? 'active' : ''; ?>">
-                            <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                                <div class="p-6">
-                                    <div class="flex justify-between items-center mb-4">
-                                        <h2 class="text-lg font-semibold text-gray-800">Manage Result Uploads</h2>
-                                        <a href="?tab=manage" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">
-                                            <i class="fas fa-sync-alt mr-2"></i>Refresh
-                                        </a>
-                                    </div>
-                                    <?php if ($uploads && $uploads->num_rows == 0): ?>
-                                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-                                            <div class="flex">
-                                                <div class="flex-shrink-0">
-                                                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
-                                                </div>
-                                                <div class="ml-3">
-                                                    <p class="text-sm text-yellow-700">
-                                                        No uploads found. If you've manually entered results, they should appear here.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endif; ?>
-                                    <div class="overflow-x-auto">
-                                        <table class="min-w-full divide-y divide-gray-200">
-                                            <thead class="bg-gray-50">
-                                                <tr>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        File Name
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Description
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Exam
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Date Uploaded
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Students
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Status
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            
-<tbody class="bg-white divide-y divide-gray-200">
-    <?php if ($uploads && $uploads->num_rows > 0): ?>
-        <?php while ($row = $uploads->fetch_assoc()): ?>
-            <?php
-            // Get all students associated with this upload
-            $studentsInUpload = [];
-            $studentQuery = "SELECT DISTINCT r.student_id, u.full_name, s.roll_number 
-                           FROM results r 
-                           JOIN students s ON r.student_id = s.student_id 
-                           JOIN users u ON s.user_id = u.user_id 
-                           WHERE r.upload_id = ? 
-                           ORDER BY u.full_name";
-            $stmt = $conn->prepare($studentQuery);
-            $stmt->bind_param("i", $row['id']);
-            $stmt->execute();
-            $studentResult = $stmt->get_result();
+<div id="content-manage" class="tab-content <?php echo $activeTab == 'manage' ? 'active' : ''; ?>">
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-gray-800">Manage Result Uploads</h2>
+                <div class="flex space-x-2">
+                    <button id="bulkDeleteBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled onclick="bulkDelete()">
+                        <i class="fas fa-trash-alt mr-2"></i>Delete Selected
+                    </button>
+                    <a href="?tab=manage" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </a>
+                </div>
+            </div>
             
-            while ($student = $studentResult->fetch_assoc()) {
-                $studentsInUpload[] = $student;
-            }
-            $stmt->close();
-            
-            // If multiple students, we'll show multiple rows, one for each student
-            if (count($studentsInUpload) > 0):
-                foreach ($studentsInUpload as $index => $student):
-            ?>
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <span class="text-sm text-gray-900">
-                                    <?php 
-                                    // Generate unique file name for each student
-                                    $originalFileName = $row['file_name'] ?? 'result_upload';
-                                    $fileExtension = pathinfo($originalFileName, PATHINFO_EXTENSION);
-                                    $baseName = pathinfo($originalFileName, PATHINFO_FILENAME);
-                                    
-                                    // Create unique identifier using upload ID, student ID, and date
-                                    $uploadDate = date('Ymd', strtotime($row['upload_date']));
-                                    $uploadId = str_pad($row['id'], 4, '0', STR_PAD_LEFT);
-                                    
-                                    // Clean student name for filename (remove spaces and special characters)
-                                    $cleanStudentName = preg_replace('/[^A-Za-z0-9]/', '_', $student['full_name']);
-                                    $cleanStudentName = substr($cleanStudentName, 0, 20); // Limit length
-                                    
-                                    // Generate new file name format: basename_StudentName_StudentID_YYYYMMDD_UploadID.extension
-                                    $newFileName = $baseName . '_' . $cleanStudentName . '_' . $student['student_id'] . '_' . $uploadDate . '_' . $uploadId;
-                                    
-                                    if ($fileExtension) {
-                                        $newFileName .= '.' . $fileExtension;
-                                    } else {
-                                        $newFileName .= '.xlsx'; // Default extension for result files
-                                    }
-                                    
-                                    echo htmlspecialchars($newFileName);
-                                    ?>
-                                </span>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <?php 
-                            $description = $row['description'] ?? 'N/A';
-                            // Add student info to description
-                            $studentInfo = "Student: " . $student['full_name'] . " (ID: " . $student['student_id'];
-                            if (!empty($student['roll_number'])) {
-                                $studentInfo .= ", Roll: " . $student['roll_number'];
-                            }
-                            $studentInfo .= ")";
-                            
-                            if ($description != 'N/A') {
-                                echo htmlspecialchars($description . " - " . $studentInfo);
-                            } else {
-                                echo htmlspecialchars($studentInfo);
-                            }
-                            ?>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <?php echo date('F d, Y', strtotime($row['upload_date'])); ?>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <?php 
-                            // Show individual student count (1) and total in parentheses
-                            echo "1 (" . count($studentsInUpload) . " total)";
-                            ?>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
-                                <?php echo htmlspecialchars($row['status']); ?>
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <a href="view_upload.php?id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
-                            <?php if ($index == 0): // Only show these actions for the first student row ?>
-                                <?php if ($row['status'] != 'Published'): ?>
-                                    <a href="publish_results.php?id=<?php echo $row['id']; ?>" class="text-green-600 hover:text-green-900 mr-3">Publish</a>
-                                <?php else: ?>
-                                    <a href="unpublish_results.php?id=<?php echo $row['id']; ?>" class="text-yellow-600 hover:text-yellow-900 mr-3">Unpublish</a>
-                                <?php endif; ?>
-                                <a href="delete_upload.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900 mr-3" onclick="return confirm('Are you sure you want to delete this upload? This will also delete all associated results.')">Delete</a>
-                            <?php endif; ?>
-                            <a href="students_result.php?upload_id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>" class="text-indigo-600 hover:text-indigo-900">Student Results</a>
-                        </td>
-                    </tr>
-            <?php 
-                endforeach;
-            else:
-                // Fallback for uploads with no associated students
-            ?>
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <span class="text-sm text-gray-900">
-                                <?php 
-                                // Generate file name for upload without students
-                                $originalFileName = $row['file_name'] ?? 'result_upload';
-                                $fileExtension = pathinfo($originalFileName, PATHINFO_EXTENSION);
-                                $baseName = pathinfo($originalFileName, PATHINFO_FILENAME);
-                                
-                                $uploadDate = date('Ymd', strtotime($row['upload_date']));
-                                $uniqueId = str_pad($row['id'], 4, '0', STR_PAD_LEFT);
-                                
-                                $newFileName = $baseName . '_' . $uploadDate . '_' . $uniqueId;
-                                if ($fileExtension) {
-                                    $newFileName .= '.' . $fileExtension;
-                                } else {
-                                    $newFileName .= '.xlsx';
-                                }
-                                
-                                echo htmlspecialchars($newFileName);
-                                ?>
-                            </span>
+            <?php if ($uploads && $uploads->num_rows == 0): ?>
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
                         </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <?php echo htmlspecialchars($row['description'] ?? 'N/A'); ?>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <?php echo date('F d, Y', strtotime($row['upload_date'])); ?>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <?php echo number_format($row['student_count']); ?>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
-                            <?php echo htmlspecialchars($row['status']); ?>
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <a href="view_upload.php?id=<?php echo $row['id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
-                        <?php if ($row['status'] != 'Published'): ?>
-                            <a href="publish_results.php?id=<?php echo $row['id']; ?>" class="text-green-600 hover:text-green-900 mr-3">Publish</a>
-                        <?php else: ?>
-                            <a href="unpublish_results.php?id=<?php echo $row['id']; ?>" class="text-yellow-600 hover:text-yellow-900 mr-3">Unpublish</a>
-                        <?php endif; ?>
-                        <a href="delete_upload.php?id=<?php echo $row['id']; ?>" class="text-red-600 hover:text-red-900 mr-3" onclick="return confirm('Are you sure you want to delete this upload? This will also delete all associated results.')">Delete</a>
-                        <a href="students_result.php?upload_id=<?php echo $row['id']; ?>" class="text-indigo-600 hover:text-indigo-900">Student Results</a>
-                    </td>
-                </tr>
-            <?php endif; ?>
-        <?php endwhile; ?>
-    <?php else: ?>
-        <tr>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" colspan="7">
-                No result uploads found.
-            </td>
-        </tr>
-    <?php endif; ?>
-</tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                No uploads found. If you've manually entered results, they should appear here.
+                            </p>
                         </div>
                     </div>
                 </div>
-            </main>
+            <?php endif; ?>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-3 py-3 text-left">
+                                <input type="checkbox" id="selectAll" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" onchange="toggleSelectAll()">
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                #
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                File Name
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Student Details
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Exam
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Date Uploaded
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php if ($uploads && $uploads->num_rows > 0): ?>
+                            <?php 
+                            $serial_number = 1;
+                            while ($row = $uploads->fetch_assoc()): 
+                                // Get all students associated with this upload
+                                $studentsInUpload = [];
+                                $studentQuery = "SELECT DISTINCT r.student_id, u.full_name, s.roll_number 
+                                               FROM results r 
+                                               JOIN students s ON r.student_id = s.student_id 
+                                               JOIN users u ON s.user_id = u.user_id 
+                                               WHERE r.upload_id = ? 
+                                               ORDER BY u.full_name";
+                                $stmt = $conn->prepare($studentQuery);
+                                $stmt->bind_param("i", $row['id']);
+                                $stmt->execute();
+                                $studentResult = $stmt->get_result();
+                                
+                                while ($student = $studentResult->fetch_assoc()) {
+                                    $studentsInUpload[] = $student;
+                                }
+                                $stmt->close();
+                                
+                                // If students exist, create separate rows for each
+                                if (count($studentsInUpload) > 0):
+                                    foreach ($studentsInUpload as $student):
+                            ?>
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-3 py-4 whitespace-nowrap">
+                                                <input type="checkbox" class="student-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" 
+                                                       value="<?php echo $row['id']; ?>_<?php echo $student['student_id']; ?>" 
+                                                       data-upload-id="<?php echo $row['id']; ?>" 
+                                                       data-student-id="<?php echo $student['student_id']; ?>"
+                                                       onchange="updateBulkDeleteButton()">
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                <?php echo $serial_number++; ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                    <span class="text-sm text-gray-900">
+                                                        <?php 
+                                                        // Simple filename format: Result_StudentName_StudentID_SerialNumber.xlsx
+                                                        $cleanStudentName = preg_replace('/[^A-Za-z0-9]/', '', $student['full_name']);
+                                                        $cleanStudentName = substr($cleanStudentName, 0, 15); // Limit length
+                                                        $simpleFileName = "Result_" . $cleanStudentName . "_" . $student['student_id'] . "_" . str_pad($serial_number-1, 3, '0', STR_PAD_LEFT) . ".xlsx";
+                                                        echo htmlspecialchars($simpleFileName);
+                                                        ?>
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">
+                                                    <div class="font-medium"><?php echo htmlspecialchars($student['full_name']); ?></div>
+                                                    <div class="text-gray-500">ID: <?php echo htmlspecialchars($student['student_id']); ?></div>
+                                                    <?php if (!empty($student['roll_number'])): ?>
+                                                        <div class="text-gray-500">Roll: <?php echo htmlspecialchars($student['roll_number']); ?></div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?php echo date('M d, Y', strtotime($row['upload_date'])); ?>
+                                                <div class="text-xs text-gray-400"><?php echo date('h:i A', strtotime($row['upload_date'])); ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
+                                                    <?php echo htmlspecialchars($row['status']); ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <div class="flex space-x-2">
+                                                    <a href="view_upload.php?id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>" 
+                                                       class="text-blue-600 hover:text-blue-900 text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded" 
+                                                       title="View Results">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="students_result.php?upload_id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>" 
+                                                       class="text-indigo-600 hover:text-indigo-900 text-xs bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded" 
+                                                       title="Student Results">
+                                                        <i class="fas fa-user-graduate"></i>
+                                                    </a>
+                                                    <button onclick="deleteStudentResult(<?php echo $row['id']; ?>, '<?php echo $student['student_id']; ?>', '<?php echo htmlspecialchars($student['full_name']); ?>')" 
+                                                            class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded" 
+                                                            title="Delete Student Results">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                            <?php 
+                                    endforeach;
+                                else:
+                                    // Fallback for uploads with no associated students
+                            ?>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-3 py-4 whitespace-nowrap">
+                                            <input type="checkbox" class="student-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" 
+                                                   value="<?php echo $row['id']; ?>_no_student" 
+                                                   data-upload-id="<?php echo $row['id']; ?>"
+                                                   onchange="updateBulkDeleteButton()">
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <?php echo $serial_number++; ?>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                <span class="text-sm text-gray-900">
+                                                    <?php 
+                                                    $simpleFileName = "Result_Upload_" . str_pad($serial_number-1, 3, '0', STR_PAD_LEFT) . ".xlsx";
+                                                    echo htmlspecialchars($simpleFileName);
+                                                    ?>
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <div class="text-gray-400">No students found</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <?php echo date('M d, Y', strtotime($row['upload_date'])); ?>
+                                            <div class="text-xs text-gray-400"><?php echo date('h:i A', strtotime($row['upload_date'])); ?></div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
+                                                <?php echo htmlspecialchars($row['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <div class="flex space-x-2">
+                                                <a href="view_upload.php?id=<?php echo $row['id']; ?>" 
+                                                   class="text-blue-600 hover:text-blue-900 text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded" 
+                                                   title="View Upload">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <button onclick="deleteUpload(<?php echo $row['id']; ?>)" 
+                                                        class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded" 
+                                                        title="Delete Upload">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                            <?php endif; ?>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center" colspan="8">
+                                    No result uploads found.
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Bulk Actions Info -->
+            <div class="mt-4 text-sm text-gray-500">
+                <p><i class="fas fa-info-circle mr-1"></i> Select multiple entries using checkboxes to delete them in bulk.</p>
+            </div>
         </div>
     </div>
+</div>
 
     <script>
         // Tab functionality
@@ -1539,6 +1532,163 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             });
         }
     </script>
+    
+    <script>
+// Bulk delete functionality
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const studentCheckboxes = document.querySelectorAll('.student-checkbox');
+    
+    studentCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    
+    updateBulkDeleteButton();
+}
+
+function updateBulkDeleteButton() {
+    const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    
+    if (selectedCheckboxes.length > 0) {
+        bulkDeleteBtn.disabled = false;
+        bulkDeleteBtn.textContent = `Delete Selected (${selectedCheckboxes.length})`;
+    } else {
+        bulkDeleteBtn.disabled = true;
+        bulkDeleteBtn.innerHTML = '<i class="fas fa-trash-alt mr-2"></i>Delete Selected';
+    }
+    
+    // Update select all checkbox state
+    const allCheckboxes = document.querySelectorAll('.student-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAll');
+    
+    if (selectedCheckboxes.length === 0) {
+        selectAllCheckbox.indeterminate = false;
+        selectAllCheckbox.checked = false;
+    } else if (selectedCheckboxes.length === allCheckboxes.length) {
+        selectAllCheckbox.indeterminate = false;
+        selectAllCheckbox.checked = true;
+    } else {
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+async function bulkDelete() {
+    const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('Please select at least one entry to delete.');
+        return;
+    }
+    
+    const confirmed = await Swal.fire({
+        title: 'Delete Selected Results?',
+        html: `You are about to delete <strong>${selectedCheckboxes.length}</strong> student result entries.<br><br>
+               <span class="text-red-600">This action cannot be undone!</span>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Yes, Delete All',
+        cancelButtonText: 'Cancel'
+    });
+    
+    if (!confirmed.isConfirmed) return;
+    
+    // Show loading
+    Swal.fire({
+        title: 'Deleting...',
+        text: 'Please wait while we delete the selected entries.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    const deletePromises = [];
+    selectedCheckboxes.forEach(checkbox => {
+        const uploadId = checkbox.dataset.uploadId;
+        const studentId = checkbox.dataset.studentId;
+        
+        if (studentId && studentId !== 'undefined') {
+            // Delete specific student results
+            deletePromises.push(
+                fetch(`delete_student_result.php?upload_id=${uploadId}&student_id=${studentId}`, {
+                    method: 'GET'
+                })
+            );
+        } else {
+            // Delete entire upload
+            deletePromises.push(
+                fetch(`delete_upload.php?id=${uploadId}`, {
+                    method: 'GET'
+                })
+            );
+        }
+    });
+    
+    try {
+        await Promise.all(deletePromises);
+        
+        Swal.fire({
+            title: 'Success!',
+            text: `Successfully deleted ${selectedCheckboxes.length} entries.`,
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false
+        });
+        
+        // Reload page after 2 seconds
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+        
+    } catch (error) {
+        Swal.fire({
+            title: 'Error!',
+            text: 'Some entries could not be deleted. Please try again.',
+            icon: 'error'
+        });
+    }
+}
+
+function deleteStudentResult(uploadId, studentId, studentName) {
+    Swal.fire({
+        title: 'Delete Student Results?',
+        html: `Are you sure you want to delete results for:<br><br>
+               <strong>${studentName}</strong> (ID: ${studentId})<br><br>
+               <span class="text-red-600">This action cannot be undone!</span>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Yes, Delete',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = `delete_student_result.php?upload_id=${uploadId}&student_id=${studentId}`;
+        }
+    });
+}
+
+function deleteUpload(uploadId) {
+    Swal.fire({
+        title: 'Delete Upload?',
+        html: `Are you sure you want to delete this upload?<br><br>
+               <span class="text-red-600">This will delete all associated results and cannot be undone!</span>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Yes, Delete',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = `delete_upload.php?id=${uploadId}`;
+        }
+    });
+}
+</script>
 </body>
 
 </html>
