@@ -35,11 +35,29 @@ if ($result->num_rows === 0) {
 $upload = $result->fetch_assoc();
 $stmt->close();
 
-// Update status to Published
+// Update exam status to Published
+$stmt = $conn->prepare("UPDATE exams SET results_published = 1 WHERE exam_id = (SELECT exam_id FROM result_uploads WHERE id = ?)");
+$stmt->bind_param("i", $upload_id);
+$exam_updated = $stmt->execute();
+$stmt->close();
+
+// Update individual results to published
+$stmt = $conn->prepare("
+    UPDATE results r 
+    JOIN result_uploads ru ON r.upload_id = ru.id 
+    SET r.is_published = 1, r.status = 'published', r.updated_at = NOW()
+    WHERE ru.id = ?
+");
+$stmt->bind_param("i", $upload_id);
+$results_updated = $stmt->execute();
+$stmt->close();
+
+// Update upload status to Published
 $stmt = $conn->prepare("UPDATE result_uploads SET status = 'Published' WHERE id = ?");
 $stmt->bind_param("i", $upload_id);
+$upload_updated = $stmt->execute();
 
-if ($stmt->execute()) {
+if ($exam_updated && $results_updated && $upload_updated) {
     $_SESSION['success_message'] = "Results have been published successfully.";
 } else {
     $_SESSION['error_message'] = "Failed to publish results: " . $conn->error;

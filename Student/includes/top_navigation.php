@@ -10,36 +10,6 @@
             </div>
         </div>
         <div class="ml-4 flex items-center md:ml-6">
-            <!-- Notification dropdown -->
-            <div class="ml-3 relative">
-                <button type="button" class="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" id="notification-button">
-                    <span class="sr-only">View notifications</span>
-                    <i class="fas fa-bell"></i>
-                </button>
-                <div class="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden" id="notification-dropdown">
-                    <div class="px-4 py-2 border-b border-gray-200">
-                        <h3 class="text-sm font-medium text-gray-900">Notifications</h3>
-                    </div>
-                    <div class="max-h-60 overflow-y-auto">
-                        <!-- Notification items would go here -->
-                        <div class="px-4 py-2 text-sm text-gray-500">No new notifications</div>
-                    </div>
-                    <div class="px-4 py-2 border-t border-gray-200 text-sm text-blue-600 hover:text-blue-500">
-                        <a href="#">View all notifications</a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Dark mode toggle -->
-            <div class="ml-3 relative">
-                <button type="button" class="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" id="dark-mode-toggle">
-                    <span class="sr-only">Toggle dark mode</span>
-                    <div class="w-10 h-5 bg-gray-200 rounded-full flex items-center p-0.5">
-                        <div class="w-4 h-4 bg-white rounded-full transform translate-x-0.5 transition-transform duration-300" id="dark-mode-toggle-dot"></div>
-                    </div>
-                </button>
-            </div>
-
             <!-- Profile dropdown -->
             <div class="ml-3 relative">
                 <div>
@@ -52,7 +22,6 @@
                 </div>
                 <div class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden" id="user-menu">
                     <a href="student_profile.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Your Profile</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
                     <a href="../includes/logout.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Sign out</a>
                 </div>
             </div>

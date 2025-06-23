@@ -74,7 +74,7 @@ try {
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
-    
+
     if ($row['count'] == 0) {
         header("Location: grade_sheet.php");
         exit();
@@ -94,31 +94,31 @@ try {
         FROM exams
         WHERE exam_id = ?
     ";
-    
+
     $stmt = $conn->prepare($query);
     if ($stmt === false) {
         throw new Exception("Failed to prepare exam details statement: " . $conn->error);
     }
-    
+
     $stmt->bind_param("i", $exam_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    
+
     if ($result->num_rows == 0) {
         die("Exam not found");
     }
-    
+
     $exam_details = $result->fetch_assoc();
-    
+
     // If exam_type is NULL or empty, use exam_name as the type
     if (empty($exam_details['exam_type'])) {
         $exam_details['exam_type'] = $exam_details['exam_name'];
     }
-    
+
     $stmt->close();
 } catch (Exception $e) {
     error_log("Error fetching exam details: " . $e->getMessage());
-    
+
     // Try alternative query without exam_type
     try {
         $alt_query = "
@@ -126,24 +126,24 @@ try {
             FROM exams
             WHERE exam_id = ?
         ";
-        
+
         $stmt = $conn->prepare($alt_query);
         if ($stmt === false) {
             throw new Exception("Failed to prepare alternative exam details statement: " . $conn->error);
         }
-        
+
         $stmt->bind_param("i", $exam_id);
         $stmt->execute();
         $result = $stmt->get_result();
-        
+
         if ($result->num_rows == 0) {
             die("Exam not found");
         }
-        
+
         $exam_details = $result->fetch_assoc();
         // Add exam_type field with the same value as exam_name
         $exam_details['exam_type'] = $exam_details['exam_name'];
-        
+
         $stmt->close();
     } catch (Exception $e2) {
         error_log("Error fetching exam details (alternative query): " . $e2->getMessage());
@@ -163,7 +163,7 @@ try {
     if ($stmt === false) {
         throw new Exception("Failed to prepare results statement: " . $conn->error);
     }
-    
+
     $stmt->bind_param("si", $student['student_id'], $exam_id);
     $stmt->execute();
     $results_data = $stmt->get_result();
@@ -174,6 +174,7 @@ try {
     $max_marks = 0;
     $total_credit_hours = 0;
     $total_grade_points = 0;
+    $failed_subjects = 0;
 
     while ($row = $results_data->fetch_assoc()) {
         $theory_marks = $row['theory_marks'] ?? 0;
@@ -181,19 +182,74 @@ try {
         $total_subject_marks = $theory_marks + $practical_marks;
         $subject_max_marks = ($row['full_marks_theory'] ?? 100) + ($row['full_marks_practical'] ?? 0);
         $credit_hours = $row['credit_hours'] ?? 1;
-        
+
+        // Check if practical marks exist
+        $has_practical = ($row['full_marks_practical'] > 0 && $practical_marks > 0);
+
         // Calculate grade point based on total marks percentage - Updated to match Admin grading system
         $total_percentage = $subject_max_marks > 0 ? ($total_subject_marks / $subject_max_marks) * 100 : 0;
+
+        // Determine theory and practical percentages
+        $theory_percentage = $row['full_marks_theory'] > 0 ? ($theory_marks / $row['full_marks_theory']) * 100 : 0;
+        $practical_percentage = $row['full_marks_practical'] > 0 ? ($practical_marks / $row['full_marks_practical']) * 100 : 0;
+
+        // Determine individual grades
+        $theory_grade = 'NG';
+        if ($theory_percentage >= 90) $theory_grade = 'A+';
+        elseif ($theory_percentage >= 80) $theory_grade = 'A';
+        elseif ($theory_percentage >= 70) $theory_grade = 'B+';
+        elseif ($theory_percentage >= 60) $theory_grade = 'B';
+        elseif ($theory_percentage >= 50) $theory_grade = 'C+';
+        elseif ($theory_percentage >= 40) $theory_grade = 'C';
+        elseif ($theory_percentage >= 33) $theory_grade = 'D';
+
+        // Set practical grade to N/A if no practical marks
+        $practical_grade = 'N/A';
+        if ($has_practical) {
+            $practical_grade = 'NG';
+            if ($practical_percentage >= 90) $practical_grade = 'A+';
+            elseif ($practical_percentage >= 80) $practical_grade = 'A';
+            elseif ($practical_percentage >= 70) $practical_grade = 'B+';
+            elseif ($practical_percentage >= 60) $practical_grade = 'B';
+            elseif ($practical_percentage >= 50) $practical_grade = 'C+';
+            elseif ($practical_percentage >= 40) $practical_grade = 'C';
+            elseif ($practical_percentage >= 33) $practical_grade = 'D';
+        }
+
+        // Check for 35% failure rule
+        $is_failed = ($theory_percentage < 35 || ($has_practical && $practical_percentage < 35));
+
         $grade_point = 0;
-        if ($total_percentage >= 90) $grade_point = 4.0;
-        elseif ($total_percentage >= 80) $grade_point = 3.7;
-        elseif ($total_percentage >= 70) $grade_point = 3.3;
-        elseif ($total_percentage >= 60) $grade_point = 3.0;
-        elseif ($total_percentage >= 50) $grade_point = 2.7;
-        elseif ($total_percentage >= 40) $grade_point = 2.3;
-        elseif ($total_percentage >= 33) $grade_point = 1.0;
-        else $grade_point = 0.0;
-        
+        $grade = 'NG';
+        if ($total_percentage >= 90) {
+            $grade_point = 4.0;
+            $grade = 'A+';
+        } elseif ($total_percentage >= 80) {
+            $grade_point = 3.7;
+            $grade = 'A';
+        } elseif ($total_percentage >= 70) {
+            $grade_point = 3.3;
+            $grade = 'B+';
+        } elseif ($total_percentage >= 60) {
+            $grade_point = 3.0;
+            $grade = 'B';
+        } elseif ($total_percentage >= 50) {
+            $grade_point = 2.7;
+            $grade = 'C+';
+        } elseif ($total_percentage >= 40) {
+            $grade_point = 2.3;
+            $grade = 'C';
+        } elseif ($total_percentage >= 33) {
+            $grade_point = 1.0;
+            $grade = 'D';
+        }
+
+        if ($is_failed) {
+            $grade_point = 0.0;
+            $grade = 'NG';
+            $failed_subjects++;
+        }
+
         $total_grade_points += ($grade_point * $credit_hours);
         $total_credit_hours += $credit_hours;
 
@@ -204,11 +260,15 @@ try {
             'theory_marks' => $theory_marks,
             'practical_marks' => $practical_marks,
             'total_marks' => $total_subject_marks,
-            'grade' => $row['grade'],
+            'grade' => $grade,
             'grade_point' => $grade_point,
             'remarks' => $row['remarks'] ?? '',
             'full_marks_theory' => $row['full_marks_theory'] ?? 100,
-            'full_marks_practical' => $row['full_marks_practical'] ?? 0
+            'full_marks_practical' => $row['full_marks_practical'] ?? 0,
+            'theory_grade' => $theory_grade,
+            'practical_grade' => $practical_grade,
+            'is_failed' => $is_failed,
+            'has_practical' => $has_practical
         ];
 
         $total_marks += $total_subject_marks;
@@ -217,12 +277,12 @@ try {
     }
 
     $stmt->close();
-    
+
     // Calculate GPA
     $gpa = $total_credit_hours > 0 ? ($total_grade_points / $total_credit_hours) : 0;
-    
+
     // Determine grade based on GPA - Updated to match Admin grading system
-    $grade = 'F';
+    $grade = 'NG';
     if ($gpa >= 4.0) $grade = 'A+';
     elseif ($gpa >= 3.7) $grade = 'A';
     elseif ($gpa >= 3.3) $grade = 'B+';
@@ -230,11 +290,11 @@ try {
     elseif ($gpa >= 2.7) $grade = 'C+';
     elseif ($gpa >= 2.3) $grade = 'C';
     elseif ($gpa >= 1.0) $grade = 'D';
-    else $grade = 'F';
-    
+    else $grade = 'NG';
+
     // Calculate percentage
     $percentage = $max_marks > 0 ? ($total_marks / $max_marks) * 100 : 0;
-    
+
     // Determine division
     if ($percentage >= 80) {
         $division = 'Distinction';
@@ -247,12 +307,12 @@ try {
     } else {
         $division = 'Fail';
     }
-    
+
     // Get student performance data if available
     try {
         // Check if student_performance table exists
         $check_table = $conn->query("SHOW TABLES LIKE 'student_performance'");
-        
+
         if ($check_table->num_rows > 0) {
             $stmt = $conn->prepare("
                 SELECT * FROM student_performance 
@@ -261,7 +321,7 @@ try {
             if ($stmt === false) {
                 throw new Exception("Failed to prepare performance statement: " . $conn->error);
             }
-            
+
             $stmt->bind_param("si", $student['student_id'], $exam_id);
             $stmt->execute();
             $performance_result = $stmt->get_result();
@@ -271,7 +331,7 @@ try {
                 // Use the stored GPA and percentage if available
                 $gpa = $performance['gpa'];
                 $percentage = $performance['average_marks'];
-                
+
                 // Get rank information if available
                 $rank = $performance['rank'] ?? 'N/A';
             }
@@ -326,11 +386,11 @@ try {
     if ($stmt === false) {
         throw new Exception("Failed to prepare statement: " . $conn->error);
     }
-    
+
     $stmt->bind_param("i", $exam_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    
+
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         $prepared_by = $row['full_name'];
@@ -354,446 +414,370 @@ $conn->close();
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
-<style>
-    @page {
-        size: A4;
-        margin: 0;
-    }
 
-    .grade-sheet-container {
-        width: 21cm;
-        min-height: 29.7cm;
-        padding: 1.5cm;
-        margin: 20px auto;
-        background-color: white;
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
-        position: relative;
-        box-sizing: border-box;
-        border-radius: 8px;
-    }
-
-    .watermark {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(-45deg);
-        font-size: 120px;
-        color: rgba(0, 0, 0, 0.03);
-        z-index: 0;
-        pointer-events: none;
-        font-weight: bold;
-    }
-
-    .header {
-        text-align: center;
-        margin-bottom: 30px;
-        position: relative;
-        z-index: 1;
-        border-bottom: 3px solid #1e40af;
-        padding-bottom: 15px;
-    }
-
-    .logo {
-        width: 90px;
-        height: 90px;
-        margin: 0 auto 15px;
-        background-color: #f0f7ff;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        color: #1e40af;
-        border: 2px solid #1e40af;
-    }
-
-    .title {
-        font-weight: bold;
-        font-size: 24px;
-        margin-bottom: 5px;
-        color: #1e40af;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    .subtitle {
-        font-size: 20px;
-        margin-bottom: 8px;
-        color: #2563eb;
-        font-weight: 500;
-    }
-
-    .exam-title {
-        font-size: 22px;
-        font-weight: bold;
-        margin: 15px 0;
-        color: #1e40af;
-        border: 2px solid #1e40af;
-        display: inline-block;
-        padding: 8px 20px;
-        border-radius: 8px;
-        background-color: #f0f7ff;
-        letter-spacing: 1px;
-    }
-
-    .student-info {
-        margin-bottom: 30px;
-        position: relative;
-        z-index: 1;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 15px;
-        background-color: #f8fafc;
-        padding: 20px;
-        border-radius: 8px;
-        border-left: 4px solid #2563eb;
-    }
-
-    .info-item {
-        margin-bottom: 12px;
-    }
-
-    .info-label {
-        font-weight: bold;
-        color: #1e40af;
-        display: inline-block;
-        min-width: 140px;
-    }
-
-    .grade-sheet-table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        margin-bottom: 30px;
-        position: relative;
-        z-index: 1;
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-
-    .grade-sheet-table th,
-    .grade-sheet-table td {
-        padding: 12px;
-        text-align: center;
-        border: 1px solid #e2e8f0;
-    }
-
-    .grade-sheet-table th {
-        background-color: #1e40af;
-        color: white;
-        font-weight: bold;
-        text-transform: uppercase;
-        font-size: 14px;
-        letter-spacing: 0.5px;
-    }
-
-    .grade-sheet-table tr:nth-child(even) {
-        background-color: #f8fafc;
-    }
-
-    .grade-sheet-table tr:hover {
-        background-color: #f0f7ff;
-    }
-
-    .summary {
-        margin: 30px 0;
-        position: relative;
-        z-index: 1;
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 20px;
-    }
-
-    .summary-item {
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 15px;
-        text-align: center;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        transition: transform 0.2s ease;
-    }
-
-    .summary-item:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .summary-label {
-        font-weight: bold;
-        color: #1e40af;
-        margin-bottom: 8px;
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .summary-value {
-        font-size: 22px;
-        font-weight: bold;
-        color: #2563eb;
-    }
-
-    .footer {
-        margin-top: 40px;
-        position: relative;
-        z-index: 1;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 30px;
-    }
-
-    .signature {
-        text-align: center;
-        margin-top: 50px;
-    }
-
-    .signature-line {
-        width: 80%;
-        margin: 60px auto 10px;
-        border-top: 1px solid #333;
-    }
-
-    .signature-title {
-        font-weight: bold;
-        color: #1e40af;
-        margin-bottom: 5px;
-    }
-
-    .grade-scale {
-        margin-top: 30px;
-        font-size: 12px;
-        border: 1px solid #e2e8f0;
-        padding: 15px;
-        background-color: #f8fafc;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-
-    .grade-title {
-        font-weight: bold;
-        margin-bottom: 10px;
-        text-align: center;
-        color: #1e40af;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .grade-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-    }
-
-    .grade-table th,
-    .grade-table td {
-        padding: 5px;
-        text-align: center;
-        border: 1px solid #e2e8f0;
-    }
-
-    .grade-table th {
-        background-color: #1e40af;
-        color: white;
-    }
-
-    .grade-table tr:nth-child(even) {
-        background-color: #f0f7ff;
-    }
-
-    .qr-code {
-        position: absolute;
-        bottom: 30px;
-        right: 30px;
-        width: 90px;
-        height: 90px;
-        background-color: #f0f7ff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 10px;
-        color: #1e40af;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-    }
-
-    /* Action buttons */
-    .action-buttons {
-        display: flex;
-        gap: 15px;
-        margin-bottom: 30px;
-        flex-wrap: wrap;
-    }
-
-    .action-button {
-        display: inline-flex;
-        align-items: center;
-        padding: 10px 20px;
-        background-color: #1e40af;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-weight: 500;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
-    }
-
-    .action-button:hover {
-        background-color: #1e3a8a;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
-    }
-
-    .action-button i {
-        margin-right: 10px;
-    }
-
-    /* Floating action buttons */
-    .floating-actions {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        z-index: 100;
-    }
-
-    .floating-action {
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        background-color: #1e40af;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .floating-action:hover {
-        transform: translateY(-3px) scale(1.05);
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
-    }
-
-    .floating-action i {
-        font-size: 20px;
-    }
-
-    /* Tooltip for floating actions */
-    .floating-action {
-        position: relative;
-    }
-
-    .floating-action::before {
-        content: attr(data-tooltip);
-        position: absolute;
-        right: 60px;
-        background-color: #1e3a8a;
-        color: white;
-        padding: 5px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-        opacity: 0;
-        transition: opacity 0.3s;
-        pointer-events: none;
-        white-space: nowrap;
-    }
-
-    .floating-action:hover::before {
-        opacity: 1;
-    }
-
-    @media print {
-        body {
-            background-color: white !important;
-        }
-
-        .grade-sheet-container {
-            width: 100%;
-            min-height: auto;
-            padding: 0.5cm;
+    <style>
+        @page {
+            size: A4;
             margin: 0;
-            box-shadow: none;
-            border-radius: 0;
         }
 
-        .print-button,
-        .back-button,
-        .sidebar,
-        .top-navigation,
-        .action-buttons,
-        .floating-actions {
-            display: none !important;
-        }
-
-        .main-content {
-            margin-left: 0 !important;
-            padding: 0 !important;
-        }
-    }
-
-    /* Mobile optimizations */
-    @media (max-width: 768px) {
         .grade-sheet-container {
-            width: 100%;
-            padding: 1cm;
+            width: 21cm;
+            min-height: 29.7cm;
+            padding: 1.5cm;
+            margin: 20px auto;
+            background-color: white;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+            position: relative;
+            box-sizing: border-box;
+            border-radius: 8px;
         }
 
-        .summary {
-            grid-template-columns: 1fr 1fr;
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 120px;
+            color: rgba(0, 0, 0, 0.03);
+            z-index: 0;
+            pointer-events: none;
+            font-weight: bold;
         }
 
-        .footer {
-            grid-template-columns: 1fr;
-            gap: 20px;
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 1;
+            border-bottom: 3px solid #1e40af;
+            padding-bottom: 15px;
+        }
+
+        .logo {
+            width: 90px;
+            height: 90px;
+            margin: 0 auto 15px;
+            background-color: #f0f7ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #1e40af;
+            border: 2px solid #1e40af;
+        }
+
+        .title {
+            font-weight: bold;
+            font-size: 24px;
+            margin-bottom: 5px;
+            color: #1e40af;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            font-size: 20px;
+            margin-bottom: 8px;
+            color: #2563eb;
+            font-weight: 500;
+        }
+
+        .exam-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin: 15px 0;
+            color: #1e40af;
+            border: 2px solid #1e40af;
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 8px;
+            background-color: #f0f7ff;
+            letter-spacing: 1px;
         }
 
         .student-info {
-            grid-template-columns: 1fr;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            max-width: 800px;
+            margin: 0 auto 30px;
+        }
+
+        .info-item {
+            background: #f9f9f9;
+            padding: 10px 15px;
+            border-radius: 6px;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 12px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #1e40af;
+            display: block;
+            margin-bottom: 5px;
         }
 
         .grade-sheet-table {
-            font-size: 14px;
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 1;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
         .grade-sheet-table th,
         .grade-sheet-table td {
-            padding: 8px 5px;
+            padding: 16px;
+            text-align: center;
+            border: none;
         }
 
-        .action-buttons {
-            justify-content: center;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .summary {
-            grid-template-columns: 1fr;
-        }
-
-        .grade-sheet-table {
-            font-size: 12px;
+        .grade-sheet-table th {
+            background-color: #1e40af;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 14px;
+            letter-spacing: 0.5px;
         }
 
-        .title {
-            font-size: 20px;
+        .grade-sheet-table tbody tr:nth-child(even) {
+            background-color: #f8fafc;
         }
 
-        .subtitle {
+        .simple-summary {
+            margin: 20px 0;
+            position: relative;
+            z-index: 1;
+            padding: 20px;
+        }
+
+        .simple-summary h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #1e40af;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .simple-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .simple-summary-item {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .simple-summary-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .simple-summary-value {
+            font-weight: bold;
+        }
+
+        .simple-additional-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .simple-info-item {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .simple-info-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .simple-info-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .simple-info-value.pass {
+            color: #28a745;
+        }
+
+        .simple-info-value.fail {
+            color: #dc3545;
+        }
+
+        .grade-title {
+            margin-bottom: 10px;
+            text-align: center;
+            letter-spacing: 0.5px;
+            font-weight: bold;
+            color: #1e40af;
+            text-transform: uppercase;
             font-size: 16px;
         }
 
-        .exam-title {
-            font-size: 18px;
+        .grade-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
         }
-    }
-</style>
+
+        .grade-table th,
+        .grade-table td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        .grade-table th {
+            background-color: #1e40af;
+            color: white;
+            font-weight: bold;
+        }
+
+        .grade-table tr:nth-child(even) {
+            background-color: #f0f7ff;
+        }
+
+        .footer {
+            margin-top: 50px;
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .signature {
+            text-align: center;
+        }
+
+        .signature-line {
+            width: 80%;
+            margin: 30px auto 15px;
+            border-top: 2px solid #333;
+        }
+
+        .signature-title {
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .action-button {
+            display: inline-flex;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #1e40af;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+        }
+
+        .action-button i {
+            margin-right: 10px;
+        }
+
+        @media print {
+            body {
+                background-color: white !important;
+            }
+
+            .grade-sheet-container {
+                width: 100%;
+                min-height: auto;
+                padding: 0.5cm;
+                margin: 0;
+                box-shadow: none;
+                border-radius: 0;
+            }
+
+            .print-button,
+            .back-button,
+            .sidebar,
+            .top-navigation,
+            .action-buttons {
+                display: none !important;
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+                padding: 0 !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .grade-sheet-container {
+                width: 100%;
+                padding: 1cm;
+            }
+
+            .student-info {
+                grid-template-columns: 1fr;
+            }
+
+            .grade-sheet-table {
+                font-size: 14px;
+            }
+
+            .grade-sheet-table th,
+            .grade-sheet-table td {
+                padding: 8px 5px;
+            }
+
+            .action-buttons {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .grade-sheet-table {
+                font-size: 12px;
+            }
+
+            .title {
+                font-size: 20px;
+            }
+
+            .subtitle {
+                font-size: 16px;
+            }
+
+            .exam-title {
+                font-size: 18px;
+            }
+        }
+    </style>
 </head>
 
 <body class="bg-gray-100">
@@ -842,10 +826,10 @@ $conn->close();
             <main class="flex-1 relative overflow-y-auto focus:outline-none">
                 <div class="py-6">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-                        
+
                         <div class="flex justify-between items-center mb-6">
                             <h1 class="text-2xl font-bold text-blue-900">
-                                <i class="fas fa-file-alt mr-2"></i> 
+                                <i class="fas fa-file-alt mr-2"></i>
                                 <?php echo htmlspecialchars($exam_details['exam_name']); ?> Result
                             </h1>
                             <div class="action-buttons">
@@ -866,15 +850,15 @@ $conn->close();
                             <div class="watermark">OFFICIAL</div>
 
                             <div class="header">
-                                <div class="logo">
+                                <div class="logo-section">
                                     <?php if (!empty($settings['school_logo'])): ?>
-                                        <img src="<?php echo htmlspecialchars($settings['school_logo']); ?>" alt="School Logo" class="h-full w-full object-contain">
+                                        <img src="<?php echo htmlspecialchars($settings['school_logo']); ?>" alt="School Logo">
                                     <?php else: ?>
-                                        <i class="fas fa-graduation-cap text-3xl"></i>
+                                        <i class="fas fa-graduation-cap text-5xl text-blue-600"></i>
                                     <?php endif; ?>
                                 </div>
-                                <div class="title"><?php echo isset($settings['school_name']) ? strtoupper($settings['school_name']) : 'GOVERNMENT OF NEPAL'; ?></div>
-                                <div class="title"><?php echo isset($settings['result_header']) ? strtoupper($settings['result_header']) : 'NATIONAL EXAMINATION BOARD'; ?></div>
+                                <div class="title"><?php echo isset($settings['school_name']) ? strtoupper($settings['school_name']) : 'School Name'; ?></div>
+                                <div class="subtitle"><?php echo isset($settings['result_header']) ? strtoupper($settings['result_header']) : 'Result Management System'; ?></div>
                                 <div class="subtitle">SECONDARY EDUCATION EXAMINATION</div>
                                 <div class="exam-title">GRADE SHEET</div>
                             </div>
@@ -895,10 +879,6 @@ $conn->close();
                                 <div class="info-item">
                                     <span class="info-label">Class:</span>
                                     <span><?php echo htmlspecialchars($student['class_name'] . ' ' . $student['section']); ?></span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Examination:</span>
-                                    <span><?php echo htmlspecialchars($exam_details['exam_name']); ?></span>
                                 </div>
                                 <div class="info-item">
                                     <span class="info-label">Exam Type:</span>
@@ -928,108 +908,148 @@ $conn->close();
                                             <td><?php echo htmlspecialchars($subject['code']); ?></td>
                                             <td><?php echo htmlspecialchars($subject['name']); ?></td>
                                             <td><?php echo htmlspecialchars($subject['credit_hour']); ?></td>
-                                            <td><?php 
-    $theory_percentage = $subject['full_marks_theory'] > 0 ? ($subject['theory_marks'] / $subject['full_marks_theory']) * 100 : 0;
-    // Theory Grade
-    if ($theory_percentage >= 90) echo 'A+';
-    elseif ($theory_percentage >= 80) echo 'A';
-    elseif ($theory_percentage >= 70) echo 'B+';
-    elseif ($theory_percentage >= 60) echo 'B';
-    elseif ($theory_percentage >= 50) echo 'C+';
-    elseif ($theory_percentage >= 40) echo 'C';
-    elseif ($theory_percentage >= 33) echo 'D';
-    else echo 'F';
-?></td>
-                                            <td><?php 
-    if ($subject['full_marks_practical'] > 0) {
-        $practical_percentage = ($subject['practical_marks'] / $subject['full_marks_practical']) * 100;
-        // Practical Grade
-        if ($practical_percentage >= 90) echo 'A+';
-        elseif ($practical_percentage >= 80) echo 'A';
-        elseif ($practical_percentage >= 70) echo 'B+';
-        elseif ($practical_percentage >= 60) echo 'B';
-        elseif ($practical_percentage >= 50) echo 'C+';
-        elseif ($practical_percentage >= 40) echo 'C';
-        elseif ($practical_percentage >= 33) echo 'D';
-        else echo 'F';
-    } else {
-        echo 'N/A';
-    }
-?></td>
-                                            <td><?php echo htmlspecialchars($subject['grade']); ?></td>
+                                            <td><?php echo htmlspecialchars($subject['theory_grade']); ?></td>
+                                            <td><?php echo htmlspecialchars($subject['practical_grade']); ?></td>
+                                            <td class="<?php echo $subject['is_failed'] ? 'text-red-600 font-bold' : ''; ?>"><?php echo htmlspecialchars($subject['grade']); ?></td>
                                             <td><?php echo number_format($subject['grade_point'], 2); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
 
-                            <div class="summary">
-                                <div class="summary-item">
-                                    <div class="summary-label">TOTAL MARKS</div>
-                                    <div class="summary-value"><?php echo $total_marks; ?> / <?php echo $max_marks; ?></div>
+                            <!-- Overall Result Summary -->
+                            <?php
+                            // Check if any subject has NG grade
+                            $has_ng_grade = false;
+                            $failed_subjects_count = 0;
+
+                            foreach ($subjects as $subject) {
+                                if ($subject['is_failed']) {
+                                    $has_ng_grade = true;
+                                    $failed_subjects_count++;
+                                }
+                            }
+
+                            $is_pass = ($failed_subjects_count == 0 && $percentage >= 35);
+
+                            // Determine division based on percentage
+                            if ($percentage >= 91) {
+                                $division = 'Distinction (A+)';
+                            } elseif ($percentage >= 81) {
+                                $division = 'First Division (A)';
+                            } elseif ($percentage >= 71) {
+                                $division = 'Second Division (B+)';
+                            } elseif ($percentage >= 61) {
+                                $division = 'Second Division (B)';
+                            } elseif ($percentage >= 51) {
+                                $division = 'Third Division (C+)';
+                            } elseif ($percentage >= 41) {
+                                $division = 'Third Division (C)';
+                            } elseif ($percentage >= 35) {
+                                $division = 'Pass (D+)';
+                            } else {
+                                $division = 'Not Graded (NG)';
+                            }
+                            ?>
+
+                            <div class="simple-summary">
+                                <h2>Overall Result Summary</h2>
+
+                                <!-- Summary Cards -->
+                                <div class="simple-summary-grid">
+                                    <div class="simple-summary-item">
+                                        <div class="simple-summary-label">Total Marks</div>
+                                        <div class="simple-summary-value">
+                                            <?php echo number_format($total_marks, 0); ?> / <?php echo number_format($max_marks, 0); ?>
+                                        </div>
+                                    </div>
+                                    <div class="simple-summary-item">
+                                        <div class="simple-summary-label">Percentage</div>
+                                        <div class="simple-summary-value"><?php echo number_format($percentage, 2); ?>%</div>
+                                    </div>
+                                    <div class="simple-summary-item">
+                                        <div class="simple-summary-label">GPA</div>
+                                        <div class="simple-summary-value"><?php echo number_format($gpa, 2); ?> / 4.0</div>
+                                    </div>
+                                    <?php if (!$has_ng_grade): ?>
+                                        <div class="simple-summary-item">
+                                            <div class="simple-summary-label">Grade</div>
+                                            <div class="simple-summary-value">
+                                                <?php
+                                                // Calculate grade based on percentage
+                                                if ($percentage >= 90) echo 'A+';
+                                                elseif ($percentage >= 80) echo 'A';
+                                                elseif ($percentage >= 70) echo 'B+';
+                                                elseif ($percentage >= 60) echo 'B';
+                                                elseif ($percentage >= 50) echo 'C+';
+                                                elseif ($percentage >= 40) echo 'C';
+                                                elseif ($percentage >= 35) echo 'D';
+                                                else echo 'NG';
+                                                ?>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="summary-item">
-                                    <div class="summary-label">PERCENTAGE</div>
-                                    <div class="summary-value"><?php echo number_format($percentage, 2); ?>%</div>
+
+                                <!-- Additional Information -->
+                                <div class="simple-additional-info">
+                                    <div class="simple-info-item">
+                                        <div class="simple-info-label">Result Status</div>
+                                        <div class="simple-info-value <?php echo $is_pass ? 'pass' : 'fail'; ?>">
+                                            <?php echo $is_pass ? 'PASS' : 'FAIL'; ?>
+                                        </div>
+                                    </div>
+
+                                    <div class="simple-info-item">
+                                        <div class="simple-info-label">Division</div>
+                                        <div class="simple-info-value"><?php echo $division; ?></div>
+                                    </div>
+
+                                    <div class="simple-info-item">
+                                        <div class="simple-info-label">Failed Subjects</div>
+                                        <div class="simple-info-value <?php echo $failed_subjects_count > 0 ? 'fail' : 'pass'; ?>">
+                                            <?php echo $failed_subjects_count; ?>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="summary-item">
-                                    <div class="summary-label">GPA</div>
-                                    <div class="summary-value"><?php echo number_format($gpa, 2); ?></div>
-                                </div>
-                                <div class="summary-item">
-                                    <div class="summary-label">DIVISION</div>
-                                    <div class="summary-value"><?php echo $division; ?></div>
-                                </div>
-                                <div class="summary-item">
-                                    <div class="summary-label">RESULT</div>
-                                    <div class="summary-value"><?php echo $percentage >= 33 ? 'PASS' : 'FAIL'; ?></div>
-                                </div>
-                                <?php if (isset($rank)): ?>
-                                <div class="summary-item">
-                                    <div class="summary-label">RANK</div>
-                                    <div class="summary-value"><?php echo $rank; ?></div>
-                                </div>
-                                <?php endif; ?>
                             </div>
 
-                            <div class="grade-scale">
-                                <div class="grade-title">GRADING SCALE</div>
-                                <table class="grade-table">
-                                    <tr>
-                                        <th>Grade</th>
-                                        <th>A+</th>
-                                        <th>A</th>
-                                        <th>B+</th>
-                                        <th>B</th>
-                                        <th>C+</th>
-                                        <th>C</th>
-                                        <th>D</th>
-                                        <th>F</th>
-                                    </tr>
-                                    <tr>
-                                        <th>Percentage</th>
-                                        <td>90-100</td>
-                                        <td>80-89</td>
-                                        <td>70-79</td>
-                                        <td>60-69</td>
-                                        <td>50-59</td>
-                                        <td>40-49</td>
-                                        <td>33-39</td>
-                                        <td>0-32</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Grade Point</th>
-                                        <td>4.0</td>
-                                        <td>3.7</td>
-                                        <td>3.3</td>
-                                        <td>3.0</td>
-                                        <td>2.7</td>
-                                        <td>2.3</td>
-                                        <td>1.0</td>
-                                        <td>0.0</td>
-                                    </tr>
-                                </table>
-                            </div>
+                            <div class="grade-title">GRADING SCALE</div>
+                            <table class="grade-table">
+                                <tr>
+                                    <th>Grade</th>
+                                    <th>A+</th>
+                                    <th>A</th>
+                                    <th>B+</th>
+                                    <th>B</th>
+                                    <th>C+</th>
+                                    <th>C</th>
+                                    <th>D+</th>
+                                    <th>NG</th>
+                                </tr>
+                                <tr>
+                                    <th>Marks Range</th>
+                                    <td>91-100</td>
+                                    <td>81-90</td>
+                                    <td>71-80</td>
+                                    <td>61-70</td>
+                                    <td>51-60</td>
+                                    <td>41-50</td>
+                                    <td>35-40</td>
+                                    <td>Below 35</td>
+                                </tr>
+                                <tr>
+                                    <th>Grade Point</th>
+                                    <td>3.6-4.0</td>
+                                    <td>3.2-3.6</td>
+                                    <td>2.8-3.2</td>
+                                    <td>2.6-2.8</td>
+                                    <td>2.2-2.6</td>
+                                    <td>1.6-2.2</td>
+                                    <td>1.6</td>
+                                    <td>0.0</td>
+                                </tr>
+                            </table>
 
                             <div class="footer">
                                 <div class="signature">
@@ -1044,28 +1064,12 @@ $conn->close();
                                 </div>
                             </div>
 
-                            <div class="qr-code">
-                                <i class="fas fa-qrcode text-3xl"></i>
-                            </div>
-
                             <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #777;">
                                 <p><?php echo isset($settings['result_footer']) ? htmlspecialchars($settings['result_footer']) : 'This is a computer-generated document. No signature is required.'; ?></p>
                                 <p>Issue Date: <?php echo date('d-m-Y', strtotime($issue_date)); ?></p>
                             </div>
                         </div>
 
-                        <!-- Floating action buttons for mobile -->
-                        <div class="floating-actions md:hidden">
-                            <div class="floating-action" onclick="window.print()" data-tooltip="Print">
-                                <i class="fas fa-print"></i>
-                            </div>
-                            <div class="floating-action" onclick="downloadPDF()" data-tooltip="Download PDF">
-                                <i class="fas fa-file-pdf"></i>
-                            </div>
-                            <a href="grade_sheet.php" class="floating-action" data-tooltip="Back to Grade Sheets">
-                                <i class="fas fa-arrow-left"></i>
-                            </a>
-                        </div>
                     </div>
                 </div>
             </main>
@@ -1077,11 +1081,11 @@ $conn->close();
         document.getElementById('sidebar-toggle').addEventListener('click', function() {
             document.getElementById('mobile-sidebar').classList.remove('-translate-x-full');
         });
-        
+
         document.getElementById('close-sidebar').addEventListener('click', function() {
             document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
         });
-        
+
         document.getElementById('sidebar-backdrop').addEventListener('click', function() {
             document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
         });
@@ -1107,22 +1111,24 @@ $conn->close();
                 logging: false
             }).then(canvas => {
                 const imgData = canvas.toDataURL('image/png');
-                
+
                 // Initialize jsPDF
-                const { jsPDF } = window.jspdf;
+                const {
+                    jsPDF
+                } = window.jspdf;
                 const doc = new jsPDF('p', 'mm', 'a4');
-                
+
                 // Calculate the width and height to maintain aspect ratio
                 const imgWidth = 210; // A4 width in mm
                 const pageHeight = 297; // A4 height in mm
                 const imgHeight = canvas.height * imgWidth / canvas.width;
                 let heightLeft = imgHeight;
                 let position = 0;
-                
+
                 // Add the first page
                 doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
                 heightLeft -= pageHeight;
-                
+
                 // Add additional pages if needed
                 while (heightLeft > 0) {
                     position = heightLeft - imgHeight;
@@ -1130,16 +1136,16 @@ $conn->close();
                     doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
                     heightLeft -= pageHeight;
                 }
-                
+
                 // Save the PDF
                 doc.save('Grade_Sheet_<?php echo isset($student['roll_number']) ? $student['roll_number'] : 'Student'; ?>_<?php echo date('Y-m-d'); ?>.pdf');
-                
+
                 // Remove loading indicator
                 document.body.removeChild(loadingIndicator);
             }).catch(error => {
                 console.error('Error generating PDF:', error);
                 alert('An error occurred while generating the PDF. Please try again.');
-                
+
                 // Remove loading indicator
                 document.body.removeChild(loadingIndicator);
             });
@@ -1152,13 +1158,13 @@ $conn->close();
                 e.preventDefault();
                 window.print();
             }
-            
+
             // Alt+D to download PDF
             if (e.altKey && e.key === 'd') {
                 e.preventDefault();
                 downloadPDF();
             }
-            
+
             // Alt+B to go back to grade sheets
             if (e.altKey && e.key === 'b') {
                 e.preventDefault();
@@ -1167,4 +1173,5 @@ $conn->close();
         });
     </script>
 </body>
+
 </html>

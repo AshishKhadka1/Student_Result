@@ -818,48 +818,6 @@ $issue_date = date('Y-m-d');
                 </div>
             </div>
             
-            <!-- Class Statistics -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-8 no-print">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">
-                    <i class="fas fa-chart-bar text-blue-500 mr-2"></i> Class Statistics
-                </h2>
-                
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="stat-card bg-blue-50 rounded-lg p-4 border border-blue-100">
-                        <p class="text-sm text-blue-600 mb-1">Results Entered</p>
-                        <p class="text-2xl font-bold text-blue-700"><?php echo $stats['results_entered']; ?> / <?php echo $stats['total_students']; ?></p>
-                        <p class="text-xs text-blue-500 mt-1">
-                            <?php echo ($stats['total_students'] > 0) ? round(($stats['results_entered'] / $stats['total_students']) * 100) : 0; ?>% Complete
-                        </p>
-                    </div>
-                    
-                    <div class="stat-card bg-green-50 rounded-lg p-4 border border-green-100">
-                        <p class="text-sm text-green-600 mb-1">Pass Rate</p>
-                        <p class="text-2xl font-bold text-green-700"><?php echo round($stats['pass_percentage']); ?>%</p>
-                        <p class="text-xs text-green-500 mt-1">
-                            <?php echo $stats['pass_count']; ?> Passed, <?php echo $stats['fail_count']; ?> Failed
-                        </p>
-                    </div>
-                    
-                    <div class="stat-card bg-purple-50 rounded-lg p-4 border border-purple-100">
-                        <p class="text-sm text-purple-600 mb-1">Average Marks</p>
-                        <p class="text-2xl font-bold text-purple-700"><?php echo round($stats['average_marks'], 2); ?></p>
-                        <p class="text-xs text-purple-500 mt-1">
-                            Out of <?php echo isset($subject['full_marks_theory']) && isset($subject['full_marks_practical']) ? 
-                                ($subject['full_marks_theory'] + $subject['full_marks_practical']) : '100'; ?>
-                        </p>
-                    </div>
-                    
-                    <div class="stat-card bg-yellow-50 rounded-lg p-4 border border-yellow-100">
-                        <p class="text-sm text-yellow-600 mb-1">Highest / Lowest</p>
-                        <p class="text-2xl font-bold text-yellow-700"><?php echo round($stats['highest_marks'], 2); ?> / <?php echo round($stats['lowest_marks'], 2); ?></p>
-                        <p class="text-xs text-yellow-500 mt-1">
-                            Range: <?php echo round($stats['highest_marks'] - $stats['lowest_marks'], 2); ?> marks
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
             <!-- Results Entry Form -->
             <?php if (empty($students)): ?>
             <div class="bg-yellow-100 text-yellow-700 p-4 rounded no-print">

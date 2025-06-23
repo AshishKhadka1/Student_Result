@@ -859,16 +859,19 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                 #
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                File Name
+                                Student Name
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Student Details
+                                Student ID
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Roll Number
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Exam
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Date Uploaded
+                                Date
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Status
@@ -917,29 +920,13 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                 <?php echo $serial_number++; ?>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                    </svg>
-                                                    <span class="text-sm text-gray-900">
-                                                        <?php 
-                                                        // Simple filename format: Result_StudentName_StudentID_SerialNumber.xlsx
-                                                        $cleanStudentName = preg_replace('/[^A-Za-z0-9]/', '', $student['full_name']);
-                                                        $cleanStudentName = substr($cleanStudentName, 0, 15); // Limit length
-                                                        $simpleFileName = "Result_" . $cleanStudentName . "_" . $student['student_id'] . "_" . str_pad($serial_number-1, 3, '0', STR_PAD_LEFT) . ".xlsx";
-                                                        echo htmlspecialchars($simpleFileName);
-                                                        ?>
-                                                    </span>
-                                                </div>
+                                                <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($student['full_name']); ?></div>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="text-sm text-gray-900">
-                                                    <div class="font-medium"><?php echo htmlspecialchars($student['full_name']); ?></div>
-                                                    <div class="text-gray-500">ID: <?php echo htmlspecialchars($student['student_id']); ?></div>
-                                                    <?php if (!empty($student['roll_number'])): ?>
-                                                        <div class="text-gray-500">Roll: <?php echo htmlspecialchars($student['roll_number']); ?></div>
-                                                    <?php endif; ?>
-                                                </div>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?php echo htmlspecialchars($student['student_id']); ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?php echo htmlspecialchars($student['roll_number'] ?? 'N/A'); ?>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
@@ -958,17 +945,12 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                     <a href="view_upload.php?id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>" 
                                                        class="text-blue-600 hover:text-blue-900 text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded" 
                                                        title="View Results">
-                                                        <i class="fas fa-eye"></i>
-                                                    </a>
-                                                    <a href="students_result.php?upload_id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>" 
-                                                       class="text-indigo-600 hover:text-indigo-900 text-xs bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded" 
-                                                       title="Student Results">
-                                                        <i class="fas fa-user-graduate"></i>
+                                                        <i class="fas fa-eye"></i> View
                                                     </a>
                                                     <button onclick="deleteStudentResult(<?php echo $row['id']; ?>, '<?php echo $student['student_id']; ?>', '<?php echo htmlspecialchars($student['full_name']); ?>')" 
                                                             class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded" 
-                                                            title="Delete Student Results">
-                                                        <i class="fas fa-trash-alt"></i>
+                                                            title="Delete Results">
+                                                        <i class="fas fa-trash-alt"></i> Delete
                                                     </button>
                                                 </div>
                                             </td>
@@ -988,22 +970,11 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                             <?php echo $serial_number++; ?>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                </svg>
-                                                <span class="text-sm text-gray-900">
-                                                    <?php 
-                                                    $simpleFileName = "Result_Upload_" . str_pad($serial_number-1, 3, '0', STR_PAD_LEFT) . ".xlsx";
-                                                    echo htmlspecialchars($simpleFileName);
-                                                    ?>
-                                                </span>
-                                            </div>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                            No students found
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <div class="text-gray-400">No students found</div>
-                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">-</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">-</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
                                         </td>
@@ -1021,12 +992,12 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                 <a href="view_upload.php?id=<?php echo $row['id']; ?>" 
                                                    class="text-blue-600 hover:text-blue-900 text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded" 
                                                    title="View Upload">
-                                                    <i class="fas fa-eye"></i>
+                                                    <i class="fas fa-eye"></i> View
                                                 </a>
                                                 <button onclick="deleteUpload(<?php echo $row['id']; ?>)" 
                                                         class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded" 
                                                         title="Delete Upload">
-                                                    <i class="fas fa-trash-alt"></i>
+                                                    <i class="fas fa-trash-alt"></i> Delete
                                                 </button>
                                             </div>
                                         </td>
@@ -1035,7 +1006,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center" colspan="8">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center" colspan="9">
                                     No result uploads found.
                                 </td>
                             </tr>
@@ -1552,7 +1523,7 @@ function updateBulkDeleteButton() {
     
     if (selectedCheckboxes.length > 0) {
         bulkDeleteBtn.disabled = false;
-        bulkDeleteBtn.textContent = `Delete Selected (${selectedCheckboxes.length})`;
+        bulkDeleteBtn.innerHTML = `<i class="fas fa-trash-alt mr-2"></i>Delete Selected (${selectedCheckboxes.length})`;
     } else {
         bulkDeleteBtn.disabled = true;
         bulkDeleteBtn.innerHTML = '<i class="fas fa-trash-alt mr-2"></i>Delete Selected';
@@ -1577,7 +1548,12 @@ async function bulkDelete() {
     const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
     
     if (selectedCheckboxes.length === 0) {
-        alert('Please select at least one entry to delete.');
+        Swal.fire({
+            title: 'No Selection',
+            text: 'Please select at least one entry to delete.',
+            icon: 'warning',
+            confirmButtonColor: '#3085d6'
+        });
         return;
     }
     
@@ -1605,51 +1581,56 @@ async function bulkDelete() {
         }
     });
     
-    const deletePromises = [];
-    selectedCheckboxes.forEach(checkbox => {
+    let successCount = 0;
+    let errorCount = 0;
+    
+    // Process deletions one by one
+    for (const checkbox of selectedCheckboxes) {
         const uploadId = checkbox.dataset.uploadId;
         const studentId = checkbox.dataset.studentId;
         
-        if (studentId && studentId !== 'undefined') {
-            // Delete specific student results
-            deletePromises.push(
-                fetch(`delete_student_result.php?upload_id=${uploadId}&student_id=${studentId}`, {
-                    method: 'GET'
-                })
-            );
-        } else {
-            // Delete entire upload
-            deletePromises.push(
-                fetch(`delete_upload.php?id=${uploadId}`, {
-                    method: 'GET'
-                })
-            );
+        try {
+            let response;
+            if (studentId && studentId !== 'undefined') {
+                // Delete specific student results
+                response = await fetch(`delete_student_result.php?upload_id=${uploadId}&student_id=${studentId}`);
+            } else {
+                // Delete entire upload
+                response = await fetch(`delete_upload.php?id=${uploadId}`);
+            }
+            
+            if (response.ok) {
+                successCount++;
+            } else {
+                errorCount++;
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            errorCount++;
         }
-    });
+    }
     
-    try {
-        await Promise.all(deletePromises);
-        
+    // Show result
+    if (errorCount === 0) {
         Swal.fire({
             title: 'Success!',
-            text: `Successfully deleted ${selectedCheckboxes.length} entries.`,
+            text: `Successfully deleted ${successCount} entries.`,
             icon: 'success',
             timer: 2000,
             showConfirmButton: false
         });
-        
-        // Reload page after 2 seconds
-        setTimeout(() => {
-            window.location.reload();
-        }, 2000);
-        
-    } catch (error) {
+    } else {
         Swal.fire({
-            title: 'Error!',
-            text: 'Some entries could not be deleted. Please try again.',
-            icon: 'error'
+            title: 'Partial Success',
+            text: `Deleted ${successCount} entries. ${errorCount} entries could not be deleted.`,
+            icon: 'warning'
         });
     }
+    
+    // Reload page after 2 seconds
+    setTimeout(() => {
+        window.location.reload();
+    }, 2000);
 }
 
 function deleteStudentResult(uploadId, studentId, studentName) {

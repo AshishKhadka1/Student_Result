@@ -101,7 +101,7 @@ if (isset($_GET['student_id']) && isset($_GET['exam_id'])) {
         SELECT r.*, s.subject_name, s.subject_code, s.full_marks_theory, s.full_marks_practical
         FROM results r
         JOIN subjects s ON r.subject_id = s.subject_id
-        WHERE r.student_id = ? AND r.exam_id = ?
+        WHERE r.student_id = ? AND r.exam_id = ? AND r.is_published = 1
         ORDER BY s.subject_name
     ");
     
@@ -347,15 +347,20 @@ if (isset($_GET['student_id']) && isset($_GET['exam_id'])) {
     if (isset($_GET['exam_id'])) {
         $selected_exam_id = $_GET['exam_id'];
 
-        $stmt = $conn->prepare("
+        // Get students with published results only
+        $students_query = "
             SELECT DISTINCT s.student_id, s.roll_number, u.full_name, c.class_name, c.section
             FROM students s
             JOIN users u ON s.user_id = u.user_id
             JOIN classes c ON s.class_id = c.class_id
-            JOIN results r ON r.student_id = s.student_id
-            WHERE r.exam_id = ?
+            JOIN results r ON s.student_id = r.student_id
+            JOIN exams e ON r.exam_id = e.exam_id
+            WHERE (r.is_published = 1 OR e.results_published = 1)
+            AND e.exam_id = ?
             ORDER BY s.roll_number
-        ");
+        ";
+        
+        $stmt = $conn->prepare($students_query);
         
         if ($stmt) {
             $stmt->bind_param("i", $selected_exam_id);

@@ -1129,3 +1129,49 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+-- Update existing results to match exam publication status
+UPDATE results r 
+JOIN exams e ON r.exam_id = e.exam_id 
+SET r.is_published = 1 
+WHERE e.results_published = 1;
+
+-- Create trigger to sync result publication with exam publication
+DELIMITER $$
+CREATE TRIGGER sync_result_publication_on_exam_update
+AFTER UPDATE ON exams
+FOR each ROW
+BEGIN
+    IF NEW.results_published != OLD.results_published THEN
+        UPDATE results 
+        SET is_published = NEW.results_published,
+            updated_at = NOW()
+        WHERE exam_id = NEW.exam_id;
+    END IF;
+END$$
+DELIMITER ;
+
+-- Create trigger to sync result publication when results are inserted
+DELIMITER $$
+CREATE TRIGGER sync_result_publication_on_insert
+AFTER INSERT ON results
+FOR EACH ROW
+BEGIN
+    DECLARE exam_published TINYINT DEFAULT 0;
+    
+    SELECT results_published INTO exam_published 
+    FROM exams 
+    WHERE exam_id = NEW.exam_id;
+    
+    IF exam_published = 1 THEN
+        UPDATE results 
+        SET is_published = 1,
+            updated_at = NOW()
+        WHERE result_id = NEW.result_id;
+    END IF;
+END$$
+DELIMITER ;
+
+-- Add index for better performance on publication queries
+CREATE INDEX idx_results_published_exam ON results(exam_id, is_published);
+CREATE INDEX idx_exams_results_published ON exams(results_published);

@@ -10,21 +10,6 @@
             </div>
         </div>
         <div class="ml-4 flex items-center md:ml-6">
-            <!-- Dark Mode Toggle -->
-            <button id="dark-mode-toggle" class="bg-gray-200 relative inline-flex h-6 w-11 items-center rounded-full mx-3">
-                <span class="sr-only">Toggle dark mode</span>
-                <span id="dark-mode-toggle-dot" class="inline-block h-4 w-4 transform rounded-full bg-white transition translate-x-0.5"></span>
-            </button>
-            
-            <!-- Notifications Dropdown -->
-            <div class="ml-3 relative">
-                <div>
-                    <button type="button" class="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <span class="sr-only">View notifications</span>
-                        <i class="fas fa-bell"></i>
-                    </button>
-                </div>
-            </div>
             
             <!-- Profile dropdown -->
             <div class="ml-3 relative">

@@ -35,6 +35,10 @@ if (!$stmt) {
     $stmt->close();
 }
 
+// Define publication settings - teachers can only see published results
+$results_table = 'results';
+$publication_condition = "AND (r.is_published = 1 OR r.status = 'published' OR e.results_published = 1)";
+
 // Initialize variables
 $student = [];
 $subjects = [];
@@ -46,10 +50,12 @@ $subject_names = [];
 $time_periods = [];
 $gpa_trend = [];
 
-// Get available exams for teacher's subjects
+// Get available exams with published results only
 $exams_query = "SELECT DISTINCT e.exam_id, e.exam_name, e.exam_type, e.academic_year 
                 FROM exams e
+                JOIN results r ON e.exam_id = r.exam_id
                 WHERE e.is_active = 1 
+                AND (r.is_published = 1 OR r.status = 'published' OR e.results_published = 1)
                 ORDER BY e.created_at DESC";
 $stmt = $conn->prepare($exams_query);
 if ($stmt) {
@@ -122,6 +128,7 @@ if (isset($_GET['student_id'])) {
     JOIN exams e ON r.exam_id = e.exam_id
     JOIN subjects s ON r.subject_id = s.subject_id
     WHERE r.student_id = ?
+    AND (r.is_published = 1 OR r.status = 'published' OR e.results_published = 1)
     ORDER BY e.created_at DESC, s.subject_name ASC";
 
     $stmt = $conn->prepare($query);
@@ -179,7 +186,9 @@ if (isset($_GET['student_id'])) {
         SELECT sp.*, e.exam_name
         FROM student_performance sp
         JOIN exams e ON sp.exam_id = e.exam_id
+        JOIN results r ON sp.student_id = r.student_id AND sp.exam_id = r.exam_id
         WHERE sp.student_id = ?
+        AND (r.is_published = 1 OR r.status = 'published' OR e.results_published = 1)
         ORDER BY e.created_at DESC
     ");
     $stmt->bind_param("s", $student_id);
@@ -201,6 +210,8 @@ if (isset($_GET['student_id'])) {
     FROM results r
     JOIN subjects s ON r.subject_id = s.subject_id
     WHERE r.student_id = ? AND r.exam_id = ?
+    AND (r.is_published = 1 OR r.status = 'published' OR 
+         EXISTS (SELECT 1 FROM exams e WHERE e.exam_id = r.exam_id AND e.results_published = 1))
     GROUP BY r.subject_id
     ORDER BY s.subject_name
 ");
@@ -238,6 +249,8 @@ if (isset($_GET['student_id'])) {
     JOIN users u ON s.user_id = u.user_id
     JOIN classes c ON s.class_id = c.class_id
     JOIN results r ON s.student_id = r.student_id
+    WHERE (r.is_published = 1 OR r.status = 'published' OR 
+           EXISTS (SELECT 1 FROM exams e WHERE e.exam_id = r.exam_id AND e.results_published = 1))
     ORDER BY c.class_name, c.section, s.roll_number
 ";
     $stmt = $conn->prepare($students_query);
@@ -811,6 +824,20 @@ function getRemarks($grade)
                     <div>
                         <h2 class="text-xl font-semibold text-gray-800"><?php echo htmlspecialchars($teacher_name ?? 'Teacher'); ?></h2>
                         <p class="mt-1 text-sm text-gray-600">View grade sheets for your students.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Published Results Notice -->
+            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-blue-400"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-blue-700">
+                            <strong>Published Results Only:</strong> You can only view results that have been officially published by the administration.
+                        </p>
                     </div>
                 </div>
             </div>

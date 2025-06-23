@@ -12,7 +12,8 @@ if ($conn->connect_error) {
 }
 
 // Function to get grade and grade point from percentage - EXACT same as view_upload.php
-function getGradeInfo($percentage) {
+function getGradeInfo($percentage)
+{
     if ($percentage >= 90) return ['grade' => 'A+', 'point' => 4.0, 'class' => 'bg-green-100 text-green-800'];
     elseif ($percentage >= 80) return ['grade' => 'A', 'point' => 3.6, 'class' => 'bg-green-100 text-green-800']; // Changed
     elseif ($percentage >= 70) return ['grade' => 'B+', 'point' => 3.2, 'class' => 'bg-green-100 text-green-800']; // Changed
@@ -24,7 +25,8 @@ function getGradeInfo($percentage) {
 }
 
 // Function to calculate grade and GPA based on percentage - EXACT same as view_upload.php
-function calculateGradeAndGPA($percentage) {
+function calculateGradeAndGPA($percentage)
+{
     if ($percentage >= 90) {
         return ['grade' => 'A+', 'gpa' => 4.0];
     } elseif ($percentage >= 80) {
@@ -45,15 +47,16 @@ function calculateGradeAndGPA($percentage) {
 }
 
 // Function to check if subject is failed - Updated to match view_upload.php (33% minimum)
-function isSubjectFailed($theory_marks, $practical_marks = null, $has_practical = false) {
+function isSubjectFailed($theory_marks, $practical_marks = null, $has_practical = false)
+{
     // Check theory failure (below 33% of theory full marks)
     $theory_full_marks = $has_practical ? 75 : 100;
     $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
-    
+
     if ($theory_percentage < 33) {
         return true;
     }
-    
+
     // Check practical failure if practical exists (below 33%)
     if ($has_practical && $practical_marks !== null) {
         $practical_percentage = ($practical_marks / 25) * 100;
@@ -61,7 +64,7 @@ function isSubjectFailed($theory_marks, $practical_marks = null, $has_practical 
             return true;
         }
     }
-    
+
     return false;
 }
 
@@ -84,8 +87,7 @@ if (isset($_POST['action'])) {
         $_SESSION['success'] = "Result published successfully.";
         header("Location: view_student_result.php?result_id=" . $result_id);
         exit();
-    } 
-    elseif ($_POST['action'] == 'unpublish') {
+    } elseif ($_POST['action'] == 'unpublish') {
         $stmt = $conn->prepare("UPDATE Results SET is_published = 0 WHERE result_id = ?");
         $stmt->bind_param("i", $result_id);
         $stmt->execute();
@@ -93,36 +95,34 @@ if (isset($_POST['action'])) {
         $_SESSION['success'] = "Result unpublished successfully.";
         header("Location: view_student_result.php?result_id=" . $result_id);
         exit();
-    }
-    elseif ($_POST['action'] == 'delete') {
+    } elseif ($_POST['action'] == 'delete') {
         // First delete related records from ResultDetails
         $stmt = $conn->prepare("DELETE FROM ResultDetails WHERE result_id = ?");
         $stmt->bind_param("i", $result_id);
         $stmt->execute();
         $stmt->close();
-        
+
         // Then delete the result
         $stmt = $conn->prepare("DELETE FROM Results WHERE result_id = ?");
         $stmt->bind_param("i", $result_id);
         $stmt->execute();
         $stmt->close();
-        
+
         $_SESSION['success'] = "Result deleted successfully.";
         header("Location: result.php");
         exit();
-    }
-    elseif ($_POST['action'] == 'update_subject_marks' && isset($_POST['result_id'])) {
+    } elseif ($_POST['action'] == 'update_subject_marks' && isset($_POST['result_id'])) {
         $result_id = $_POST['result_id'];
         $theory_marks = floatval($_POST['theory_marks']);
         $practical_marks = !empty($_POST['practical_marks']) ? floatval($_POST['practical_marks']) : null;
-        
+
         // Determine if subject has practical based on whether practical marks are provided
         $has_practical = !empty($_POST['practical_marks']);
-        
+
         // Determine full marks based on whether practical exists
         $theory_full_marks = $has_practical ? 75 : 100;
         $practical_full_marks = $has_practical ? 25 : 0;
-        
+
         // Validate marks don't exceed their respective maximums
         if ($theory_marks > $theory_full_marks) {
             $_SESSION['error'] = "Theory marks cannot exceed " . $theory_full_marks . " for this subject type.";
@@ -135,7 +135,7 @@ if (isset($_POST['action'])) {
             header("Location: view_student_result.php?result_id=" . $result_id);
             exit();
         }
-        
+
         // Validate total doesn't exceed 100
         $total_marks_obtained = $theory_marks + ($practical_marks ?? 0);
         if ($total_marks_obtained > 100) {
@@ -147,10 +147,10 @@ if (isset($_POST['action'])) {
         // Calculate percentage based on actual full marks
         $total_full_marks = $theory_full_marks + $practical_full_marks;
         $percentage = ($total_marks_obtained / $total_full_marks) * 100;
-        
+
         // Check if subject is failed using 33% rule
         $is_failed = isSubjectFailed($theory_marks, $practical_marks, $has_practical);
-        
+
         // Calculate grade and GPA
         if ($is_failed) {
             $grade = 'F';
@@ -160,7 +160,7 @@ if (isset($_POST['action'])) {
             $grade = $grade_data['grade'];
             $gpa = $grade_data['gpa'];
         }
-        
+
         // Update the result
         if ($practical_marks !== null) {
             $stmt = $conn->prepare("UPDATE results SET theory_marks = ?, practical_marks = ?, grade = ?, gpa = ?, updated_at = NOW() WHERE result_id = ?");
@@ -171,14 +171,13 @@ if (isset($_POST['action'])) {
         }
         $stmt->execute();
         $stmt->close();
-        
+
         $_SESSION['success'] = "Subject marks updated successfully.";
         header("Location: view_student_result.php?result_id=" . $result_id);
         exit();
-    }
-    elseif ($_POST['action'] == 'delete_subject' && isset($_POST['detail_id'])) {
+    } elseif ($_POST['action'] == 'delete_subject' && isset($_POST['detail_id'])) {
         $detail_id = intval($_POST['detail_id']);
-        
+
         // Get the subject info before deleting (for the success message)
         $stmt = $conn->prepare("SELECT s.subject_name FROM ResultDetails rd 
                                JOIN Subjects s ON rd.subject_id = s.subject_id 
@@ -188,13 +187,13 @@ if (isset($_POST['action'])) {
         $result = $stmt->get_result();
         $subject_info = $result->fetch_assoc();
         $stmt->close();
-        
+
         // Delete the subject result
         $stmt = $conn->prepare("DELETE FROM ResultDetails WHERE detail_id = ?");
         $stmt->bind_param("i", $detail_id);
         $stmt->execute();
         $stmt->close();
-        
+
         $_SESSION['success'] = "Subject '" . $subject_info['subject_name'] . "' has been deleted successfully.";
         header("Location: view_student_result.php?result_id=" . $result_id);
         exit();
@@ -223,24 +222,24 @@ try {
           LEFT JOIN result_uploads ru ON r.upload_id = ru.id
           WHERE r.result_id = ?
           LIMIT 1";
-    
+
     $stmt = $conn->prepare($query);
     $stmt->bind_param("i", $result_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    
+
     if ($result->num_rows === 0) {
         $_SESSION['error'] = "Result not found.";
         header("Location: result.php");
         exit();
     }
-    
+
     $result_data = $result->fetch_assoc();
     $stmt->close();
-    
+
     // Convert upload status to boolean for compatibility
     $result_data['is_published'] = ($result_data['upload_status'] == 'Published') ? 1 : 0;
-    
+
     // Get all subject results for this student and exam - EXACT same logic as view_upload.php
     $subject_results = [];
 
@@ -292,7 +291,7 @@ try {
         // Remove duplicates by keeping only the first (most recent) result for each subject
         $seen_subjects = [];
         $unique_subjects = [];
-        
+
         foreach ($student_subjects as $row) {
             $subject_key = $row['subject_id'];
             if (!isset($seen_subjects[$subject_key])) {
@@ -300,30 +299,30 @@ try {
                 $unique_subjects[] = $row;
             }
         }
-        
+
         // Process each unique subject with EXACT same calculation as view_upload.php
         foreach ($unique_subjects as $row) {
             $theory_marks = floatval($row['theory_marks'] ?? 0);
             $practical_marks = floatval($row['practical_marks'] ?? 0);
-            
+
             // Determine if subject has practical based on whether practical_marks > 0 - EXACT same logic
             $has_practical = $practical_marks > 0;
-            
+
             // Determine full marks based on whether practical exists - EXACT same logic
             $theory_full_marks = $has_practical ? 75 : 100;
             $practical_full_marks = $has_practical ? 25 : 0;
             $subject_full_marks = 100; // Total is always 100
-            
+
             $subject_total_obtained = $theory_marks + $practical_marks;
-            
+
             // Calculate individual component percentages - EXACT same logic
             $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
             $practical_percentage = $has_practical ? ($practical_marks / $practical_full_marks) * 100 : 0;
-            
+
             // Get grade info for theory and practical using the same function
             $theory_grade_info = getGradeInfo($theory_percentage);
             $practical_grade_info = $has_practical ? getGradeInfo($practical_percentage) : ['grade' => 'N/A', 'point' => 0, 'class' => 'bg-gray-100 text-gray-800'];
-            
+
             // Check for failure condition (either theory or practical below 33%)
             $is_failed = ($theory_percentage < 33) || ($has_practical && $practical_percentage < 33);
 
@@ -335,7 +334,7 @@ try {
             } else {
                 // Calculate subject GPA based on total percentage - EXACT same as view_upload.php
                 $subject_total_percentage = ($subject_total_obtained / $subject_full_marks) * 100;
-                
+
                 // Use EXACT same grading scale as view_upload.php
                 if ($subject_total_percentage >= 90) {
                     $subject_gpa = 4.0;
@@ -345,129 +344,126 @@ try {
                     $subject_grade = 'A';
                 } elseif ($subject_total_percentage >= 70) {
                     $subject_gpa = 3.2; // Changed to match view_upload.php exactly
-            $subject_grade = 'B+';
-            } elseif ($subject_total_percentage >= 60) {
-                $subject_gpa = 2.8; // Changed to match view_upload.php exactly
-                $subject_grade = 'B';
-            } elseif ($subject_total_percentage >= 50) {
-                $subject_gpa = 2.4; // Changed to match view_upload.php exactly
-                $subject_grade = 'C+';
-            } elseif ($subject_total_percentage >= 40) {
-                $subject_gpa = 2.0; // Changed to match view_upload.php exactly
-                $subject_grade = 'C';
-            } elseif ($subject_total_percentage >= 33) {
-                $subject_gpa = 1.6; // Changed to match view_upload.php exactly
-                $subject_grade = 'D';
-            } else {
-                $subject_gpa = 0.0;
-                $subject_grade = 'F';
+                    $subject_grade = 'B+';
+                } elseif ($subject_total_percentage >= 60) {
+                    $subject_gpa = 2.8; // Changed to match view_upload.php exactly
+                    $subject_grade = 'B';
+                } elseif ($subject_total_percentage >= 50) {
+                    $subject_gpa = 2.4; // Changed to match view_upload.php exactly
+                    $subject_grade = 'C+';
+                } elseif ($subject_total_percentage >= 40) {
+                    $subject_gpa = 2.0; // Changed to match view_upload.php exactly
+                    $subject_grade = 'C';
+                } elseif ($subject_total_percentage >= 33) {
+                    $subject_gpa = 1.6; // Changed to match view_upload.php exactly
+                    $subject_grade = 'D';
+                } else {
+                    $subject_gpa = 0.0;
+                    $subject_grade = 'F';
+                }
+
+                $final_grade_class = $subject_grade == 'F' ? 'bg-red-100 text-red-800' : ($subject_gpa >= 3.0 ? 'bg-green-100 text-green-800' : ($subject_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
             }
-            
-            $final_grade_class = $subject_grade == 'F' ? 'bg-red-100 text-red-800' : 
-                       ($subject_gpa >= 3.0 ? 'bg-green-100 text-green-800' : 
-                       ($subject_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
+
+            // Store calculated values - EXACT same structure as view_upload.php
+            $subject_results[] = [
+                'result_id' => $row['result_id'],
+                'subject_id' => $row['subject_id'],
+                'subject_name' => $row['subject_name'],
+                'subject_code' => $row['subject_code'],
+                'theory_marks' => $theory_marks,
+                'practical_marks' => $has_practical ? $practical_marks : null,
+                'grade' => $row['grade'], // Keep original grade from DB
+                'gpa' => $row['gpa'], // Keep original GPA from DB
+                'calculated_grade' => $subject_grade,
+                'calculated_gpa' => $subject_gpa,
+                'calculated_percentage' => ($subject_total_obtained / $subject_full_marks) * 100,
+                'theory_full_marks' => $theory_full_marks,
+                'practical_full_marks' => $practical_full_marks,
+                'subject_full_marks' => $subject_full_marks,
+                'has_practical' => $has_practical,
+                'theory_percentage' => $theory_percentage,
+                'practical_percentage' => $practical_percentage,
+                'theory_grade_info' => $theory_grade_info,
+                'practical_grade_info' => $practical_grade_info,
+                'final_grade_class' => $final_grade_class,
+                'is_failed' => $is_failed
+            ];
         }
-        
-        // Store calculated values - EXACT same structure as view_upload.php
-        $subject_results[] = [
-            'result_id' => $row['result_id'],
-            'subject_id' => $row['subject_id'],
-            'subject_name' => $row['subject_name'],
-            'subject_code' => $row['subject_code'],
-            'theory_marks' => $theory_marks,
-            'practical_marks' => $has_practical ? $practical_marks : null,
-            'grade' => $row['grade'], // Keep original grade from DB
-            'gpa' => $row['gpa'], // Keep original GPA from DB
-            'calculated_grade' => $subject_grade,
-            'calculated_gpa' => $subject_gpa,
-            'calculated_percentage' => ($subject_total_obtained / $subject_full_marks) * 100,
-            'theory_full_marks' => $theory_full_marks,
-            'practical_full_marks' => $practical_full_marks,
-            'subject_full_marks' => $subject_full_marks,
-            'has_practical' => $has_practical,
-            'theory_percentage' => $theory_percentage,
-            'practical_percentage' => $practical_percentage,
-            'theory_grade_info' => $theory_grade_info,
-            'practical_grade_info' => $practical_grade_info,
-            'final_grade_class' => $final_grade_class,
-            'is_failed' => $is_failed
-        ];
     }
-}
 
-// Calculate overall result from subject results using EXACT same logic as view_upload.php
-$total_marks_obtained = 0;
-$total_full_marks = 0;
-$total_subjects = count($subject_results);
-$failed_subjects = 0;
-$total_gpa_points = 0;
+    // Calculate overall result from subject results using EXACT same logic as view_upload.php
+    $total_marks_obtained = 0;
+    $total_full_marks = 0;
+    $total_subjects = count($subject_results);
+    $failed_subjects = 0;
+    $total_gpa_points = 0;
 
-foreach ($subject_results as $subject) {
-    $subject_total_obtained = $subject['theory_marks'] + ($subject['practical_marks'] ?? 0);
-    $total_marks_obtained += $subject_total_obtained;
-    $total_full_marks += $subject['subject_full_marks'];
-    $total_gpa_points += $subject['calculated_gpa'];
-    
-    if ($subject['is_failed']) {
-        $failed_subjects++;
+    foreach ($subject_results as $subject) {
+        $subject_total_obtained = $subject['theory_marks'] + ($subject['practical_marks'] ?? 0);
+        $total_marks_obtained += $subject_total_obtained;
+        $total_full_marks += $subject['subject_full_marks'];
+        $total_gpa_points += $subject['calculated_gpa'];
+
+        if ($subject['is_failed']) {
+            $failed_subjects++;
+        }
     }
-}
 
-// Calculate overall percentage and GPA - EXACT same logic as view_upload.php
-$overall_percentage = $total_full_marks > 0 ? ($total_marks_obtained / $total_full_marks) * 100 : 0;
-$overall_gpa = $total_subjects > 0 ? ($total_gpa_points / $total_subjects) : 0;
-$is_pass = ($failed_subjects == 0);
+    // Calculate overall percentage and GPA - EXACT same logic as view_upload.php
+    $overall_percentage = $total_full_marks > 0 ? ($total_marks_obtained / $total_full_marks) * 100 : 0;
+    $overall_gpa = $total_subjects > 0 ? ($total_gpa_points / $total_subjects) : 0;
+    $is_pass = ($failed_subjects == 0);
 
-// Determine overall grade - EXACT same logic as view_upload.php
-if ($failed_subjects > 0) {
-    $overall_grade = 'F';
-} else {
-    // Use EXACT same grading scale as view_upload.php
-    if ($overall_percentage >= 90) {
-        $overall_grade = 'A+';
-    } elseif ($overall_percentage >= 80) {
-        $overall_grade = 'A';
-    } elseif ($overall_percentage >= 70) {
-        $overall_grade = 'B+';
-    } elseif ($overall_percentage >= 60) {
-        $overall_grade = 'B';
-    } elseif ($overall_percentage >= 50) {
-        $overall_grade = 'C+';
-    } elseif ($overall_percentage >= 40) {
-        $overall_grade = 'C';
-    } elseif ($overall_percentage >= 33) {
-        $overall_grade = 'D';
-    } else {
+    // Determine overall grade - EXACT same logic as view_upload.php
+    if ($failed_subjects > 0) {
         $overall_grade = 'F';
+    } else {
+        // Use EXACT same grading scale as view_upload.php
+        if ($overall_percentage >= 90) {
+            $overall_grade = 'A+';
+        } elseif ($overall_percentage >= 80) {
+            $overall_grade = 'A';
+        } elseif ($overall_percentage >= 70) {
+            $overall_grade = 'B+';
+        } elseif ($overall_percentage >= 60) {
+            $overall_grade = 'B';
+        } elseif ($overall_percentage >= 50) {
+            $overall_grade = 'C+';
+        } elseif ($overall_percentage >= 40) {
+            $overall_grade = 'C';
+        } elseif ($overall_percentage >= 33) {
+            $overall_grade = 'D';
+        } else {
+            $overall_grade = 'F';
+        }
     }
-}
 
-// Determine division - EXACT same logic as view_upload.php
-$division = '';
-if ($failed_subjects > 0) {
-    $division = 'Fail';
-} elseif ($overall_percentage >= 80) {
-    $division = 'Distinction';
-} elseif ($overall_percentage >= 60) {
-    $division = 'First Division';
-} elseif ($overall_percentage >= 45) {
-    $division = 'Second Division';
-} elseif ($overall_percentage >= 33) {
-    $division = 'Third Division';
-} else {
-    $division = 'Fail';
-}
+    // Determine division - EXACT same logic as view_upload.php
+    $division = '';
+    if ($failed_subjects > 0) {
+        $division = 'Fail';
+    } elseif ($overall_percentage >= 80) {
+        $division = 'Distinction';
+    } elseif ($overall_percentage >= 60) {
+        $division = 'First Division';
+    } elseif ($overall_percentage >= 45) {
+        $division = 'Second Division';
+    } elseif ($overall_percentage >= 33) {
+        $division = 'Third Division';
+    } else {
+        $division = 'Fail';
+    }
 
-// Update result_data with calculated values
-$result_data['calculated_total_marks'] = $total_full_marks;
-$result_data['calculated_marks_obtained'] = $total_marks_obtained;
-$result_data['calculated_percentage'] = $overall_percentage;
-$result_data['calculated_grade'] = $overall_grade;
-$result_data['calculated_gpa'] = $overall_gpa;
-$result_data['calculated_is_pass'] = $is_pass;
-$result_data['calculated_division'] = $division;
-$result_data['failed_subjects'] = $failed_subjects;
-    
+    // Update result_data with calculated values
+    $result_data['calculated_total_marks'] = $total_full_marks;
+    $result_data['calculated_marks_obtained'] = $total_marks_obtained;
+    $result_data['calculated_percentage'] = $overall_percentage;
+    $result_data['calculated_grade'] = $overall_grade;
+    $result_data['calculated_gpa'] = $overall_gpa;
+    $result_data['calculated_is_pass'] = $is_pass;
+    $result_data['calculated_division'] = $division;
+    $result_data['failed_subjects'] = $failed_subjects;
 } catch (Exception $e) {
     $_SESSION['error'] = "Error loading result: " . $e->getMessage();
     header("Location: result.php");
@@ -479,6 +475,7 @@ $conn->close();
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -492,21 +489,21 @@ $conn->close();
             width: 8px;
             height: 8px;
         }
-        
+
         ::-webkit-scrollbar-track {
             background: #f1f1f1;
             border-radius: 10px;
         }
-        
+
         ::-webkit-scrollbar-thumb {
             background: #888;
             border-radius: 10px;
         }
-        
+
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
-        
+
         /* Modal styles */
         .modal {
             display: none;
@@ -517,9 +514,9 @@ $conn->close();
             width: 100%;
             height: 100%;
             overflow: auto;
-            background-color: rgba(0,0,0,0.4);
+            background-color: rgba(0, 0, 0, 0.4);
         }
-        
+
         .modal-content {
             background-color: #fefefe;
             margin: 10% auto;
@@ -529,7 +526,7 @@ $conn->close();
             max-width: 500px;
             border-radius: 8px;
         }
-        
+
         .close {
             color: #aaa;
             float: right;
@@ -537,7 +534,7 @@ $conn->close();
             font-weight: bold;
             cursor: pointer;
         }
-        
+
         .close:hover,
         .close:focus {
             color: black;
@@ -549,12 +546,12 @@ $conn->close();
             .no-print {
                 display: none !important;
             }
-            
+
             body {
                 background-color: white;
                 color: black;
             }
-            
+
             .print-container {
                 padding: 20px;
                 max-width: 100%;
@@ -562,6 +559,7 @@ $conn->close();
         }
     </style>
 </head>
+
 <body class="bg-gray-100" id="body">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
@@ -581,50 +579,52 @@ $conn->close();
                 <div class="py-6">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
                         <!-- Notification Messages -->
-                        <?php if(isset($_SESSION['success'])): ?>
-                        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded no-print">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-check-circle text-green-500"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm text-green-700">
-                                        <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
-                                    </p>
-                                </div>
-                                <div class="ml-auto pl-3">
-                                    <div class="-mx-1.5 -my-1.5">
-                                        <button class="inline-flex rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none" onclick="this.parentElement.parentElement.parentElement.remove()">
-                                            <span class="sr-only">Dismiss</span>
-                                            <i class="fas fa-times"></i>
-                                        </button>
+                        <?php if (isset($_SESSION['success'])): ?>
+                            <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded no-print">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-check-circle text-green-500"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm text-green-700">
+                                            <?php echo $_SESSION['success'];
+                                            unset($_SESSION['success']); ?>
+                                        </p>
+                                    </div>
+                                    <div class="ml-auto pl-3">
+                                        <div class="-mx-1.5 -my-1.5">
+                                            <button class="inline-flex rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none" onclick="this.parentElement.parentElement.parentElement.remove()">
+                                                <span class="sr-only">Dismiss</span>
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         <?php endif; ?>
 
-                        <?php if(isset($_SESSION['error'])): ?>
-                        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded no-print">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-exclamation-circle text-red-500"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm text-red-700">
-                                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-                                    </p>
-                                </div>
-                                <div class="ml-auto pl-3">
-                                    <div class="-mx-1.5 -my-1.5">
-                                        <button class="inline-flex rounded-md p-1.5 text-red-500 hover:bg-red-100 focus:outline-none" onclick="this.parentElement.parentElement.parentElement.remove()">
-                                            <span class="sr-only">Dismiss</span>
-                                            <i class="fas fa-times"></i>
-                                        </button>
+                        <?php if (isset($_SESSION['error'])): ?>
+                            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded no-print">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-circle text-red-500"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm text-red-700">
+                                            <?php echo $_SESSION['error'];
+                                            unset($_SESSION['error']); ?>
+                                        </p>
+                                    </div>
+                                    <div class="ml-auto pl-3">
+                                        <div class="-mx-1.5 -my-1.5">
+                                            <button class="inline-flex rounded-md p-1.5 text-red-500 hover:bg-red-100 focus:outline-none" onclick="this.parentElement.parentElement.parentElement.remove()">
+                                                <span class="sr-only">Dismiss</span>
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         <?php endif; ?>
 
                         <!-- Action Buttons -->
@@ -632,31 +632,31 @@ $conn->close();
                             <a href="result.php" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                                 <i class="fas fa-arrow-left mr-2"></i> Back to Results
                             </a>
-                            
+
                             <div class="flex space-x-2">
                                 <?php if ($result_data['is_published']): ?>
-                                <form method="POST">
-                                    <input type="hidden" name="action" value="unpublish">
-                                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
-                                        <i class="fas fa-eye-slash mr-2"></i> Unpublish
-                                    </button>
-                                </form>
+                                    <form method="POST">
+                                        <input type="hidden" name="action" value="unpublish">
+                                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
+                                            <i class="fas fa-eye-slash mr-2"></i> Unpublish
+                                        </button>
+                                    </form>
                                 <?php else: ?>
-                                <form method="POST">
-                                    <input type="hidden" name="action" value="publish">
-                                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                                        <i class="fas fa-check-circle mr-2"></i> Publish
-                                    </button>
-                                </form>
+                                    <form method="POST">
+                                        <input type="hidden" name="action" value="publish">
+                                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                            <i class="fas fa-check-circle mr-2"></i> Publish
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
-                                
+
                                 <form method="POST" onsubmit="return confirm('Are you sure you want to delete this result? This action cannot be undone.');">
                                     <input type="hidden" name="action" value="delete">
                                     <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                                         <i class="fas fa-trash mr-2"></i> Delete
                                     </button>
                                 </form>
-                                
+
                                 <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                     <i class="fas fa-print mr-2"></i> Print
                                 </button>
@@ -670,75 +670,77 @@ $conn->close();
                                 <h1 class="text-2xl font-bold">School Result Management System</h1>
                                 <p>Student Result Card</p>
                             </div>
-                            
+
                             <!-- Result Status Banner -->
                             <?php if ($result_data['is_published']): ?>
-                            <div class="bg-green-100 text-green-800 px-4 py-2 text-center">
-                                <span class="font-semibold">Published Result</span>
-                            </div>
+                                <div class="bg-green-100 text-green-800 px-4 py-2 text-center">
+                                    <span class="font-semibold">Published Result</span>
+                                </div>
                             <?php else: ?>
-                            <div class="bg-yellow-100 text-yellow-800 px-4 py-2 text-center">
-                                <span class="font-semibold">Unpublished Result</span>
-                            </div>
+                                <div class="bg-yellow-100 text-yellow-800 px-4 py-2 text-center">
+                                    <span class="font-semibold">Unpublished Result</span>
+                                </div>
                             <?php endif; ?>
 
-                            <!-- Student Information Card -->
-                            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
-                                <h2 class="text-2xl font-bold text-indigo-600 mb-4 border-b pb-2">🎓 Student Information</h2>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Student Information -->
+                            <div class="border border-gray-200 rounded-lg p-4 mb-6 bg-white">
+                                <h2 class="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">Student Information</h2>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                     <div>
-                                        <p class="text-sm text-gray-500">Full Name</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['full_name']); ?></p>
+                                        <p class="text-gray-500">Full Name</p>
+                                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($result_data['full_name']); ?></p>
                                     </div>
                                     <div>
-                                        <p class="text-sm text-gray-500">Roll Number</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['roll_number']); ?></p>
+                                        <p class="text-gray-500">Roll Number</p>
+                                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($result_data['roll_number']); ?></p>
                                     </div>
                                     <div>
-                                        <p class="text-sm text-gray-500">Class</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['class_name'] . ' ' . $result_data['section']); ?></p>
+                                        <p class="text-gray-500">Class</p>
+                                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($result_data['class_name'] . ' ' . $result_data['section']); ?></p>
                                     </div>
                                     <div>
-                                        <p class="text-sm text-gray-500">Academic Year</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['academic_year']); ?></p>
+                                        <p class="text-gray-500">Academic Year</p>
+                                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($result_data['academic_year']); ?></p>
                                     </div>
                                     <div>
-                                        <p class="text-sm text-gray-500">Email</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['email'] ?? 'N/A'); ?></p>
+                                        <p class="text-gray-500">Email</p>
+                                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($result_data['email'] ?? 'N/A'); ?></p>
                                     </div>
                                     <div>
-                                        <p class="text-sm text-gray-500">Phone</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['phone'] ?? 'N/A'); ?></p>
+                                        <p class="text-gray-500">Phone</p>
+                                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($result_data['phone'] ?? 'N/A'); ?></p>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Exam Information Card -->
-                            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 mt-6">
-                                <h2 class="text-2xl font-bold text-indigo-600 mb-4 border-b pb-2">📝 Exam Information</h2>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Exam Information -->
+                            <div class="border border-gray-200 rounded-lg p-4 bg-white">
+                                <h2 class="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">Exam Information</h2>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                     <div>
-                                        <p class="text-sm text-gray-500">Exam Name</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['exam_name']); ?></p>
+                                        <p class="text-gray-500">Exam Name</p>
+                                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($result_data['exam_name']); ?></p>
                                     </div>
                                     <div>
-                                        <p class="text-sm text-gray-500">Exam Type</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($result_data['exam_type']); ?></p>
+                                        <p class="text-gray-500">Exam Type</p>
+                                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($result_data['exam_type']); ?></p>
                                     </div>
                                     <div>
-                                        <p class="text-sm text-gray-500">Exam Date</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo date('d M Y', strtotime($result_data['exam_date'])); ?></p>
+                                        <p class="text-gray-500">Exam Date</p>
+                                        <p class="font-medium text-gray-800"><?php echo date('d M Y', strtotime($result_data['exam_date'])); ?></p>
                                     </div>
                                     <div>
-                                        <p class="text-sm text-gray-500">Result Date</p>
-                                        <p class="text-lg font-semibold text-gray-900"><?php echo date('d M Y', strtotime($result_data['created_at'])); ?></p>
+                                        <p class="text-gray-500">Result Date</p>
+                                        <p class="font-medium text-gray-800"><?php echo date('d M Y', strtotime($result_data['created_at'])); ?></p>
                                     </div>
                                 </div>
                             </div>
-                            
+
+
+
                             <!-- Subject-wise Results -->
                             <div class="p-6 border-b border-gray-200">
-                                <h2 class="text-xl font-semibold text-gray-900 mb-4">Subject-wise Results (<?php echo count($subject_results); ?> subjects)</h2>
+                                <h2 class="text-xl font-semibold text-gray-900 mb-4">Results </h2>
                                 <div class="overflow-x-auto">
                                     <table class="min-w-full divide-y divide-gray-200">
                                         <thead class="bg-gray-50">
@@ -766,171 +768,168 @@ $conn->close();
                                         </thead>
                                         <tbody class="bg-white divide-y divide-gray-200">
                                             <?php if (empty($subject_results)): ?>
-                                            <tr>
-                                                <td colspan="9" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No subject results found</td>
-                                            </tr>
+                                                <tr>
+                                                    <td colspan="9" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No subject results found</td>
+                                                </tr>
                                             <?php else: ?>
                                                 <?php foreach ($subject_results as $subject): ?>
-                                                <tr>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-                                                        <div class="text-xs text-gray-500">ID: <?php echo $subject['subject_id']; ?></div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm text-gray-900"><?php echo htmlspecialchars($subject['subject_code'] ?? 'N/A'); ?></div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="flex flex-col">
-                                                            <span><?php echo number_format($subject['theory_marks'], 1); ?>/<?php echo $subject['theory_full_marks']; ?></span>
-                                                            <span class="text-xs text-gray-400"><?php echo number_format($subject['theory_percentage'], 1); ?>%</span>
-                                                            <span class="px-1 inline-flex text-xs leading-4 font-semibold rounded <?php echo $subject['theory_grade_info']['class']; ?>">
-                                                                <?php echo $subject['theory_grade_info']['grade']; ?>
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <?php if ($subject['has_practical']): ?>
+                                                    <tr>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+                                                            <div class="text-xs text-gray-500">ID: <?php echo $subject['subject_id']; ?></div>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <div class="text-sm text-gray-900"><?php echo htmlspecialchars($subject['subject_code'] ?? 'N/A'); ?></div>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
                                                             <div class="flex flex-col">
-                                                                <span><?php echo number_format($subject['practical_marks'], 1); ?>/<?php echo $subject['practical_full_marks']; ?></span>
-                                                                <span class="text-xs text-gray-400"><?php echo number_format($subject['practical_percentage'], 1); ?>%</span>
-                                                                <span class="px-1 inline-flex text-xs leading-4 font-semibold rounded <?php echo $subject['practical_grade_info']['class']; ?>">
-                                                                    <?php echo $subject['practical_grade_info']['grade']; ?>
+                                                                <span><?php echo number_format($subject['theory_marks'], 1); ?>/<?php echo $subject['theory_full_marks']; ?></span>
+                                                                <span class="text-xs text-gray-400"><?php echo number_format($subject['theory_percentage'], 1); ?>%</span>
+                                                                <span class="px-1 inline-flex text-xs leading-4 font-semibold rounded <?php echo $subject['theory_grade_info']['class']; ?>">
+                                                                    <?php echo $subject['theory_grade_info']['grade']; ?>
                                                                 </span>
                                                             </div>
-                                                        <?php else: ?>
-                                                            <span class="text-gray-400">N/A</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="flex flex-col">
-                                                            <span class="font-medium"><?php echo number_format($subject['theory_marks'] + $subject['practical_marks'], 1); ?>/100</span>
-                                                            <span class="text-xs text-gray-400"><?php echo number_format($subject['calculated_percentage'], 1); ?>%</span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm font-semibold text-gray-900">
-                                                            <?php echo number_format($subject['calculated_percentage'], 2); ?>%
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="flex flex-col">
-                                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $subject['final_grade_class']; ?>">
-                                                                <?php echo $subject['calculated_grade']; ?>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <?php if ($subject['has_practical']): ?>
+                                                                <div class="flex flex-col">
+                                                                    <span><?php echo number_format($subject['practical_marks'], 1); ?>/<?php echo $subject['practical_full_marks']; ?></span>
+                                                                    <span class="text-xs text-gray-400"><?php echo number_format($subject['practical_percentage'], 1); ?>%</span>
+                                                                    <span class="px-1 inline-flex text-xs leading-4 font-semibold rounded <?php echo $subject['practical_grade_info']['class']; ?>">
+                                                                        <?php echo $subject['practical_grade_info']['grade']; ?>
+                                                                    </span>
+                                                                </div>
+                                                            <?php else: ?>
+                                                                <span class="text-gray-400">N/A</span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <div class="flex flex-col">
+                                                                <span class="font-medium"><?php echo number_format($subject['theory_marks'] + $subject['practical_marks'], 1); ?>/100</span>
+                                                                <span class="text-xs text-gray-400"><?php echo number_format($subject['calculated_percentage'], 1); ?>%</span>
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <div class="text-sm font-semibold text-gray-900">
+                                                                <?php echo number_format($subject['calculated_percentage'], 2); ?>%
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <div class="flex flex-col">
+                                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $subject['final_grade_class']; ?>">
+                                                                    <?php echo $subject['calculated_grade']; ?>
+                                                                </span>
+                                                                <span class="text-xs text-gray-400 mt-1">GPA: <?php echo number_format($subject['calculated_gpa'], 2); ?></span>
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                            <?php $is_pass = ($subject['calculated_grade'] != 'F'); ?>
+                                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $is_pass ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
+                                                                <?php echo $is_pass ? 'Pass' : 'Fail'; ?>
                                                             </span>
-                                                            <span class="text-xs text-gray-400 mt-1">GPA: <?php echo number_format($subject['calculated_gpa'], 2); ?></span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <?php $is_pass = ($subject['calculated_grade'] != 'F'); ?>
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $is_pass ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
-                                                            <?php echo $is_pass ? 'Pass' : 'Fail'; ?>
-                                                        </span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium no-print">
-                                                        <div class="flex space-x-3">
-                                                            <button type="button" onclick="openEditSubjectMarksModal('<?php echo $subject['result_id']; ?>', '<?php echo htmlspecialchars($subject['subject_name']); ?>', <?php echo $subject['theory_marks']; ?>, <?php echo $subject['practical_marks'] ?? 0; ?>, <?php echo $subject['has_practical'] ? 'true' : 'false'; ?>)" class="text-blue-600 hover:text-blue-900 transition-colors duration-200">
-                                                                <i class="fas fa-edit"></i> Edit
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                                        </td>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium no-print">
+                                                            <div class="flex space-x-3">
+                                                                <button type="button" onclick="openEditSubjectMarksModal('<?php echo $subject['result_id']; ?>', '<?php echo htmlspecialchars($subject['subject_name']); ?>', <?php echo $subject['theory_marks']; ?>, <?php echo $subject['practical_marks'] ?? 0; ?>, <?php echo $subject['has_practical'] ? 'true' : 'false'; ?>)" class="text-blue-600 hover:text-blue-900 transition-colors duration-200">
+                                                                    <i class="fas fa-edit"></i> Edit
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
                                                 <?php endforeach; ?>
                                             <?php endif; ?>
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
-                            
+
                             <!-- Overall Result -->
-                            <div class="p-6">
-                                <h2 class="text-xl font-semibold text-gray-900 mb-4">Overall Result Summary</h2>
-                                
+                            <div class="p-6 bg-white rounded-md border border-gray-200">
+                                <h2 class="text-lg font-semibold text-gray-800 mb-4">Overall Result Summary</h2>
+
                                 <!-- Summary Cards -->
-                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                                        <p class="text-sm text-blue-600 font-medium">Total Marks</p>
-                                        <p class="text-2xl font-bold text-blue-800">
-                                            <?php echo number_format($result_data['calculated_marks_obtained'], 0); ?> / <?php echo number_format($result_data['calculated_total_marks'], 0); ?>
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 text-sm">
+                                    <div class="border p-4 rounded text-center">
+                                        <p class="text-gray-500">Total Marks</p>
+                                        <p class="text-xl font-bold text-gray-800">
+                                            <?php echo number_format($result_data['calculated_marks_obtained'], 0); ?> /
+                                            <?php echo number_format($result_data['calculated_total_marks'], 0); ?>
                                         </p>
                                     </div>
-                                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
-                                        <p class="text-sm text-green-600 font-medium">Percentage</p>
-                                        <p class="text-2xl font-bold text-green-800"><?php echo number_format($result_data['calculated_percentage'], 2); ?>%</p>
+                                    <div class="border p-4 rounded text-center">
+                                        <p class="text-gray-500">Percentage</p>
+                                        <p class="text-xl font-bold text-gray-800">
+                                            <?php echo number_format($result_data['calculated_percentage'], 2); ?>%
+                                        </p>
                                     </div>
-                                    <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                                        <p class="text-sm text-purple-600 font-medium">GPA</p>
-                                        <p class="text-2xl font-bold text-purple-800"><?php echo number_format($result_data['calculated_gpa'], 2); ?> / 4.0</p>
+                                    <div class="border p-4 rounded text-center">
+                                        <p class="text-gray-500">GPA</p>
+                                        <p class="text-xl font-bold text-gray-800">
+                                            <?php echo number_format($result_data['calculated_gpa'], 2); ?> / 4.0
+                                        </p>
                                     </div>
-                                    <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-                                        <p class="text-sm text-indigo-600 font-medium">Grade</p>
+                                    <div class="border p-4 rounded text-center">
+                                        <p class="text-gray-500">Grade</p>
                                         <?php
-                                        $grade_class = '';
-                                        switch ($result_data['calculated_grade']) {
-                                            case 'A+': $grade_class = 'text-green-800'; break;
-                                            case 'A': $grade_class = 'text-green-700'; break;
-                                            case 'B+': $grade_class = 'text-blue-700'; break;
-                                            case 'B': $grade_class = 'text-blue-600'; break;
-                                            case 'C+': $grade_class = 'text-yellow-700'; break;
-                                            case 'C': $grade_class = 'text-yellow-600'; break;
-                                            case 'D': $grade_class = 'text-orange-700'; break;
-                                            case 'F': $grade_class = 'text-red-700'; break;
-                                            default: $grade_class = 'text-gray-700';
-                                        }
+                                        $grade_class = match ($result_data['calculated_grade']) {
+                                            'A+', 'A' => 'text-green-700',
+                                            'B+', 'B' => 'text-blue-700',
+                                            'C+', 'C' => 'text-yellow-700',
+                                            'D'        => 'text-orange-700',
+                                            'F'        => 'text-red-700',
+                                            default    => 'text-gray-700'
+                                        };
                                         ?>
-                                        <p class="text-2xl font-bold <?php echo $grade_class; ?>"><?php echo htmlspecialchars($result_data['calculated_grade']); ?></p>
+                                        <p class="text-xl font-bold <?php echo $grade_class; ?>">
+                                            <?php echo htmlspecialchars($result_data['calculated_grade']); ?>
+                                        </p>
                                     </div>
                                 </div>
-                                
-                                <!-- Additional Information -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div class="bg-gray-50 p-4 rounded-lg">
-                                        <p class="text-sm text-gray-600 font-medium">Result Status</p>
-                                        <?php if ($result_data['calculated_is_pass']): ?>
-                                        <p class="text-xl font-bold text-green-600 flex items-center">
-                                            <i class="fas fa-check-circle mr-2"></i> PASS
+
+                                <!-- Additional Info -->
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                    <div class="border p-4 rounded text-center">
+                                        <p class="text-gray-500">Result Status</p>
+                                        <p class="text-lg font-bold <?php echo $result_data['calculated_is_pass'] ? 'text-green-600' : 'text-red-600'; ?>">
+                                            <?php echo $result_data['calculated_is_pass'] ? 'PASS' : 'FAIL'; ?>
                                         </p>
-                                        <?php else: ?>
-                                        <p class="text-xl font-bold text-red-600 flex items-center">
-                                            <i class="fas fa-times-circle mr-2"></i> FAIL
+                                    </div>
+                                    <div class="border p-4 rounded text-center">
+                                        <p class="text-gray-500">Division</p>
+                                        <p class="text-lg font-bold text-gray-800">
+                                            <?php echo htmlspecialchars($result_data['calculated_division']); ?>
                                         </p>
-                                        <?php endif; ?>
                                     </div>
-                                    
-                                    <div class="bg-gray-50 p-4 rounded-lg">
-                                        <p class="text-sm text-gray-600 font-medium">Division</p>
-                                        <p class="text-xl font-bold text-gray-800"><?php echo $result_data['calculated_division']; ?></p>
-                                    </div>
-                                    
-                                    <div class="bg-gray-50 p-4 rounded-lg">
-                                        <p class="text-sm text-gray-600 font-medium">Failed Subjects</p>
-                                        <p class="text-xl font-bold <?php echo $result_data['failed_subjects'] > 0 ? 'text-red-600' : 'text-green-600'; ?>">
+                                    <div class="border p-4 rounded text-center">
+                                        <p class="text-gray-500">Failed Subjects</p>
+                                        <p class="text-lg font-bold <?php echo $result_data['failed_subjects'] > 0 ? 'text-red-600' : 'text-green-600'; ?>">
                                             <?php echo $result_data['failed_subjects']; ?>
                                         </p>
                                     </div>
                                 </div>
-                         
-                                
-                                <!-- Signature Section (visible only in print) -->
+
+                                <!-- Print-Only Signature Section -->
                                 <div class="hidden print:block mt-12">
-                                    <div class="grid grid-cols-3 gap-4">
-                                        <div class="text-center">
-                                            <div class="border-t border-gray-300 pt-2">
+                                    <div class="grid grid-cols-3 gap-4 text-center">
+                                        <div>
+                                            <div class="border-t border-gray-400 pt-2">
                                                 <p>Class Teacher</p>
                                             </div>
                                         </div>
-                                        <div class="text-center">
-                                            <div class="border-t border-gray-300 pt-2">
+                                        <div>
+                                            <div class="border-t border-gray-400 pt-2">
                                                 <p>Examination Controller</p>
                                             </div>
                                         </div>
-                                        <div class="text-center">
-                                            <div class="border-t border-gray-300 pt-2">
+                                        <div>
+                                            <div class="border-t border-gray-400 pt-2">
                                                 <p>Principal</p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
                         </div>
                     </div>
                 </div>
@@ -946,24 +945,24 @@ $conn->close();
             <form method="POST" id="editSubjectMarksForm">
                 <input type="hidden" name="action" value="update_subject_marks">
                 <input type="hidden" name="result_id" id="edit_result_id">
-                
+
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
                     <p id="edit_subject_name" class="text-lg font-semibold text-gray-900"></p>
                 </div>
-                
+
                 <div class="mb-4">
                     <label for="edit_theory_marks" class="block text-sm font-medium text-gray-700 mb-2">Theory Marks</label>
                     <input type="number" name="theory_marks" id="edit_theory_marks" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                     <p class="text-xs text-gray-500 mt-1">Maximum: <span id="theory_max_marks"></span> marks</p>
                 </div>
-                
+
                 <div class="mb-4" id="practical_marks_section">
                     <label for="edit_practical_marks" class="block text-sm font-medium text-gray-700 mb-2">Practical Marks</label>
                     <input type="number" name="practical_marks" id="edit_practical_marks" step="0.01" min="0" max="25" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <p class="text-xs text-gray-500 mt-1">Maximum: 25 marks (leave empty if no practical)</p>
                 </div>
-                
+
                 <div class="flex justify-end space-x-3">
                     <button type="button" onclick="closeEditSubjectMarksModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Update Marks</button>
@@ -978,7 +977,7 @@ $conn->close();
             document.getElementById('edit_result_id').value = resultId;
             document.getElementById('edit_subject_name').textContent = subjectName;
             document.getElementById('edit_theory_marks').value = theoryMarks;
-            
+
             if (hasPractical) {
                 document.getElementById('edit_practical_marks').value = practicalMarks || '';
                 document.getElementById('practical_marks_section').style.display = 'block';
@@ -990,7 +989,7 @@ $conn->close();
                 document.getElementById('theory_max_marks').textContent = '100';
                 document.getElementById('edit_theory_marks').max = '100';
             }
-            
+
             document.getElementById('editSubjectMarksModal').style.display = 'block';
         }
 
@@ -1011,19 +1010,19 @@ $conn->close();
             const theoryMarks = parseFloat(document.getElementById('edit_theory_marks').value);
             const practicalMarks = parseFloat(document.getElementById('edit_practical_marks').value) || 0;
             const theoryMax = parseFloat(document.getElementById('edit_theory_marks').max);
-            
+
             if (theoryMarks > theoryMax) {
                 e.preventDefault();
                 alert('Theory marks cannot exceed ' + theoryMax);
                 return;
             }
-            
+
             if (practicalMarks > 25) {
                 e.preventDefault();
                 alert('Practical marks cannot exceed 25');
                 return;
             }
-            
+
             if ((theoryMarks + practicalMarks) > 100) {
                 e.preventDefault();
                 alert('Total marks cannot exceed 100');
@@ -1032,4 +1031,5 @@ $conn->close();
         });
     </script>
 </body>
+
 </html>
