@@ -818,15 +818,7 @@ function getRemarks($grade)
             </div>
             <?php endif; ?>
             
-            <!-- Teacher Info Card -->
-            <div class="bg-white shadow rounded-lg p-6 mb-6">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h2 class="text-xl font-semibold text-gray-800"><?php echo htmlspecialchars($teacher_name ?? 'Teacher'); ?></h2>
-                        <p class="mt-1 text-sm text-gray-600">View grade sheets for your students.</p>
-                    </div>
-                </div>
-            </div>
+           
 
             <!-- Published Results Notice -->
             <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
@@ -898,9 +890,7 @@ function getRemarks($grade)
                         <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mr-2">
                             <i class="fas fa-print mr-2"></i> Print Grade Sheet
                         </button>
-                        <button onclick="generatePDF('current')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                            <i class="fas fa-file-pdf mr-2"></i> Download PDF
-                        </button>
+                        
                     </div>
                 </div>
 

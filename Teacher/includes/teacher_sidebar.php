@@ -27,10 +27,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         Dashboard
                     </a>
 
-                    <a href="result_sheet.php" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md <?php echo basename($_SERVER['PHP_SELF']) == 'edit_marks.php' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'; ?>">
-                        <i class="fas fa-edit mr-3 text-gray-400 group-hover:text-gray-300"></i>
-                        Grade Sheet
-                    </a>
+                 
 
                   
                     <a href="edit_results.php" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md <?php echo basename($_SERVER['PHP_SELF']) == 'edit_marks.php' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'; ?>">

@@ -157,34 +157,6 @@ if ($check_table && $check_table->num_rows > 0) {
     }
 }
 
-// Get pending tasks - simplified query
-$pending_tasks = [];
-// Check if the necessary tables and columns exist
-$check_table = $conn->query("SHOW TABLES LIKE 'results'");
-if ($check_table && $check_table->num_rows > 0) {
-    $stmt = $conn->prepare("SELECT e.exam_id, e.exam_name, c.class_id, c.class_name, c.section, 
-                           s.subject_id, s.subject_name, 
-                           (SELECT COUNT(*) FROM students st WHERE st.class_id = c.class_id) as total_students,
-                           (SELECT COUNT(*) FROM results r WHERE r.exam_id = e.exam_id AND r.subject_id = s.subject_id) as entered_results
-                           FROM exams e 
-                           JOIN classes c ON e.class_id = c.class_id
-                           JOIN teachersubjects ts ON c.class_id = ts.class_id
-                           JOIN subjects s ON ts.subject_id = s.subject_id
-                           WHERE ts.teacher_id = ?
-                           AND (e.status = 'active' OR e.status IS NULL)
-                           LIMIT 5");
-    if ($stmt) {
-        $stmt->bind_param("i", $teacher['teacher_id']);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result) {
-            $pending_tasks = $result->fetch_all(MYSQLI_ASSOC);
-        }
-        $stmt->close();
-    }
-}
-
-$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -314,29 +286,6 @@ $conn->close();
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="bg-white overflow-hidden shadow rounded-lg stat-card">
-                                <div class="p-5">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0 bg-red-500 rounded-md p-3">
-                                            <i class="fas fa-tasks text-white text-xl"></i>
-                                        </div>
-                                        <div class="ml-5 w-0 flex-1">
-                                            <dl>
-                                                <dt class="text-sm font-medium text-gray-500 truncate">Pending Tasks</dt>
-                                                <dd class="flex items-baseline">
-                                                    <div class="text-2xl font-semibold text-gray-900"><?php echo count($pending_tasks); ?></div>
-                                                </dd>
-                                            </dl>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="bg-gray-50 px-5 py-3">
-                                    <div class="text-sm">
-                                        <a href="#pending-tasks" class="font-medium text-blue-600 hover:text-blue-500">View pending tasks</a>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
               
@@ -380,9 +329,7 @@ $conn->close();
                                                         <a href="view_students.php?class_id=<?php echo $subject['class_id']; ?>&subject_id=<?php echo $subject['subject_id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">
                                                             <i class="fas fa-users"></i> View Students
                                                         </a>
-                                                        <a href="manage_results.php?class_id=<?php echo $subject['class_id']; ?>&subject_id=<?php echo $subject['subject_id']; ?>" class="text-green-600 hover:text-green-900">
-                                                            <i class="fas fa-edit"></i> Manage Results
-                                                        </a>
+                                                       
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
@@ -431,9 +378,7 @@ $conn->close();
                                                         <a href="view_students.php?class_id=<?php echo $class['class_id']; ?>" class="text-blue-600 hover:text-blue-900 mr-3">
                                                             <i class="fas fa-users"></i> View Students
                                                         </a>
-                                                        <a href="class_performance.php?class_id=<?php echo $class['class_id']; ?>" class="text-purple-600 hover:text-purple-900">
-                                                            <i class="fas fa-chart-bar"></i> Performance
-                                                        </a>
+                                                       
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>

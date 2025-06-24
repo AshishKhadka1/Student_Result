@@ -14,7 +14,10 @@ $success_message = '';
 $error_message = '';
 
 // Get teacher ID from the teachers table
-$teacher_query = "SELECT teacher_id FROM teachers WHERE user_id = ?";
+$teacher_query = "SELECT t.teacher_id, u.full_name 
+                 FROM teachers t
+                 JOIN users u ON t.user_id = u.user_id
+                 WHERE t.user_id = ?";
 $stmt = $conn->prepare($teacher_query);
 if (!$stmt) {
     $error_message = "Database error: " . $conn->error;
@@ -25,11 +28,19 @@ if (!$stmt) {
     if ($result->num_rows > 0) {
         $teacher = $result->fetch_assoc();
         $teacher_id = $teacher['teacher_id'];
+        $teacher_name = $teacher['full_name'];
     } else {
         $error_message = "Teacher record not found. Please contact the administrator.";
     }
     $stmt->close();
 }
+
+// Determine the current mode (view or edit)
+$mode = isset($_GET['mode']) ? $_GET['mode'] : 'view';
+$subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
+$class_id = isset($_GET['class_id']) ? intval($_GET['class_id']) : 0;
+$exam_id = isset($_GET['exam_id']) ? intval($_GET['exam_id']) : 0;
+$student_id = isset($_GET['student_id']) ? $_GET['student_id'] : null;
 
 // Handle AJAX request for individual mark updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_individual_marks') {
@@ -117,22 +128,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit();
 }
 
-// Get subject ID, class ID, and exam ID from URL parameters
-$subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
-$class_id = isset($_GET['class_id']) ? intval($_GET['class_id']) : 0;
-$exam_id = isset($_GET['exam_id']) ? intval($_GET['exam_id']) : 0;
-$student_id = isset($_GET['student_id']) ? $_GET['student_id'] : null;
+// Get filter parameters for view mode
+$selected_class_filter = isset($_GET['class_filter']) ? intval($_GET['class_filter']) : 0;
+$selected_subject_filter = isset($_GET['subject_filter']) ? intval($_GET['subject_filter']) : 0;
+$selected_exam_filter = isset($_GET['exam_filter']) ? intval($_GET['exam_filter']) : 0;
+$selected_academic_year = isset($_GET['academic_year']) ? $_GET['academic_year'] : '';
 
-// Check if all required parameters are provided
-$missing_params = false;
-if (!$subject_id || !$class_id || !$exam_id) {
-    $missing_params = true;
-    
-    // Only show error if user tried to submit the form
-    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['submit'])) {
-        $error_message = "Missing required parameters. Please select a subject, class, and exam.";
+// Get all classes
+$classes = [];
+$classes_query = "SELECT c.class_id, c.class_name, c.section, c.academic_year
+                 FROM classes c
+                 ORDER BY c.class_name, c.section";
+$stmt = $conn->prepare($classes_query);
+if (!$stmt) {
+    $error_message = "Database error: " . $conn->error;
+} else {
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $classes[] = $row;
+    }
+    $stmt->close();
+}
+
+// Get all academic years
+$academic_years = [];
+foreach ($classes as $class) {
+    if (!in_array($class['academic_year'], $academic_years)) {
+        $academic_years[] = $class['academic_year'];
     }
 }
+sort($academic_years);
 
 // Get available subjects for this teacher
 $subjects = [];
@@ -146,7 +172,21 @@ if (isset($teacher_id) && empty($error_message)) {
     
     $stmt = $conn->prepare($subjects_query);
     if (!$stmt) {
-        $error_message = "Database error: " . $conn->error;
+        // Try alternative query if the first one fails
+        $alt_subjects_query = "SELECT s.subject_id, s.subject_name, s.subject_code 
+                              FROM subjects s
+                              ORDER BY s.subject_name";
+        $stmt = $conn->prepare($alt_subjects_query);
+        if (!$stmt) {
+            $error_message = "Database error: " . $conn->error;
+        } else {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $subjects[] = $row;
+            }
+            $stmt->close();
+        }
     } else {
         $stmt->bind_param("i", $teacher_id);
         $stmt->execute();
@@ -159,29 +199,6 @@ if (isset($teacher_id) && empty($error_message)) {
         if (empty($subjects)) {
             $warning_message = "You don't have any subjects assigned to you. Please contact the administrator.";
         }
-    }
-}
-
-// Get available classes for this teacher
-$classes = [];
-if (empty($error_message)) {
-    $classes_query = "SELECT DISTINCT c.class_id, c.class_name, c.section, c.academic_year
-                     FROM classes c
-                     JOIN teachersubjects ts ON c.class_id = ts.class_id
-                     WHERE ts.teacher_id = ? AND ts.is_active = 1
-                     ORDER BY c.class_name, c.section";
-    
-    $stmt = $conn->prepare($classes_query);
-    if (!$stmt) {
-        $error_message = "Database error: " . $conn->error;
-    } else {
-        $stmt->bind_param("i", $teacher_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $classes[] = $row;
-        }
-        $stmt->close();
     }
 }
 
@@ -205,9 +222,93 @@ if (empty($error_message)) {
     }
 }
 
-// Get subject details
+// Get grade sheets for view mode
+$grade_sheets = [];
+if ($mode === 'view' && isset($teacher_id)) {
+    $filter_conditions = [];
+    $filter_params = [];
+    $param_types = "i";
+    $filter_params[] = $teacher_id;
+
+    $base_query = "SELECT 
+                    e.exam_id, e.exam_name, e.exam_type, e.academic_year, e.start_date, e.end_date,
+                    c.class_id, c.class_name, c.section,
+                    s.subject_id, s.subject_name, s.subject_code,
+                    COUNT(DISTINCT r.student_id) as students_count,
+                    COUNT(r.result_id) as results_count,
+                    AVG(r.percentage) as average_percentage,
+                    SUM(CASE WHEN r.remarks = 'Pass' THEN 1 ELSE 0 END) as pass_count
+                  FROM exams e
+                  JOIN results r ON e.exam_id = r.exam_id
+                  JOIN students st ON r.student_id = st.student_id
+                  JOIN classes c ON st.class_id = c.class_id
+                  JOIN subjects s ON r.subject_id = s.subject_id
+                  JOIN teachersubjects ts ON s.subject_id = ts.subject_id AND c.class_id = ts.class_id
+                  WHERE ts.teacher_id = ?";
+
+    // Add filters based on selection
+    if ($selected_class_filter) {
+        $filter_conditions[] = "c.class_id = ?";
+        $param_types .= "i";
+        $filter_params[] = $selected_class_filter;
+    }
+
+    if ($selected_subject_filter) {
+        $filter_conditions[] = "s.subject_id = ?";
+        $param_types .= "i";
+        $filter_params[] = $selected_subject_filter;
+    }
+
+    if ($selected_exam_filter) {
+        $filter_conditions[] = "e.exam_id = ?";
+        $param_types .= "i";
+        $filter_params[] = $selected_exam_filter;
+    }
+
+    if ($selected_academic_year) {
+        $filter_conditions[] = "e.academic_year = ?";
+        $param_types .= "s";
+        $filter_params[] = $selected_academic_year;
+    }
+
+    // Add filter conditions to query
+    if (!empty($filter_conditions)) {
+        $base_query .= " AND " . implode(" AND ", $filter_conditions);
+    }
+
+    // Group by and order by
+    $base_query .= " GROUP BY e.exam_id, c.class_id, s.subject_id
+                    ORDER BY e.start_date DESC, c.class_name, s.subject_name";
+
+    // Execute query
+    $stmt = $conn->prepare($base_query);
+    if ($stmt) {
+        if (!empty($filter_params)) {
+            $stmt->bind_param($param_types, ...$filter_params);
+        }
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $grade_sheets[] = $row;
+        }
+        $stmt->close();
+    }
+}
+
+// Check if all required parameters are provided for edit mode
+$missing_params = false;
+if ($mode === 'edit' && (!$subject_id || !$class_id || !$exam_id)) {
+    $missing_params = true;
+    
+    // Only show error if user tried to submit the form
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['submit'])) {
+        $error_message = "Missing required parameters. Please select a subject, class, and exam.";
+    }
+}
+
+// Get subject details for edit mode
 $subject = [];
-if (!$missing_params && empty($error_message)) {
+if ($mode === 'edit' && !$missing_params && empty($error_message)) {
     $subject_query = "SELECT subject_name, subject_code, credit_hours,
                      full_marks_theory, full_marks_practical, 
                      pass_marks_theory, pass_marks_practical
@@ -229,9 +330,9 @@ if (!$missing_params && empty($error_message)) {
     }
 }
 
-// Get class details
+// Get class details for edit mode
 $class = [];
-if (!$missing_params && empty($error_message)) {
+if ($mode === 'edit' && !$missing_params && empty($error_message)) {
     $class_query = "SELECT class_name, section
                    FROM classes
                    WHERE class_id = ?";
@@ -251,9 +352,9 @@ if (!$missing_params && empty($error_message)) {
     }
 }
 
-// Get exam details
+// Get exam details for edit mode
 $exam = [];
-if (!$missing_params && empty($error_message)) {
+if ($mode === 'edit' && !$missing_params && empty($error_message)) {
     $exam_query = "SELECT exam_name, exam_type, academic_year, start_date, end_date
                   FROM exams
                   WHERE exam_id = ?";
@@ -274,7 +375,7 @@ if (!$missing_params && empty($error_message)) {
 }
 
 // Verify that the teacher is authorized to edit results for this subject and class
-if (!$missing_params && empty($error_message)) {
+if ($mode === 'edit' && !$missing_params && empty($error_message)) {
     $auth_query = "SELECT id FROM teachersubjects 
                   WHERE teacher_id = ? AND subject_id = ? AND class_id = ? AND is_active = 1";
     $stmt = $conn->prepare($auth_query);
@@ -292,9 +393,9 @@ if (!$missing_params && empty($error_message)) {
     }
 }
 
-// Get students and their results
+// Get students and their results for edit mode
 $students = [];
-if (!$missing_params && empty($error_message)) {
+if ($mode === 'edit' && !$missing_params && empty($error_message)) {
     // If a specific student is requested
     if ($student_id) {
         $students_query = "SELECT s.student_id, s.roll_number, s.registration_number, u.full_name,
@@ -364,7 +465,7 @@ if ($grade_result && $grade_result->num_rows > 0) {
 }
 
 // Handle form submission for bulk updates
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results']) && !$missing_params && empty($error_message)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results']) && $mode === 'edit' && !$missing_params && empty($error_message)) {
     // Begin transaction
     $conn->begin_transaction();
     try {
@@ -540,7 +641,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results']) && !$
     }
 }
 
-// Calculate class statistics
+// Calculate class statistics for edit mode
 $stats = [
     'total_students' => count($students),
     'results_entered' => 0,
@@ -552,7 +653,7 @@ $stats = [
     'total_marks' => 0
 ];
 
-if (!$missing_params) {
+if ($mode === 'edit' && !$missing_params) {
     foreach ($students as $student) {
         if (isset($student['total_marks']) && $student['total_marks'] > 0) {
             $stats['results_entered']++;
@@ -596,6 +697,8 @@ if ($result) {
 // Set default values if settings are not available
 $prepared_by = isset($_SESSION['full_name']) ? $_SESSION['full_name'] : 'System Administrator';
 $issue_date = date('Y-m-d');
+
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -603,7 +706,7 @@ $issue_date = date('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Results - <?php echo isset($subject['subject_name']) ? $subject['subject_name'] : 'Subject'; ?></title>
+    <title><?php echo $mode === 'edit' ? 'Edit Results' : 'Grade Sheets'; ?> | Teacher Dashboard</title>
     <link href="../css/tailwind.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -675,6 +778,72 @@ $issue_date = date('Y-m-d');
         .notification.show { transform: translateX(0); }
         .notification.success { background-color: #D1FAE5; border-left: 4px solid #10B981; color: #065F46; }
         .notification.error { background-color: #FEE2E2; border-left: 4px solid #EF4444; color: #991B1B; }
+        
+        .grade-card {
+            transition: all 0.3s ease;
+        }
+        
+        .grade-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .status-badge.good {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-badge.average {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-badge.poor {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+        
+        .filter-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background-color: #e5e7eb;
+            color: #374151;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .filter-badge button {
+            margin-left: 0.25rem;
+            color: #6b7280;
+        }
+        
+        .filter-badge button:hover {
+            color: #ef4444;
+        }
+        
+        @media (max-width: 640px) {
+            .filter-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-container > div {
+                margin-bottom: 1rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -686,22 +855,27 @@ $issue_date = date('Y-m-d');
             <div class="flex justify-between items-center mb-6">
                 <h1 class="text-2xl font-bold text-gray-800">
                     <i class="fas fa-edit text-blue-500 mr-2"></i>
-                    Edit Student Results
+                    <?php echo $mode === 'edit' ? 'Edit Student Results' : 'Grade Sheets Management'; ?>
                 </h1>
                 <div class="flex space-x-3">
-                    <?php if (!$missing_params): ?>
-                    <button onclick="window.print()" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded no-print">
-                        <i class="fas fa-print mr-2"></i> Print Results
-                    </button>
+                    <?php if ($mode === 'view'): ?>
+                    <a href="?mode=edit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        <i class="fas fa-edit mr-2"></i> Edit Results
+                    </a>
+                    <?php else: ?>
+                    <a href="?mode=view" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                        <i class="fas fa-list mr-2"></i> View Grade Sheets
+                    </a>
                     <?php endif; ?>
-                    <a href="grade_sheet.php" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded no-print">
-                        <i class="fas fa-arrow-left mr-2"></i> Back to Grade Sheets
+                    
+                    <a href="teacher_dashboard.php" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                        <i class="fas fa-arrow-left mr-2"></i> Back to Dashboard
                     </a>
                 </div>
             </div>
             
             <?php if (!empty($success_message)): ?>
-            <div id="success-alert" class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 fade-in no-print" role="alert">
+            <div id="success-alert" class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 fade-in" role="alert">
                 <div class="flex items-center">
                     <div class="py-1"><i class="fas fa-check-circle text-green-500 mr-3"></i></div>
                     <div>
@@ -716,7 +890,7 @@ $issue_date = date('Y-m-d');
             <?php endif; ?>
             
             <?php if (!empty($error_message)): ?>
-            <div id="error-alert" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 fade-in no-print" role="alert">
+            <div id="error-alert" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 fade-in" role="alert">
                 <div class="flex items-center">
                     <div class="py-1"><i class="fas fa-exclamation-circle text-red-500 mr-3"></i></div>
                     <div>
@@ -730,6 +904,312 @@ $issue_date = date('Y-m-d');
             </div>
             <?php endif; ?>
             
+            <?php if ($mode === 'view'): ?>
+            <!-- VIEW MODE: Grade Sheets List -->
+            
+            <!-- Teacher Info Card -->
+            <div class="bg-white shadow rounded-lg p-6 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-800"><?php echo htmlspecialchars($teacher_name ?? 'Teacher'); ?></h2>
+                        <p class="mt-1 text-sm text-gray-600">Manage and view grade sheets for your assigned classes and subjects.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filters -->
+            <div class="bg-white shadow rounded-lg p-6 mb-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Filter Grade Sheets</h3>
+                
+                <form action="" method="get" class="filter-container flex flex-wrap gap-4 mb-4">
+                    <input type="hidden" name="mode" value="view">
+                    
+                    <!-- Class Filter -->
+                    <div class="w-full sm:w-auto">
+                        <label for="class_filter" class="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                        <select id="class_filter" name="class_filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="">All Classes</option>
+                            <?php foreach ($classes as $class): ?>
+                                <option value="<?php echo $class['class_id']; ?>" <?php echo $selected_class_filter == $class['class_id'] ? 'selected' : ''; ?>>
+                                    <?php echo $class['class_name'] . ' ' . $class['section'] . ' (' . $class['academic_year'] . ')'; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <!-- Subject Filter -->
+                    <div class="w-full sm:w-auto">
+                        <label for="subject_filter" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                        <select id="subject_filter" name="subject_filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="">All Subjects</option>
+                            <?php foreach ($subjects as $subject): ?>
+                                <option value="<?php echo $subject['subject_id']; ?>" <?php echo $selected_subject_filter == $subject['subject_id'] ? 'selected' : ''; ?>>
+                                    <?php echo $subject['subject_name'] . ' (' . $subject['subject_code'] . ')'; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <!-- Exam Filter -->
+                    <div class="w-full sm:w-auto">
+                        <label for="exam_filter" class="block text-sm font-medium text-gray-700 mb-1">Exam</label>
+                        <select id="exam_filter" name="exam_filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="">All Exams</option>
+                            <?php foreach ($exams as $exam): ?>
+                                <option value="<?php echo $exam['exam_id']; ?>" <?php echo $selected_exam_filter == $exam['exam_id'] ? 'selected' : ''; ?>>
+                                    <?php echo $exam['exam_name'] . ' (' . $exam['academic_year'] . ')'; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <!-- Academic Year Filter -->
+                    <div class="w-full sm:w-auto">
+                        <label for="academic_year" class="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
+                        <select id="academic_year" name="academic_year" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="">All Years</option>
+                            <?php foreach ($academic_years as $year): ?>
+                                <option value="<?php echo $year; ?>" <?php echo $selected_academic_year == $year ? 'selected' : ''; ?>>
+                                    <?php echo $year; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <!-- Filter Button -->
+                    <div class="w-full sm:w-auto flex items-end">
+                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i class="fas fa-filter mr-2"></i> Apply Filters
+                        </button>
+                    </div>
+                    
+                    <!-- Reset Filters -->
+                    <?php if ($selected_class_filter || $selected_subject_filter || $selected_exam_filter || $selected_academic_year): ?>
+                        <div class="w-full sm:w-auto flex items-end">
+                            <a href="?mode=view" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <i class="fas fa-times mr-2"></i> Reset Filters
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                </form>
+                
+                <!-- Active Filters -->
+                <?php if ($selected_class_filter || $selected_subject_filter || $selected_exam_filter || $selected_academic_year): ?>
+                    <div class="mt-4">
+                        <h4 class="text-sm font-medium text-gray-500 mb-2">Active Filters:</h4>
+                        <div>
+                            <?php if ($selected_class_filter): ?>
+                                <?php 
+                                $class_name = '';
+                                foreach ($classes as $class) {
+                                    if ($class['class_id'] == $selected_class_filter) {
+                                        $class_name = $class['class_name'] . ' ' . $class['section'];
+                                        break;
+                                    }
+                                }
+                                ?>
+                                <span class="filter-badge">
+                                    Class: <?php echo $class_name; ?>
+                                    <a href="?mode=view&<?php 
+                                        $params = $_GET;
+                                        unset($params['class_filter']);
+                                        echo http_build_query($params);
+                                    ?>" class="ml-1 text-gray-500 hover:text-red-500">
+                                        <i class="fas fa-times-circle"></i>
+                                    </a>
+                                </span>
+                            <?php endif; ?>
+                            
+                            <?php if ($selected_subject_filter): ?>
+                                <?php 
+                                $subject_name = '';
+                                foreach ($subjects as $subject) {
+                                    if ($subject['subject_id'] == $selected_subject_filter) {
+                                        $subject_name = $subject['subject_name'];
+                                        break;
+                                    }
+                                }
+                                ?>
+                                <span class="filter-badge">
+                                    Subject: <?php echo $subject_name; ?>
+                                    <a href="?mode=view&<?php 
+                                        $params = $_GET;
+                                        unset($params['subject_filter']);
+                                        echo http_build_query($params);
+                                    ?>" class="ml-1 text-gray-500 hover:text-red-500">
+                                        <i class="fas fa-times-circle"></i>
+                                    </a>
+                                </span>
+                            <?php endif; ?>
+                            
+                            <?php if ($selected_exam_filter): ?>
+                                <?php 
+                                $exam_name = '';
+                                foreach ($exams as $exam) {
+                                    if ($exam['exam_id'] == $selected_exam_filter) {
+                                        $exam_name = $exam['exam_name'];
+                                        break;
+                                    }
+                                }
+                                ?>
+                                <span class="filter-badge">
+                                    Exam: <?php echo $exam_name; ?>
+                                    <a href="?mode=view&<?php 
+                                        $params = $_GET;
+                                        unset($params['exam_filter']);
+                                        echo http_build_query($params);
+                                    ?>" class="ml-1 text-gray-500 hover:text-red-500">
+                                        <i class="fas fa-times-circle"></i>
+                                    </a>
+                                </span>
+                            <?php endif; ?>
+                            
+                            <?php if ($selected_academic_year): ?>
+                                <span class="filter-badge">
+                                    Academic Year: <?php echo $selected_academic_year; ?>
+                                    <a href="?mode=view&<?php 
+                                        $params = $_GET;
+                                        unset($params['academic_year']);
+                                        echo http_build_query($params);
+                                    ?>" class="ml-1 text-gray-500 hover:text-red-500">
+                                        <i class="fas fa-times-circle"></i>
+                                    </a>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Grade Sheets Grid -->
+            <div class="mb-8">
+                <?php if (empty($grade_sheets)): ?>
+                    <div class="bg-white shadow rounded-lg p-8 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 text-yellow-500 mb-4">
+                            <i class="fas fa-exclamation-circle text-3xl"></i>
+                        </div>
+                        <h2 class="text-xl font-medium text-gray-900 mb-2">No Grade Sheets Found</h2>
+                        <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                            <?php if ($selected_class_filter || $selected_subject_filter || $selected_exam_filter || $selected_academic_year): ?>
+                                No grade sheets match your filter criteria. Try adjusting your filters or view all grade sheets.
+                            <?php else: ?>
+                                You don't have any grade sheets available yet. Start by adding results for your assigned classes and subjects.
+                            <?php endif; ?>
+                        </p>
+                        
+                        <?php if ($selected_class_filter || $selected_subject_filter || $selected_exam_filter || $selected_academic_year): ?>
+                            <a href="?mode=view" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <i class="fas fa-list mr-2"></i> View All Grade Sheets
+                            </a>
+                        <?php else: ?>
+                            <a href="?mode=edit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <i class="fas fa-edit mr-2"></i> Edit Results
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <?php foreach ($grade_sheets as $sheet): ?>
+                            <div class="bg-white shadow rounded-lg overflow-hidden grade-card">
+                                <div class="bg-blue-600 text-white px-4 py-3">
+                                    <div class="flex justify-between items-center">
+                                        <h3 class="font-semibold"><?php echo $sheet['exam_name']; ?></h3>
+                                        <span class="text-xs bg-blue-500 px-2 py-1 rounded-full">
+                                            <?php echo $sheet['exam_type'] ?? 'Exam'; ?>
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-4">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <span class="text-sm text-gray-500">
+                                            <i class="far fa-calendar-alt mr-1"></i> 
+                                            <?php echo $sheet['academic_year']; ?>
+                                        </span>
+                                        
+                                        <?php 
+                                        $percentage = $sheet['average_percentage'] ?? 0;
+                                        $status_class = 'poor';
+                                        $status_text = 'Poor';
+                                        
+                                        if ($percentage >= 70) {
+                                            $status_class = 'good';
+                                            $status_text = 'Good';
+                                        } elseif ($percentage >= 40) {
+                                            $status_class = 'average';
+                                            $status_text = 'Average';
+                                        }
+                                        ?>
+                                        
+                                        <span class="status-badge <?php echo $status_class; ?>">
+                                            <?php echo $status_text; ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <p class="text-sm font-medium text-gray-700">
+                                            <i class="fas fa-book mr-1 text-blue-500"></i> 
+                                            <?php echo $sheet['subject_name']; ?> (<?php echo $sheet['subject_code']; ?>)
+                                        </p>
+                                        <p class="text-sm font-medium text-gray-700">
+                                            <i class="fas fa-users mr-1 text-green-500"></i> 
+                                            <?php echo $sheet['class_name'] . ' ' . $sheet['section']; ?>
+                                        </p>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-2 gap-2 mb-4">
+                                        <div class="bg-gray-50 p-2 rounded">
+                                            <p class="text-xs text-gray-500">Students</p>
+                                            <p class="font-semibold"><?php echo $sheet['students_count']; ?></p>
+                                        </div>
+                                        <div class="bg-gray-50 p-2 rounded">
+                                            <p class="text-xs text-gray-500">Pass Rate</p>
+                                            <p class="font-semibold">
+                                                <?php 
+                                                $pass_rate = ($sheet['students_count'] > 0) ? 
+                                                    round(($sheet['pass_count'] / $sheet['students_count']) * 100) : 0;
+                                                echo $pass_rate . '%'; 
+                                                ?>
+                                            </p>
+                                        </div>
+                                        <div class="bg-gray-50 p-2 rounded">
+                                            <p class="text-xs text-gray-500">Average</p>
+                                            <p class="font-semibold"><?php echo round($sheet['average_percentage'], 1); ?>%</p>
+                                        </div>
+                                        <div class="bg-gray-50 p-2 rounded">
+                                            <p class="text-xs text-gray-500">Exam Date</p>
+                                            <p class="font-semibold text-xs">
+                                                <?php 
+                                                if (isset($sheet['start_date'])) {
+                                                    echo date('d M Y', strtotime($sheet['start_date']));
+                                                } else {
+                                                    echo 'N/A';
+                                                }
+                                                ?>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex space-x-2">
+                                        <a href="?mode=edit&subject_id=<?php echo $sheet['subject_id']; ?>&class_id=<?php echo $sheet['class_id']; ?>&exam_id=<?php echo $sheet['exam_id']; ?>" 
+                                           class="flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                            <i class="fas fa-edit mr-2"></i> Edit Results
+                                        </a>
+                                        <a href="view_students.php?subject_id=<?php echo $sheet['subject_id']; ?>&class_id=<?php echo $sheet['class_id']; ?>&exam_id=<?php echo $sheet['exam_id']; ?>" 
+                                           class="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                            <i class="fas fa-users mr-2"></i> Students
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+            
+            <?php else: ?>
+            <!-- EDIT MODE: Result Entry Form -->
+            
             <?php if ($missing_params): ?>
             <!-- Selection Form -->
             <div class="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -737,7 +1217,8 @@ $issue_date = date('Y-m-d');
                     <i class="fas fa-clipboard-list text-blue-500 mr-2"></i> Select Class, Subject and Exam
                 </h2>
                 
-                <form action="edit_results.php" method="GET" class="space-y-6">
+                <form action="" method="GET" class="space-y-6">
+                    <input type="hidden" name="mode" value="edit">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Subject and Class Selection -->
                         <div>
@@ -790,7 +1271,7 @@ $issue_date = date('Y-m-d');
             
             <?php else: ?>
             <!-- Subject and Exam Information -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-8 no-print">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
                         <h3 class="text-sm font-medium opacity-80 mb-1">Subject</h3>
@@ -820,13 +1301,13 @@ $issue_date = date('Y-m-d');
             
             <!-- Results Entry Form -->
             <?php if (empty($students)): ?>
-            <div class="bg-yellow-100 text-yellow-700 p-4 rounded no-print">
+            <div class="bg-yellow-100 text-yellow-700 p-4 rounded">
                 <p><i class="fas fa-exclamation-triangle mr-2"></i> No students found in this class.</p>
             </div>
             <?php else: ?>
             
             <!-- Results Entry Form (for editing) -->
-            <form method="POST" action="" id="results-form" class="no-print">
+            <form method="POST" action="" id="results-form">
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     <div class="p-6 bg-gray-50 border-b border-gray-200">
                         <h2 class="text-xl font-bold text-gray-800">
@@ -959,7 +1440,7 @@ $issue_date = date('Y-m-d');
                             Grades and percentages are calculated automatically. Changes will be reflected in grade sheets.
                         </div>
                         <div class="flex space-x-3">
-                            <button type="button" onclick="window.location.href='grade_sheet.php'" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                            <button type="button" onclick="window.location.href='?mode=view'" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                                 <i class="fas fa-times mr-2"></i> Cancel
                             </button>
                             
@@ -971,6 +1452,7 @@ $issue_date = date('Y-m-d');
                 </div>
             </form>
             <?php endif; ?>          
+            <?php endif; ?>
             <?php endif; ?>
         </div>
     </div>
