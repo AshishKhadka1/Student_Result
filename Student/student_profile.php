@@ -81,6 +81,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                 throw new Exception("Current password is incorrect.");
             }
         }
+
+        // Handle profile picture upload
+        if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] == 0) {
+            $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+            $max_size = 2 * 1024 * 1024; // 2MB
+            
+            if (in_array($_FILES['profile_picture']['type'], $allowed_types) && $_FILES['profile_picture']['size'] <= $max_size) {
+                $upload_dir = '../uploads/profiles/';
+                if (!file_exists($upload_dir)) {
+                    mkdir($upload_dir, 0777, true);
+                }
+                
+                $file_extension = pathinfo($_FILES['profile_picture']['name'], PATHINFO_EXTENSION);
+                $new_filename = 'student_' . $user_id . '_' . time() . '.' . $file_extension;
+                $upload_path = $upload_dir . $new_filename;
+                
+                if (move_uploaded_file($_FILES['profile_picture']['tmp_name'], $upload_path)) {
+                    // Delete old profile picture if exists
+                    if (!empty($student['profile_picture']) && file_exists($upload_dir . $student['profile_picture'])) {
+                        unlink($upload_dir . $student['profile_picture']);
+                    }
+                    
+                    // Update database with new profile picture
+                    $stmt = $conn->prepare("UPDATE students SET profile_picture = ? WHERE user_id = ?");
+                    $stmt->bind_param("si", $new_filename, $user_id);
+                    $stmt->execute();
+                    $stmt->close();
+                }
+            }
+        }
         
         // Commit transaction
         $conn->commit();
@@ -422,9 +452,6 @@ $conn->close();
                                     <button id="tab-academic" class="text-gray-500 hover:text-gray-700 py-4 px-6 text-sm font-medium">
                                         Academic Information
                                     </button>
-                                    <button id="tab-performance" class="text-gray-500 hover:text-gray-700 py-4 px-6 text-sm font-medium">
-                                        Performance
-                                    </button>
                                 </nav>
                             </div>
 
@@ -433,8 +460,19 @@ $conn->close();
                                 <div class="flex flex-col md:flex-row">
                                     <!-- Profile Image -->
                                     <div class="flex-shrink-0 mb-6 md:mb-0 md:mr-6">
-                                        <div class="h-32 w-32 rounded-full bg-blue-600 flex items-center justify-center text-white text-4xl font-bold">
-                                            <?php echo substr($student['full_name'], 0, 1); ?>
+                                        <div class="relative">
+                                            <?php if (!empty($student['profile_picture']) && file_exists("../uploads/profiles/" . $student['profile_picture'])): ?>
+                                                <img src="../uploads/profiles/<?php echo htmlspecialchars($student['profile_picture']); ?>" 
+                                                     alt="Profile Picture" 
+                                                     class="h-32 w-32 rounded-full object-cover border-4 border-white shadow-lg">
+                                            <?php else: ?>
+                                                <div class="h-32 w-32 rounded-full bg-blue-600 flex items-center justify-center text-white text-4xl font-bold border-4 border-white shadow-lg">
+                                                    <?php echo substr($student['full_name'], 0, 1); ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            <button type="button" id="change-photo-btn" class="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-2 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                <i class="fas fa-camera text-sm"></i>
+                                            </button>
                                         </div>
                                     </div>
 
@@ -609,148 +647,6 @@ $conn->close();
                                     </div>
                                 <?php endif; ?>
                             </div>
-
-                            <!-- Performance Tab -->
-                            <div id="content-performance" class="p-6 hidden">
-                                <h3 class="text-lg font-medium text-gray-900 mb-4">Academic Performance</h3>
-                                
-                                <!-- Performance Overview -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                    <div class="bg-white overflow-hidden shadow rounded-lg hover-scale">
-                                        <div class="p-5">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                                                    <i class="fas fa-chart-line text-white text-xl"></i>
-                                                </div>
-                                                <div class="ml-5 w-0 flex-1">
-                                                    <dl>
-                                                        <dt class="text-sm font-medium text-gray-500 truncate">Average GPA</dt>
-                                                        <dd class="flex items-baseline">
-                                                            <div class="text-2xl font-semibold text-gray-900"><?php echo number_format($overall_performance['average_gpa'], 2); ?></div>
-                                                            <div class="ml-2 flex items-baseline text-sm font-semibold text-green-600">
-                                                                <span class="sr-only">out of</span>
-                                                                / 4.0
-                                                            </div>
-                                                        </dd>
-                                                    </dl>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="bg-gray-50 px-5 py-3">
-                                            <div class="text-sm">
-                                                <span class="font-medium text-blue-600">Grade: <?php echo $overall_performance['average_grade']; ?></span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="bg-white overflow-hidden shadow rounded-lg hover-scale">
-                                        <div class="p-5">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
-                                                    <i class="fas fa-percentage text-white text-xl"></i>
-                                                </div>
-                                                <div class="ml-5 w-0 flex-1">
-                                                    <dl>
-                                                        <dt class="text-sm font-medium text-gray-500 truncate">Average Percentage</dt>
-                                                        <dd class="flex items-baseline">
-                                                            <div class="text-2xl font-semibold text-gray-900"><?php echo number_format($overall_performance['average_percentage'], 2); ?>%</div>
-                                                        </dd>
-                                                    </dl>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="bg-gray-50 px-5 py-3">
-                                            <div class="text-sm">
-                                                <span class="font-medium text-green-600"><?php echo $overall_performance['pass_count']; ?> subjects passed</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="bg-white overflow-hidden shadow rounded-lg hover-scale">
-                                        <div class="p-5">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 bg-purple-500 rounded-md p-3">
-                                                    <i class="fas fa-book text-white text-xl"></i>
-                                                </div>
-                                                <div class="ml-5 w-0 flex-1">
-                                                    <dl>
-                                                        <dt class="text-sm font-medium text-gray-500 truncate">Subjects</dt>
-                                                        <dd class="flex items-baseline">
-                                                            <div class="text-2xl font-semibold text-gray-900"><?php echo $overall_performance['subjects_with_results']; ?></div>
-                                                        </dd>
-                                                    </dl>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="bg-gray-50 px-5 py-3">
-                                            <div class="text-sm">
-                                                <a href="view_result.php" class="font-medium text-blue-600 hover:text-blue-500">View all results</a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Recent Results -->
-                                <h3 class="text-lg font-medium text-gray-900 mt-8 mb-4">Recent Results</h3>
-                                
-                                <?php if (empty($recent_results)): ?>
-                                    <div class="text-center py-4 bg-gray-50 rounded-lg">
-                                        <i class="fas fa-info-circle text-blue-500 text-2xl mb-2"></i>
-                                        <p class="text-gray-500">No results available yet.</p>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="overflow-x-auto">
-                                        <table class="min-w-full divide-y divide-gray-200">
-                                            <thead class="bg-gray-50">
-                                                <tr>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam</th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Theory</th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Practical</th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="bg-white divide-y divide-gray-200">
-                                                <?php foreach ($recent_results as $result): ?>
-                                                    <tr class="hover:bg-gray-50">
-                                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                            <?php echo htmlspecialchars($result['subject_name']); ?>
-                                                        </td>
-                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                            <?php echo htmlspecialchars($result['exam_name']); ?>
-                                                        </td>
-                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                            <?php echo $result['theory_marks']; ?>
-                                                        </td>
-                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                            <?php echo $result['practical_marks'] ?? 'N/A'; ?>
-                                                        </td>
-                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                            <?php echo $result['theory_marks'] + ($result['practical_marks'] ?? 0); ?>
-                                                        </td>
-                                                        <td class="px-6 py-4 whitespace-nowrap">
-                                                            <span class="grade-badge grade-<?php echo strtolower(str_replace('+', '-plus', $result['grade'])); ?>">
-                                                                <?php echo $result['grade']; ?>
-                                                            </span>
-                                                        </td>
-                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                            <?php echo date('M d, Y', strtotime($result['created_at'])); ?>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    
-                                    <div class="mt-4 text-right">
-                                        <a href="view_result.php" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                            <i class="fas fa-eye mr-2"></i> View All Results
-                                        </a>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -768,11 +664,32 @@ $conn->close();
                 </button>
             </div>
             <div class="mt-4">
-                <form action="" method="POST">
+                <form action="" method="POST" enctype="multipart/form-data">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div class="md:col-span-2">
                             <h4 class="text-md font-medium text-gray-700 mb-2">Personal Information</h4>
                             <p class="text-sm text-gray-500 mb-4">Update your personal details below. Some fields cannot be changed and require administrator assistance.</p>
+                        </div>
+                        
+                        <div class="md:col-span-2 mb-4">
+                            <label for="profile_picture" class="block text-sm font-medium text-gray-700">Profile Picture</label>
+                            <div class="mt-1 flex items-center space-x-4">
+                                <div class="flex-shrink-0">
+                                    <?php if (!empty($student['profile_picture']) && file_exists("../uploads/profiles/" . $student['profile_picture'])): ?>
+                                        <img id="preview-image" src="../uploads/profiles/<?php echo htmlspecialchars($student['profile_picture']); ?>" 
+                                             alt="Profile Picture" 
+                                             class="h-16 w-16 rounded-full object-cover">
+                                    <?php else: ?>
+                                        <div id="preview-image" class="h-16 w-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-bold">
+                                            <?php echo substr($student['full_name'], 0, 1); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="flex-grow">
+                                    <input type="file" name="profile_picture" id="profile_picture" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                    <p class="mt-1 text-xs text-gray-500">PNG, JPG, GIF up to 2MB</p>
+                                </div>
+                            </div>
                         </div>
                         
                         <div>
@@ -840,12 +757,8 @@ $conn->close();
             document.getElementById('tab-academic').classList.remove('tab-active');
             document.getElementById('tab-academic').classList.add('text-gray-500', 'hover:text-gray-700');
             
-            document.getElementById('tab-performance').classList.remove('tab-active');
-            document.getElementById('tab-performance').classList.add('text-gray-500', 'hover:text-gray-700');
-            
             document.getElementById('content-personal').classList.remove('hidden');
             document.getElementById('content-academic').classList.add('hidden');
-            document.getElementById('content-performance').classList.add('hidden');
         });
         
         document.getElementById('tab-academic').addEventListener('click', function() {
@@ -855,27 +768,8 @@ $conn->close();
             document.getElementById('tab-personal').classList.remove('tab-active');
             document.getElementById('tab-personal').classList.add('text-gray-500', 'hover:text-gray-700');
             
-            document.getElementById('tab-performance').classList.remove('tab-active');
-            document.getElementById('tab-performance').classList.add('text-gray-500', 'hover:text-gray-700');
-            
             document.getElementById('content-academic').classList.remove('hidden');
             document.getElementById('content-personal').classList.add('hidden');
-            document.getElementById('content-performance').classList.add('hidden');
-        });
-        
-        document.getElementById('tab-performance').addEventListener('click', function() {
-            document.getElementById('tab-performance').classList.add('tab-active');
-            document.getElementById('tab-performance').classList.remove('text-gray-500', 'hover:text-gray-700');
-            
-            document.getElementById('tab-personal').classList.remove('tab-active');
-            document.getElementById('tab-personal').classList.add('text-gray-500', 'hover:text-gray-700');
-            
-            document.getElementById('tab-academic').classList.remove('tab-active');
-            document.getElementById('tab-academic').classList.add('text-gray-500', 'hover:text-gray-700');
-            
-            document.getElementById('content-performance').classList.remove('hidden');
-            document.getElementById('content-personal').classList.add('hidden');
-            document.getElementById('content-academic').classList.add('hidden');
         });
         
         // Edit profile modal
@@ -956,6 +850,24 @@ $conn->close();
                     confirmButtonColor: '#3085d6'
                 });
             <?php endif; ?>
+        });
+
+        // Profile picture preview
+        document.getElementById('profile_picture').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('preview-image');
+                    preview.innerHTML = '<img src="' + e.target.result + '" alt="Preview" class="h-16 w-16 rounded-full object-cover">';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Change photo button
+        document.getElementById('change-photo-btn').addEventListener('click', function() {
+            document.getElementById('editProfileModal').classList.remove('hidden');
         });
     </script>
 </body>

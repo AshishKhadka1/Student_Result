@@ -270,13 +270,12 @@ $conn->close();
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         <?php if (empty($students)): ?>
                                             <tr>
-                                                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">No students found.</td>
+                                                <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No students found.</td>
                                             </tr>
                                         <?php else: ?>
                                             <?php foreach ($students as $student): ?>
@@ -284,13 +283,8 @@ $conn->close();
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?php echo htmlspecialchars($student['student_id']); ?></td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($student['full_name']); ?></td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($student['roll_number']); ?></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($student['class_name'] . ' ' . $student['section']); ?></td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($student['class_name']); ?></td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($student['email']); ?></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                        <a href="student_results.php?student_id=<?php echo $student['student_id']; ?>&subject_id=<?php echo $subject_id; ?>&class_id=<?php echo $class_id; ?>&section_id=<?php echo $section_id; ?>" class="text-blue-600 hover:text-blue-900">
-                                                            <i class="fas fa-eye mr-1"></i> View Results
-                                                        </a>
-                                                    </td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         <?php endif; ?>

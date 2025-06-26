@@ -5,8 +5,8 @@
     </button>
     <div class="flex-1 px-4 flex justify-between">
         <div class="flex-1 flex items-center">
-            <div class="max-w-7xl">
-                <h1 class="text-xl font-semibold text-gray-900">Student Portal</h1>
+            <div>
+    <h1 class="text-xl font-semibold text-gray-800 dark:text-gray-100">Student Dashboard</h1>
             </div>
         </div>
         <div class="ml-4 flex items-center md:ml-6">

@@ -1,42 +1,58 @@
-<div class="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow">
-    <button type="button" class="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 md:hidden" id="sidebar-toggle">
-        <span class="sr-only">Open sidebar</span>
-        <i class="fas fa-bars"></i>
-    </button>
-    <div class="flex-1 px-4 flex justify-between">
-        <div class="flex-1 flex items-center">
-            <div class="max-w-7xl">
-                <h1 class="text-xl font-semibold text-gray-900">Teacher Dashboard</h1>
-            </div>
-        </div>
-        <div class="ml-4 flex items-center md:ml-6">
-            
-            <!-- Profile dropdown -->
-            <div class="ml-3 relative">
-                <div>
-                    <button type="button" class="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" id="user-menu-button" aria-expanded="false" aria-haspopup="true">
-                        <span class="sr-only">Open user menu</span>
-                        <?php if (isset($teacher['profile_image']) && !empty($teacher['profile_image'])): ?>
-                            <img class="h-8 w-8 rounded-full" src="<?php echo htmlspecialchars($teacher['profile_image']); ?>" alt="Profile image">
-                        <?php else: ?>
-                            <div class="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
-                                <?php 
-                                $initials = 'T';
-                                if (isset($teacher['full_name']) && !empty($teacher['full_name'])) {
-                                    $name_parts = explode(' ', $teacher['full_name']);
-                                    $initials = strtoupper(substr($name_parts[0], 0, 1));
-                                    if (count($name_parts) > 1) {
-                                        $initials .= strtoupper(substr(end($name_parts), 0, 1));
-                                    }
-                                }
-                                echo $initials;
-                                ?>
-                            </div>
-                        <?php endif; ?>
-                    </button>
-                </div>
-            </div>
+<!-- Include Tailwind CSS and Font Awesome -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- Top Navbar -->
+<nav class="bg-white shadow-md px-4 py-3 flex items-center justify-between">
+    <!-- Left: Logo and toggler -->
+    <div class="flex items-center space-x-4">
+        <!-- Mobile sidebar toggler -->
+        <button id="sidebar-toggle" class="text-gray-600 hover:text-blue-600 focus:outline-none md:hidden">
+            <i class="fas fa-bars text-lg"></i>
+        </button>
+
+        <!-- Logo -->
+    <h1 class="text-xl font-semibold text-gray-800 dark:text-gray-100">Teacher Dashboard</h1>
+    </div>
+
+    <!-- Right: Profile dropdown -->
+    <div class="relative">
+        <button id="profileDropdownBtn" class="focus:outline-none">
+            <img src="#" alt="User" class="h-10 w-10 rounded-full border">
+        </button>
+
+        <!-- Dropdown Menu -->
+        <div id="profileDropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden z-50">
+            <ul class="py-2 text-sm text-gray-700">
+                <li>
+                    <a href="teacher_profile.php" class="flex items-center px-4 py-2 hover:bg-gray-100">
+                        <i class="fas fa-user mr-2 text-gray-500"></i> My Profile
+                    </a>
+                </li>
+                <li>
+                    <a href="logout.php" class="flex items-center px-4 py-2 hover:bg-gray-100">
+                        <i class="fa fa-power-off mr-2 text-gray-500"></i> Logout
+                    </a>
+                </li>
+            </ul>
         </div>
     </div>
-</div>
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</nav>
+
+<!-- Profile Dropdown Script -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const btn = document.getElementById('profileDropdownBtn');
+        const dropdown = document.getElementById('profileDropdown');
+
+        btn.addEventListener('click', () => {
+            dropdown.classList.toggle('hidden');
+        });
+
+        window.addEventListener('click', function (e) {
+            if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+    });
+</script>

@@ -103,7 +103,7 @@ function getRecentResults($conn, $student_id) {
                               FROM results r 
                               JOIN subjects s ON r.subject_id = s.subject_id 
                               JOIN exams e ON r.exam_id = e.exam_id
-                              WHERE r.student_id = ? 
+                              WHERE r.student_id = ? AND r.is_published = 1
                               ORDER BY r.created_at DESC LIMIT 10");
         
         // Check if prepare statement failed
@@ -167,7 +167,7 @@ function getSubjectPerformance($conn, $student_id) {
                                 MIN(r.theory_marks + COALESCE(r.practical_marks, 0)) as lowest_marks
                               FROM results r
                               JOIN subjects s ON r.subject_id = s.subject_id
-                              WHERE r.student_id = ?
+                              WHERE r.student_id = ? AND r.is_published = 1
                               GROUP BY r.subject_id
                               ORDER BY avg_marks DESC");
         $stmt->bind_param("s", $student_id);
@@ -192,7 +192,7 @@ function getGPATrend($conn, $student_id) {
         $stmt = $conn->prepare("SELECT e.exam_name, r.grade, e.created_at
                               FROM results r
                               JOIN exams e ON r.exam_id = e.exam_id
-                              WHERE r.student_id = ?
+                              WHERE r.student_id = ? AND r.is_published = 1
                               GROUP BY e.exam_id
                               ORDER BY e.created_at ASC");
         
@@ -555,9 +555,6 @@ $conn->close();
             <!-- Top Navigation -->
             <?php include('./includes/top_navigation.php'); ?>
             
-                        <?php include('./includes./mobile_sidebar.php'); ?>
-
-            
             <!-- Main Content -->
             <main class="flex-1 relative overflow-y-auto focus:outline-none">
                 <div class="py-6">
@@ -700,6 +697,22 @@ $conn->close();
 
                     </div>
                 </div>
+                <?php if (empty($recent_results)): ?>
+                <!-- No Published Results Message -->
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                <strong>No Published Results Available</strong><br>
+                                Your results are currently being processed by the administration. Published results will appear here once they are officially released.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </main>
         </div>
     </div>

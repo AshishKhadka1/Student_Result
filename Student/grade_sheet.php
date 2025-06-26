@@ -461,25 +461,7 @@ $conn->close();
                        </div>
                        <?php endif; ?>
 
-                       <!-- Student Info Card -->
-                       <div class="bg-white shadow rounded-lg p-6 mb-6">
-                           <div class="flex flex-col md:flex-row md:items-center md:justify-between">
-                               <div>
-                                   <h2 class="text-xl font-semibold text-gray-800"><?php echo htmlspecialchars($student['full_name']); ?></h2>
-                                   <div class="mt-2 text-sm text-gray-600">
-                                       <p><span class="font-medium">Roll Number:</span> <?php echo htmlspecialchars($student['roll_number']); ?></p>
-                                       <p><span class="font-medium">Registration Number:</span> <?php echo htmlspecialchars($student['registration_number']); ?></p>
-                                       <p><span class="font-medium">Class:</span> <?php echo htmlspecialchars($student['class_name'] . ' ' . $student['section']); ?></p>
-                                   </div>
-                               </div>
-                               <div class="mt-4 md:mt-0">
-                                   <div class="inline-flex items-center px-4 py-2 bg-blue-50 rounded-full text-sm font-medium text-blue-700">
-                                       <i class="fas fa-graduation-cap mr-2"></i>
-                                       Academic Year: <?php echo htmlspecialchars($student['academic_year']); ?>
-                                   </div>
-                               </div>
-                           </div>
-                       </div>
+                  
 
                        <?php if (count($exams) > 0): ?>
                            <!-- Filters -->
@@ -563,20 +545,7 @@ $conn->close();
                                <?php endif; ?>
                            </div>
                            
-                           <!-- Published Results Notice -->
-                           <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
-                               <div class="flex">
-                                   <div class="flex-shrink-0">
-                                       <i class="fas fa-check-circle text-green-400"></i>
-                                   </div>
-                                   <div class="ml-3">
-                                       <p class="text-sm text-green-700">
-                                           <strong>Published Results Only:</strong> You can only view results that have been officially published by the administration.
-                                           <br><small>Using table: <code><?php echo $results_table; ?></code> with field: <code><?php echo $publication_field; ?></code></small>
-                                       </p>
-                                   </div>
-                               </div>
-                           </div>
+                    
                            
                            <!-- Exam Results Grid -->
                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
