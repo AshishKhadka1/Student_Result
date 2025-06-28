@@ -15,9 +15,9 @@ $error_message = '';
 
 // Get teacher ID from the teachers table
 $teacher_query = "SELECT t.teacher_id, u.full_name 
-                 FROM teachers t
-                 JOIN users u ON t.user_id = u.user_id
-                 WHERE t.user_id = ?";
+                FROM teachers t
+                JOIN users u ON t.user_id = u.user_id
+                WHERE t.user_id = ?";
 $stmt = $conn->prepare($teacher_query);
 if (!$stmt) {
     $error_message = "Database error: " . $conn->error;
@@ -137,8 +137,8 @@ $selected_academic_year = isset($_GET['academic_year']) ? $_GET['academic_year']
 // Get all classes
 $classes = [];
 $classes_query = "SELECT c.class_id, c.class_name, c.section, c.academic_year
-                 FROM classes c
-                 ORDER BY c.class_name, c.section";
+                FROM classes c
+                ORDER BY c.class_name, c.section";
 $stmt = $conn->prepare($classes_query);
 if (!$stmt) {
     $error_message = "Database error: " . $conn->error;
@@ -223,7 +223,6 @@ if (empty($error_message)) {
 }
 
 // Get grade sheets for view mode
-$grade_sheets = [];
 if ($mode === 'view' && isset($teacher_id)) {
     $filter_conditions = [];
     $filter_params = [];
@@ -244,7 +243,7 @@ if ($mode === 'view' && isset($teacher_id)) {
               JOIN classes c ON st.class_id = c.class_id
               JOIN subjects s ON r.subject_id = s.subject_id
               JOIN teachersubjects ts ON s.subject_id = ts.subject_id AND c.class_id = ts.class_id
-              WHERE ts.teacher_id = ? AND r.is_published = 1";
+              WHERE ts.teacher_id = ?";
 
     // Add filters based on selection
     if ($selected_class_filter) {
@@ -320,7 +319,7 @@ if ($mode === 'edit' && !$missing_params && empty($error_message)) {
     } else {
         $stmt->bind_param("i", $subject_id);
         $stmt->execute();
-        $subject_result = $subject_result->get_result();
+        $subject_result = $stmt->get_result();
         $subject = $subject_result->fetch_assoc();
         $stmt->close();
 
@@ -342,7 +341,7 @@ if ($mode === 'edit' && !$missing_params && empty($error_message)) {
     } else {
         $stmt->bind_param("i", $class_id);
         $stmt->execute();
-        $class_result = $class_result->get_result();
+        $class_result = $stmt->get_result();
         $class = $class_result->fetch_assoc();
         $stmt->close();
 
@@ -364,7 +363,7 @@ if ($mode === 'edit' && !$missing_params && empty($error_message)) {
     } else {
         $stmt->bind_param("i", $exam_id);
         $stmt->execute();
-        $exam_result = $exam_result->get_result();
+        $exam_result = $stmt->get_result();
         $exam = $exam_result->fetch_assoc();
         $stmt->close();
 
@@ -403,7 +402,7 @@ if ($mode === 'edit' && !$missing_params && empty($error_message)) {
                       FROM students s
                       JOIN users u ON s.user_id = u.user_id
                       LEFT JOIN results r ON s.student_id = r.student_id 
-                          AND r.subject_id = ? AND r.exam_id = ? AND r.is_published = 1
+                          AND r.subject_id = ? AND r.exam_id = ?
                       WHERE s.student_id = ?";
     } else {
         $students_query = "SELECT s.student_id, s.roll_number, s.registration_number, u.full_name,
@@ -411,7 +410,7 @@ if ($mode === 'edit' && !$missing_params && empty($error_message)) {
                       FROM students s
                       JOIN users u ON s.user_id = u.user_id
                       LEFT JOIN results r ON s.student_id = r.student_id 
-                          AND r.subject_id = ? AND r.exam_id = ? AND r.is_published = 1
+                          AND r.subject_id = ? AND r.exam_id = ?
                       WHERE s.class_id = ?
                       ORDER BY s.roll_number";
     }
@@ -511,8 +510,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results']) && $m
             if (empty($result_id)) {
                 // Insert new result
                 $insert_query = "INSERT INTO results (student_id, subject_id, exam_id, theory_marks, practical_marks, 
-                                total_marks, percentage, grade, gpa, remarks, created_by, created_at, updated_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+                               total_marks, percentage, grade, gpa, remarks, created_by, created_at, updated_at)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
                 $stmt = $conn->prepare($insert_query);
                 if (!$stmt) {
                     throw new Exception("Database error: " . $conn->error);
@@ -557,50 +556,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results']) && $m
         
         // Commit transaction
         $conn->commit();
-
-        // Refresh the student data after successful save
-        $students = [];
-        if ($student_id) {
-            // If editing a specific student
-            $students_query = "SELECT s.student_id, s.roll_number, s.registration_number, u.full_name,
-                              r.result_id, r.theory_marks, r.practical_marks, r.total_marks, r.percentage, r.grade, r.gpa, r.remarks
-                              FROM students s
-                              JOIN users u ON s.user_id = u.user_id
-                              LEFT JOIN results r ON s.student_id = r.student_id 
-                                  AND r.subject_id = ? AND r.exam_id = ?
-                              WHERE s.student_id = ?
-                              ORDER BY s.roll_number";
-            $stmt = $conn->prepare($students_query);
-            if ($stmt) {
-                $stmt->bind_param("iis", $subject_id, $exam_id, $student_id);
-                $stmt->execute();
-                $students_result = $stmt->get_result();
-                while ($student = $students_result->fetch_assoc()) {
-                    $students[] = $student;
-                }
-                $stmt->close();
-            }
-        } else {
-            // If editing all students in the class
-            $students_query = "SELECT s.student_id, s.roll_number, s.registration_number, u.full_name,
-                              r.result_id, r.theory_marks, r.practical_marks, r.total_marks, r.percentage, r.grade, r.gpa, r.remarks
-                              FROM students s
-                              JOIN users u ON s.user_id = u.user_id
-                              LEFT JOIN results r ON s.student_id = r.student_id 
-                                  AND r.subject_id = ? AND r.exam_id = ?
-                              WHERE s.class_id = ?
-                              ORDER BY s.roll_number";
-            $stmt = $conn->prepare($students_query);
-            if ($stmt) {
-                $stmt->bind_param("iii", $subject_id, $exam_id, $class_id);
-                $stmt->execute();
-                $students_result = $stmt->get_result();
-                while ($student = $students_result->fetch_assoc()) {
-                    $students[] = $student;
-                }
-                $stmt->close();
-            }
-        }
         
         $success_message = "Results saved successfully! Updated $total_updated student records.";
         
@@ -910,7 +865,7 @@ $conn->close();
                     </div>
                     <div class="ml-3">
                         <p class="text-sm text-blue-700">
-                            <strong>Published Results Only:</strong> You can only view results that have been officially published by the administration.
+                            <strong>Published Results Only:</strong> You can only view and edit results that have been officially published by the administration.
                         </p>
                     </div>
                 </div>
@@ -1188,7 +1143,10 @@ $conn->close();
                                     </div>
                                     
                                     <div class="flex space-x-2">
-                                        
+                                        <a href="?mode=edit&subject_id=<?php echo $sheet['subject_id']; ?>&class_id=<?php echo $sheet['class_id']; ?>&exam_id=<?php echo $sheet['exam_id']; ?>" 
+                                           class="flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                            <i class="fas fa-edit mr-2"></i> Edit Results
+                                        </a>
                                         <a href="view_students.php?subject_id=<?php echo $sheet['subject_id']; ?>&class_id=<?php echo $sheet['class_id']; ?>&exam_id=<?php echo $sheet['exam_id']; ?>" 
                                            class="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                             <i class="fas fa-users mr-2"></i> View Students
@@ -1205,6 +1163,62 @@ $conn->close();
             <!-- EDIT MODE: Result Entry Form -->
             
             <?php if ($missing_params): ?>
+            <!-- Parameter Selection Form -->
+            <div class="bg-white shadow rounded-lg p-6 mb-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Select Parameters to Edit Results</h3>
+                <p class="text-sm text-gray-600 mb-6">Please select a subject, class, and exam to edit student results.</p>
+                
+                <form action="" method="get" class="space-y-4">
+                    <input type="hidden" name="mode" value="edit">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Subject Selection -->
+                        <div>
+                            <label for="subject_id" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                            <select id="subject_id" name="subject_id" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                <option value="">Select Subject</option>
+                                <?php foreach ($subjects as $subj): ?>
+                                    <option value="<?php echo $subj['subject_id']; ?>" <?php echo $subject_id == $subj['subject_id'] ? 'selected' : ''; ?>>
+                                        <?php echo $subj['subject_name'] . ' (' . $subj['subject_code'] . ')'; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <!-- Class Selection -->
+                        <div>
+                            <label for="class_id" class="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                            <select id="class_id" name="class_id" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                <option value="">Select Class</option>
+                                <?php foreach ($classes as $cls): ?>
+                                    <option value="<?php echo $cls['class_id']; ?>" <?php echo $class_id == $cls['class_id'] ? 'selected' : ''; ?>>
+                                        <?php echo $cls['class_name'] . ' ' . $cls['section'] . ' (' . $cls['academic_year'] . ')'; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <!-- Exam Selection -->
+                        <div>
+                            <label for="exam_id" class="block text-sm font-medium text-gray-700 mb-1">Exam</label>
+                            <select id="exam_id" name="exam_id" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                <option value="">Select Exam</option>
+                                <?php foreach ($exams as $ex): ?>
+                                    <option value="<?php echo $ex['exam_id']; ?>" <?php echo $exam_id == $ex['exam_id'] ? 'selected' : ''; ?>>
+                                        <?php echo $ex['exam_name'] . ' (' . $ex['academic_year'] . ')'; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="submit" name="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i class="fas fa-search mr-2"></i> Load Results
+                        </button>
+                    </div>
+                </form>
+            </div>
             
             <?php else: ?>
             <!-- Subject and Exam Information -->
@@ -1243,7 +1257,184 @@ $conn->close();
             </div>
             <?php else: ?>
             
-            <!-- Results Entry Form (for editing) -->
+            <!-- Statistics Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4 stat-card">
+                    <div class="flex items-center">
+                        <div class="p-2 rounded-full bg-blue-100 text-blue-600">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-500">Total Students</p>
+                            <p class="text-lg font-semibold text-gray-900"><?php echo $stats['total_students']; ?></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-4 stat-card">
+                    <div class="flex items-center">
+                        <div class="p-2 rounded-full bg-green-100 text-green-600">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-500">Pass Count</p>
+                            <p class="text-lg font-semibold text-gray-900"><?php echo $stats['pass_count']; ?></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-4 stat-card">
+                    <div class="flex items-center">
+                        <div class="p-2 rounded-full bg-yellow-100 text-yellow-600">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-500">Average Marks</p>
+                            <p class="text-lg font-semibold text-gray-900"><?php echo number_format($stats['average_marks'], 1); ?></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-4 stat-card">
+                    <div class="flex items-center">
+                        <div class="p-2 rounded-full bg-purple-100 text-purple-600">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-500">Pass Rate</p>
+                            <p class="text-lg font-semibold text-gray-900"><?php echo number_format($stats['pass_percentage'], 1); ?>%</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <form id="results-form" method="POST" class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No.</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Theory Marks
+                                    <br><span class="text-xs text-gray-400">(Max: <?php echo $subject['full_marks_theory'] ?? 100; ?>)</span>
+                                </th>
+                                <?php if (isset($subject['full_marks_practical']) && $subject['full_marks_practical'] > 0): ?>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Practical Marks
+                                    <br><span class="text-xs text-gray-400">(Max: <?php echo $subject['full_marks_practical']; ?>)</span>
+                                </th>
+                                <?php endif; ?>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <?php foreach ($students as $index => $student): ?>
+                            <tr class="result-row" id="student-row-<?php echo $index; ?>"
+                                data-theory-full-marks="<?php echo $subject['full_marks_theory'] ?? 100; ?>"
+                                data-practical-full-marks="<?php echo $subject['full_marks_practical'] ?? 0; ?>"
+                                data-theory-pass-marks="<?php echo $subject['pass_marks_theory'] ?? 33; ?>"
+                                data-practical-pass-marks="<?php echo $subject['pass_marks_practical'] ?? 0; ?>">
+                                
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($student['full_name']); ?></div>
+                                    <div class="text-sm text-gray-500">ID: <?php echo htmlspecialchars($student['student_id']); ?></div>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <?php echo htmlspecialchars($student['roll_number']); ?>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="number" 
+                                           name="theory_marks[<?php echo $index; ?>]" 
+                                           value="<?php echo $student['theory_marks'] ?? ''; ?>"
+                                           class="marks-input w-20 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           min="0" 
+                                           max="<?php echo $subject['full_marks_theory'] ?? 100; ?>"
+                                           step="0.01"
+                                           data-index="<?php echo $index; ?>"
+                                           onchange="validateMarks(this)"
+                                           onfocus="highlightRow(<?php echo $index; ?>)">
+                                </td>
+                                
+                                <?php if (isset($subject['full_marks_practical']) && $subject['full_marks_practical'] > 0): ?>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="number" 
+                                           name="practical_marks[<?php echo $index; ?>]" 
+                                           value="<?php echo $student['practical_marks'] ?? ''; ?>"
+                                           class="marks-input w-20 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           min="0" 
+                                           max="<?php echo $subject['full_marks_practical']; ?>"
+                                           step="0.01"
+                                           data-index="<?php echo $index; ?>"
+                                           onchange="validateMarks(this)"
+                                           onfocus="highlightRow(<?php echo $index; ?>)">
+                                </td>
+                                <?php endif; ?>
+                                
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <span id="total-marks-<?php echo $index; ?>"><?php echo number_format($student['total_marks'] ?? 0, 2); ?></span>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <span id="percentage-<?php echo $index; ?>"><?php echo number_format($student['percentage'] ?? 0, 2); ?>%</span>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <?php
+                                    $grade = $student['grade'] ?? 'F';
+                                    $grade_class = 'grade-' . strtolower(str_replace('+', '-plus', $grade));
+                                    ?>
+                                    <span id="grade-<?php echo $index; ?>" class="grade-badge <?php echo $grade_class; ?>">
+                                        <?php echo $grade; ?>
+                                    </span>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <?php
+                                    $remarks = $student['remarks'] ?? 'Fail';
+                                    $status_class = ($remarks === 'Pass') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                                    ?>
+                                    <span id="status-<?php echo $index; ?>" class="px-2 py-1 rounded-full text-xs <?php echo $status_class; ?>">
+                                        <?php echo $remarks; ?>
+                                    </span>
+                                </td>
+                                
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button type="button" 
+                                            onclick="editIndividualResult('<?php echo $student['result_id']; ?>', <?php echo $index; ?>)"
+                                            class="text-blue-600 hover:text-blue-900"
+                                            title="Quick Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </td>
+                                
+                                <!-- Hidden fields -->
+                                <input type="hidden" name="student_id[<?php echo $index; ?>]" value="<?php echo $student['student_id']; ?>">
+                                <input type="hidden" name="result_id[<?php echo $index; ?>]" value="<?php echo $student['result_id'] ?? ''; ?>">
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm text-gray-500">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                You can edit the results below. Use Tab or Enter to navigate between fields.
+                            </div>
+                            <button type="submit" 
+                                    name="save_results" 
+                                    id="save-button"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                <i class="fas fa-save mr-2"></i> Save All Results
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
             
             <?php endif; ?>          
             <?php endif; ?>
