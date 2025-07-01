@@ -1083,12 +1083,12 @@ function getRemarks($grade)
                                     <?php 
                                     // Calculate theory grade from marks
                                     if ($theory_full_marks > 0) {
-                                        if ($theory_percentage >= 90) echo 'A+';
-                                        elseif ($theory_percentage >= 80) echo 'A';
-                                        elseif ($theory_percentage >= 70) echo 'B+';
-                                        elseif ($theory_percentage >= 60) echo 'B';
-                                        elseif ($theory_percentage >= 50) echo 'C+';
-                                        elseif ($theory_percentage >= 40) echo 'C';
+                                        if ($theory_percentage >= 91) echo 'A+';
+                                        elseif ($theory_percentage >= 81) echo 'A';
+                                        elseif ($theory_percentage >= 71) echo 'B+';
+                                        elseif ($theory_percentage >= 61) echo 'B';
+                                        elseif ($theory_percentage >= 51) echo 'C+';
+                                        elseif ($theory_percentage >= 41) echo 'C';
                                         elseif ($theory_percentage >= 35) echo 'D';
                                         else echo 'NG';
                                     } else {
@@ -1189,12 +1189,12 @@ function getRemarks($grade)
                         <div class="simple-summary-value">
                             <?php
                             // Calculate grade based on percentage
-                            if ($percentage >= 90) echo 'A+';
-                            elseif ($percentage >= 80) echo 'A';
-                            elseif ($percentage >= 70) echo 'B+';
-                            elseif ($percentage >= 60) echo 'B';
-                            elseif ($percentage >= 50) echo 'C+';
-                            elseif ($percentage >= 40) echo 'C';
+                            if ($percentage >= 91) echo 'A+';
+                            elseif ($percentage >= 81) echo 'A';
+                            elseif ($percentage >= 71) echo 'B+';
+                            elseif ($percentage >= 61) echo 'B';
+                            elseif ($percentage >= 51) echo 'C+';
+                            elseif ($percentage >= 41) echo 'C';
                             elseif ($percentage >= 35) echo 'D';
                             else echo 'NG';
                             ?>

@@ -168,97 +168,100 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             border-color: #4a5568 !important;
         }
     </style>
-    
-    <script>
-    // Function to check if results already exist for exam and class combination
-    async function checkExistingResults(examId, classId = null, studentId = null) {
-        try {
-            const params = new URLSearchParams({
-                action: 'check_existing',
-                exam_id: examId
-            });
-            
-            if (classId) params.append('class_id', classId);
-            if (studentId) params.append('student_id', studentId);
-            
-            const response = await fetch('check_existing_results.php?' + params);
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error checking existing results:', error);
-            return { exists: false, error: true };
-        }
-    }
 
-    // Function to validate manual entry before submission
-    async function validateManualEntry() {
-        const studentId = document.getElementById('student_id').value;
-        const examId = document.getElementById('exam_id').value;
-        
-        if (!studentId || !examId) {
-            return true; // Let normal validation handle empty fields
+    <script>
+        // Function to check if results already exist for exam and class combination
+        async function checkExistingResults(examId, classId = null, studentId = null) {
+            try {
+                const params = new URLSearchParams({
+                    action: 'check_existing',
+                    exam_id: examId
+                });
+
+                if (classId) params.append('class_id', classId);
+                if (studentId) params.append('student_id', studentId);
+
+                const response = await fetch('check_existing_results.php?' + params);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error checking existing results:', error);
+                return {
+                    exists: false,
+                    error: true
+                };
+            }
         }
-        
-        const result = await checkExistingResults(examId, null, studentId);
-        
-        if (result.exists) {
-            const confirmed = await Swal.fire({
-                title: 'Results Already Exist!',
-                html: `Results for this student already exist for the selected exam:<br><br>
+
+        // Function to validate manual entry before submission
+        async function validateManualEntry() {
+            const studentId = document.getElementById('student_id').value;
+            const examId = document.getElementById('exam_id').value;
+
+            if (!studentId || !examId) {
+                return true; // Let normal validation handle empty fields
+            }
+
+            const result = await checkExistingResults(examId, null, studentId);
+
+            if (result.exists) {
+                const confirmed = await Swal.fire({
+                    title: 'Results Already Exist!',
+                    html: `Results for this student already exist for the selected exam:<br><br>
                        <strong>Student:</strong> ${result.student_name}<br>
                        <strong>Exam:</strong> ${result.exam_name}<br>
                        <strong>Existing Subjects:</strong> ${result.subjects.join(', ')}<br><br>
                        Do you want to update the existing results?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, Update Results',
-                cancelButtonText: 'Cancel'
-            });
-            
-            return confirmed.isConfirmed;
-        }
-        
-        return true;
-    }
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, Update Results',
+                    cancelButtonText: 'Cancel'
+                });
 
-    // Function to validate batch entry before submission
-    async function validateBatchEntry() {
-        const examId = document.getElementById('batch_exam_id').value;
-        const classId = document.getElementById('batch_class_id').value;
-        const subjectId = document.getElementById('batch_subject_id').value;
-        
-        if (!examId || !subjectId) {
-            return true; // Let normal validation handle empty fields
+                return confirmed.isConfirmed;
+            }
+
+            return true;
         }
-        
-        const result = await checkExistingResults(examId, classId);
-        
-        if (result.exists) {
-            const classInfo = classId ? ` for class ${result.class_name}` : '';
-            
-            const confirmed = await Swal.fire({
-                title: 'Results Already Exist!',
-                html: `Results already exist for the selected exam${classInfo}:<br><br>
+
+        // Function to validate batch entry before submission
+        async function validateBatchEntry() {
+            const examId = document.getElementById('batch_exam_id').value;
+            const classId = document.getElementById('batch_class_id').value;
+            const subjectId = document.getElementById('batch_subject_id').value;
+
+            if (!examId || !subjectId) {
+                return true; // Let normal validation handle empty fields
+            }
+
+            const result = await checkExistingResults(examId, classId);
+
+            if (result.exists) {
+                const classInfo = classId ? ` for class ${result.class_name}` : '';
+
+                const confirmed = await Swal.fire({
+                    title: 'Results Already Exist!',
+                    html: `Results already exist for the selected exam${classInfo}:<br><br>
                        <strong>Exam:</strong> ${result.exam_name}<br>
                        <strong>Subject:</strong> ${result.subject_name}<br>
                        ${classId ? `<strong>Class:</strong> ${result.class_name}<br>` : ''}
                        <strong>Affected Students:</strong> ${result.student_count}<br><br>
                        Do you want to update the existing results?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, Update Results',
-                cancelButtonText: 'Cancel'
-            });
-            
-            return confirmed.isConfirmed;
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, Update Results',
+                    cancelButtonText: 'Cancel'
+                });
+
+                return confirmed.isConfirmed;
+            }
+
+            return true;
         }
-        
-        return true;
-    }
     </script>
 </head>
 
@@ -526,21 +529,21 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                             </div>
                                                             <div class="sm:col-span-2">
                                                                 <label class="block text-sm font-medium text-gray-700">
-                                                                    Theory Marks 
+                                                                    Theory Marks
                                                                     <span class="theory-max-marks text-xs text-gray-500">(Max: 100)</span>
                                                                 </label>
-                                                                <input type="number" name="theory_marks[]" min="0" max="100" step="0.01" 
-                                                                       class="theory-marks mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                                                                       onchange="updateMarksDistribution(this)">
+                                                                <input type="number" name="theory_marks[]" min="0" max="100" step="0.01"
+                                                                    class="theory-marks mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                                                    onchange="updateMarksDistribution(this)">
                                                             </div>
                                                             <div class="sm:col-span-2">
                                                                 <label class="block text-sm font-medium text-gray-700">
-                                                                    Practical Marks 
+                                                                    Practical Marks
                                                                     <span class="practical-max-marks text-xs text-gray-500">(Max: 0)</span>
                                                                 </label>
-                                                                <input type="number" name="practical_marks[]" min="0" max="100" step="0.01" 
-                                                                       class="practical-marks mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                                                                       onchange="updateMarksDistribution(this)">
+                                                                <input type="number" name="practical_marks[]" min="0" max="100" step="0.01"
+                                                                    class="practical-marks mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                                                    onchange="updateMarksDistribution(this)">
                                                             </div>
                                                             <div class="sm:col-span-1">
                                                                 <label class="block text-sm font-medium text-gray-700">Total</label>
@@ -750,16 +753,16 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                                                 </select>
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                                <input type="number" name="students[0][theory_marks]" 
-                                                                       class="batch-theory-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                                                       min="0" max="100" step="0.01" required
-                                                                       onchange="updateBatchMarksDistribution(this)">
+                                                                <input type="number" name="students[0][theory_marks]"
+                                                                    class="batch-theory-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                    min="0" max="100" step="0.01" required
+                                                                    onchange="updateBatchMarksDistribution(this)">
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                                <input type="number" name="students[0][practical_marks]" 
-                                                                       class="batch-practical-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                                                       min="0" max="100" step="0.01"
-                                                                       onchange="updateBatchMarksDistribution(this)">
+                                                                <input type="number" name="students[0][practical_marks]"
+                                                                    class="batch-practical-marks w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                    min="0" max="100" step="0.01"
+                                                                    onchange="updateBatchMarksDistribution(this)">
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap">
                                                                 <input type="text" class="batch-total-marks w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md" readonly>
@@ -818,248 +821,248 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                         </div>
 
                         <!-- Manage Uploads Tab Content -->
-<div id="content-manage" class="tab-content <?php echo $activeTab == 'manage' ? 'active' : ''; ?>">
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold text-gray-800">Manage Result Uploads</h2>
-                <div class="flex space-x-2">
-                    <button id="bulkDeleteBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled onclick="bulkDelete()">
-                        <i class="fas fa-trash-alt mr-2"></i>Delete Selected
-                    </button>
-                    <a href="?tab=manage" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">
-                        <i class="fas fa-sync-alt mr-2"></i>Refresh
-                    </a>
-                </div>
-            </div>
-            
-            <?php if ($uploads && $uploads->num_rows == 0): ?>
-                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm text-yellow-700">
-                                No uploads found. If you've manually entered results, they should appear here.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            <?php endif; ?>
-            
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-3 py-3 text-left">
-                                <input type="checkbox" id="selectAll" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" onchange="toggleSelectAll()">
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                #
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Student Name
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Student ID
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Roll Number
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Exam
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Date
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Status
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Actions
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        <?php if ($uploads && $uploads->num_rows > 0): ?>
-                            <?php 
-                            $serial_number = 1;
-                            while ($row = $uploads->fetch_assoc()): 
-                                // Get all students associated with this upload
-                                $studentsInUpload = [];
-                                $studentQuery = "SELECT DISTINCT r.student_id, u.full_name, s.roll_number 
+                        <div id="content-manage" class="tab-content <?php echo $activeTab == 'manage' ? 'active' : ''; ?>">
+                            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                                <div class="p-6">
+                                    <div class="flex justify-between items-center mb-4">
+                                        <h2 class="text-lg font-semibold text-gray-800">Manage Result Uploads</h2>
+                                        <div class="flex space-x-2">
+                                            <button id="bulkDeleteBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled onclick="bulkDelete()">
+                                                <i class="fas fa-trash-alt mr-2"></i>Delete Selected
+                                            </button>
+                                            <a href="?tab=manage" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm">
+                                                <i class="fas fa-sync-alt mr-2"></i>Refresh
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <?php if ($uploads && $uploads->num_rows == 0): ?>
+                                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                                            <div class="flex">
+                                                <div class="flex-shrink-0">
+                                                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                                </div>
+                                                <div class="ml-3">
+                                                    <p class="text-sm text-yellow-700">
+                                                        No uploads found. If you've manually entered results, they should appear here.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-gray-200">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th scope="col" class="px-3 py-3 text-left">
+                                                        <input type="checkbox" id="selectAll" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" onchange="toggleSelectAll()">
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        #
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Student Name
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Student ID
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Roll Number
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Exam
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Date
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Status
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Actions
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
+                                                <?php if ($uploads && $uploads->num_rows > 0): ?>
+                                                    <?php
+                                                    $serial_number = 1;
+                                                    while ($row = $uploads->fetch_assoc()):
+                                                        // Get all students associated with this upload
+                                                        $studentsInUpload = [];
+                                                        $studentQuery = "SELECT DISTINCT r.student_id, u.full_name, s.roll_number 
                                                FROM results r 
                                                JOIN students s ON r.student_id = s.student_id 
                                                JOIN users u ON s.user_id = u.user_id 
                                                WHERE r.upload_id = ? 
                                                ORDER BY u.full_name";
-                                $stmt = $conn->prepare($studentQuery);
-                                $stmt->bind_param("i", $row['id']);
-                                $stmt->execute();
-                                $studentResult = $stmt->get_result();
-                                
-                                while ($student = $studentResult->fetch_assoc()) {
-                                    $studentsInUpload[] = $student;
-                                }
-                                $stmt->close();
-                                
-                                // If students exist, create separate rows for each
-                                if (count($studentsInUpload) > 0):
-                                    foreach ($studentsInUpload as $student):
-                            ?>
-                                        <tr class="hover:bg-gray-50">
-                                            <td class="px-3 py-4 whitespace-nowrap">
-                                                <input type="checkbox" class="student-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" 
-                                                       value="<?php echo $row['id']; ?>_<?php echo $student['student_id']; ?>" 
-                                                       data-upload-id="<?php echo $row['id']; ?>" 
-                                                       data-student-id="<?php echo $student['student_id']; ?>"
-                                                       onchange="updateBulkDeleteButton()">
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                <?php echo $serial_number++; ?>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($student['full_name']); ?></div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <?php echo htmlspecialchars($student['student_id']); ?>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <?php echo htmlspecialchars($student['roll_number'] ?? 'N/A'); ?>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <?php echo date('M d, Y', strtotime($row['upload_date'])); ?>
-                                                <div class="text-xs text-gray-400"><?php echo date('h:i A', strtotime($row['upload_date'])); ?></div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
-                                                    <?php echo htmlspecialchars($row['status']); ?>
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <div class="flex space-x-2">
-                                                    <a href="view_upload.php?id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>" 
-                                                       class="text-blue-600 hover:text-blue-900 text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded" 
-                                                       title="View Results">
-                                                        <i class="fas fa-eye"></i> View
-                                                    </a>
-                                                    <button onclick="deleteStudentResult(<?php echo $row['id']; ?>, '<?php echo $student['student_id']; ?>', '<?php echo htmlspecialchars($student['full_name']); ?>')" 
-                                                            class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded" 
-                                                            title="Delete Results">
-                                                        <i class="fas fa-trash-alt"></i> Delete
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                            <?php 
-                                    endforeach;
-                                else:
-                                    // Fallback for uploads with no associated students
-                            ?>
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-3 py-4 whitespace-nowrap">
-                                            <input type="checkbox" class="student-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" 
-                                                   value="<?php echo $row['id']; ?>_no_student" 
-                                                   data-upload-id="<?php echo $row['id']; ?>"
-                                                   onchange="updateBulkDeleteButton()">
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            <?php echo $serial_number++; ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                                            No students found
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">-</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">-</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <?php echo date('M d, Y', strtotime($row['upload_date'])); ?>
-                                            <div class="text-xs text-gray-400"><?php echo date('h:i A', strtotime($row['upload_date'])); ?></div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
-                                                <?php echo htmlspecialchars($row['status']); ?>
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <div class="flex space-x-2">
-                                                <a href="view_upload.php?id=<?php echo $row['id']; ?>" 
-                                                   class="text-blue-600 hover:text-blue-900 text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded" 
-                                                   title="View Upload">
-                                                    <i class="fas fa-eye"></i> View
-                                                </a>
-                                                <button onclick="deleteUpload(<?php echo $row['id']; ?>)" 
-                                                        class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded" 
-                                                        title="Delete Upload">
-                                                    <i class="fas fa-trash-alt"></i> Delete
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                            <?php endif; ?>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center" colspan="9">
-                                    No result uploads found.
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Bulk Actions Info -->
-            <div class="mt-4 text-sm text-gray-500">
-                <p><i class="fas fa-info-circle mr-1"></i> Select multiple entries using checkboxes to delete them in bulk.</p>
-            </div>
-        </div>
-    </div>
-</div>
+                                                        $stmt = $conn->prepare($studentQuery);
+                                                        $stmt->bind_param("i", $row['id']);
+                                                        $stmt->execute();
+                                                        $studentResult = $stmt->get_result();
 
-    <script>
-        // Tab functionality
-        function showTab(tabId) {
-            const tabContents = document.querySelectorAll('.tab-content');
-            const tabButtons = document.querySelectorAll('.tab-button');
+                                                        while ($student = $studentResult->fetch_assoc()) {
+                                                            $studentsInUpload[] = $student;
+                                                        }
+                                                        $stmt->close();
 
-            tabContents.forEach(content => {
-                content.classList.remove('active');
-            });
+                                                        // If students exist, create separate rows for each
+                                                        if (count($studentsInUpload) > 0):
+                                                            foreach ($studentsInUpload as $student):
+                                                    ?>
+                                                                <tr class="hover:bg-gray-50">
+                                                                    <td class="px-3 py-4 whitespace-nowrap">
+                                                                        <input type="checkbox" class="student-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                                                                            value="<?php echo $row['id']; ?>_<?php echo $student['student_id']; ?>"
+                                                                            data-upload-id="<?php echo $row['id']; ?>"
+                                                                            data-student-id="<?php echo $student['student_id']; ?>"
+                                                                            onchange="updateBulkDeleteButton()">
+                                                                    </td>
+                                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                                        <?php echo $serial_number++; ?>
+                                                                    </td>
+                                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                                        <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($student['full_name']); ?></div>
+                                                                    </td>
+                                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                        <?php echo htmlspecialchars($student['student_id']); ?>
+                                                                    </td>
+                                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                        <?php echo htmlspecialchars($student['roll_number'] ?? 'N/A'); ?>
+                                                                    </td>
+                                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                        <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
+                                                                    </td>
+                                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                        <?php echo date('M d, Y', strtotime($row['upload_date'])); ?>
+                                                                        <div class="text-xs text-gray-400"><?php echo date('h:i A', strtotime($row['upload_date'])); ?></div>
+                                                                    </td>
+                                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
+                                                                            <?php echo htmlspecialchars($row['status']); ?>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                        <div class="flex space-x-2">
+                                                                            <a href="view_upload.php?id=<?php echo $row['id']; ?>&student_id=<?php echo $student['student_id']; ?>"
+                                                                                class="text-blue-600 hover:text-blue-900 text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
+                                                                                title="View Results">
+                                                                                <i class="fas fa-eye"></i> View
+                                                                            </a>
+                                                                            <button onclick="deleteStudentResult(<?php echo $row['id']; ?>, '<?php echo $student['student_id']; ?>', '<?php echo htmlspecialchars($student['full_name']); ?>')"
+                                                                                class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded"
+                                                                                title="Delete Results">
+                                                                                <i class="fas fa-trash-alt"></i> Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            <?php
+                                                            endforeach;
+                                                        else:
+                                                            // Fallback for uploads with no associated students
+                                                            ?>
+                                                            <tr class="hover:bg-gray-50">
+                                                                <td class="px-3 py-4 whitespace-nowrap">
+                                                                    <input type="checkbox" class="student-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                                                                        value="<?php echo $row['id']; ?>_no_student"
+                                                                        data-upload-id="<?php echo $row['id']; ?>"
+                                                                        onchange="updateBulkDeleteButton()">
+                                                                </td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                                    <?php echo $serial_number++; ?>
+                                                                </td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                                                    No students found
+                                                                </td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">-</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">-</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                    <?php echo htmlspecialchars($row['exam_name'] ?? 'N/A'); ?>
+                                                                </td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                    <?php echo date('M d, Y', strtotime($row['upload_date'])); ?>
+                                                                    <div class="text-xs text-gray-400"><?php echo date('h:i A', strtotime($row['upload_date'])); ?></div>
+                                                                </td>
+                                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-100 text-<?php echo $row['status'] == 'Published' ? 'green' : 'yellow'; ?>-800">
+                                                                        <?php echo htmlspecialchars($row['status']); ?>
+                                                                    </span>
+                                                                </td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                    <div class="flex space-x-2">
+                                                                        <a href="view_upload.php?id=<?php echo $row['id']; ?>"
+                                                                            class="text-blue-600 hover:text-blue-900 text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
+                                                                            title="View Upload">
+                                                                            <i class="fas fa-eye"></i> View
+                                                                        </a>
+                                                                        <button onclick="deleteUpload(<?php echo $row['id']; ?>)"
+                                                                            class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded"
+                                                                            title="Delete Upload">
+                                                                            <i class="fas fa-trash-alt"></i> Delete
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        <?php endif; ?>
+                                                    <?php endwhile; ?>
+                                                <?php else: ?>
+                                                    <tr>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center" colspan="9">
+                                                            No result uploads found.
+                                                        </td>
+                                                    </tr>
+                                                <?php endif; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
 
-            tabButtons.forEach(button => {
-                button.classList.remove('active');
-            });
+                                    <!-- Bulk Actions Info -->
+                                    <div class="mt-4 text-sm text-gray-500">
+                                        <p><i class="fas fa-info-circle mr-1"></i> Select multiple entries using checkboxes to delete them in bulk.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-            document.getElementById('content-' + tabId).classList.add('active');
-            document.getElementById('tab-' + tabId).classList.add('active');
+                        <script>
+                            // Tab functionality
+                            function showTab(tabId) {
+                                const tabContents = document.querySelectorAll('.tab-content');
+                                const tabButtons = document.querySelectorAll('.tab-button');
 
-            // Update URL with tab parameter
-            const url = new URL(window.location.href);
-            url.searchParams.set('tab', tabId);
-            window.history.replaceState({}, '', url);
-        }
+                                tabContents.forEach(content => {
+                                    content.classList.remove('active');
+                                });
 
-        // Add student row in batch entry
-        let studentRowCount = 1;
-        document.getElementById('add-student-row').addEventListener('click', function() {
-            const container = document.getElementById('batch-students-container');
-            const newRow = document.createElement('tr');
+                                tabButtons.forEach(button => {
+                                    button.classList.remove('active');
+                                });
 
-            // Get the HTML content of the first student row
-            const firstRow = container.querySelector('tr');
-            const studentSelectHTML = firstRow.querySelector('td:first-child select').outerHTML;
+                                document.getElementById('content-' + tabId).classList.add('active');
+                                document.getElementById('tab-' + tabId).classList.add('active');
 
-            // Replace the name attribute to use the new index
-            const updatedStudentSelectHTML = studentSelectHTML.replace(/students\[0\]/g, `students[${studentRowCount}]`);
+                                // Update URL with tab parameter
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('tab', tabId);
+                                window.history.replaceState({}, '', url);
+                            }
 
-            newRow.innerHTML = `
+                            // Add student row in batch entry
+                            let studentRowCount = 1;
+                            document.getElementById('add-student-row').addEventListener('click', function() {
+                                const container = document.getElementById('batch-students-container');
+                                const newRow = document.createElement('tr');
+
+                                // Get the HTML content of the first student row
+                                const firstRow = container.querySelector('tr');
+                                const studentSelectHTML = firstRow.querySelector('td:first-child select').outerHTML;
+
+                                // Replace the name attribute to use the new index
+                                const updatedStudentSelectHTML = studentSelectHTML.replace(/students\[0\]/g, `students[${studentRowCount}]`);
+
+                                newRow.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap">
                     ${updatedStudentSelectHTML}
                 </td>
@@ -1081,129 +1084,154 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                 </td>
             `;
 
-            container.appendChild(newRow);
-            studentRowCount++;
-        });
+                                container.appendChild(newRow);
+                                studentRowCount++;
+                            });
 
-        // Add Subject Row
-        document.getElementById('addSubject').addEventListener('click', function() {
-            const container = document.getElementById('subjectsContainer');
-            const subjectRow = document.querySelector('.subject-row').cloneNode(true);
+                            // Add Subject Row
+                            document.getElementById('addSubject').addEventListener('click', function() {
+                                const container = document.getElementById('subjectsContainer');
+                                const subjectRow = document.querySelector('.subject-row').cloneNode(true);
 
-            // Clear input values
-            subjectRow.querySelectorAll('input').forEach(input => {
-                input.value = '';
-            });
+                                // Clear input values
+                                subjectRow.querySelectorAll('input').forEach(input => {
+                                    input.value = '';
+                                });
 
-            // Reset select
-            subjectRow.querySelector('select').selectedIndex = 0;
-            
-            // Reset max marks display
-            subjectRow.querySelector('.theory-max-marks').textContent = '(Max: 100)';
-            subjectRow.querySelector('.practical-max-marks').textContent = '(Max: 0)';
-            subjectRow.querySelector('.theory-marks').max = 100;
-            subjectRow.querySelector('.practical-marks').max = 100;
+                                // Reset select
+                                subjectRow.querySelector('select').selectedIndex = 0;
 
-            // Add event listeners for marks distribution
-            subjectRow.querySelector('.theory-marks').addEventListener('change', function() {
-                updateMarksDistribution(this);
-            });
-            
-            subjectRow.querySelector('.practical-marks').addEventListener('change', function() {
-                updateMarksDistribution(this);
-            });
+                                // Reset max marks display
+                                subjectRow.querySelector('.theory-max-marks').textContent = '(Max: 100)';
+                                subjectRow.querySelector('.practical-max-marks').textContent = '(Max: 0)';
+                                subjectRow.querySelector('.theory-marks').max = 100;
+                                subjectRow.querySelector('.practical-marks').max = 100;
 
-            // Add event listener to remove button
-            subjectRow.querySelector('.remove-subject').addEventListener('click', function() {
-                if (container.children.length > 1) {
-                    this.closest('.subject-row').remove();
-                }
-            });
+                                // Add event listeners for marks distribution
+                                subjectRow.querySelector('.theory-marks').addEventListener('change', function() {
+                                    updateMarksDistribution(this);
+                                });
 
-            container.appendChild(subjectRow);
-        });
+                                subjectRow.querySelector('.practical-marks').addEventListener('change', function() {
+                                    updateMarksDistribution(this);
+                                });
 
-        // Initialize event listeners
-        document.addEventListener('DOMContentLoaded', function() {
-            // Add event listener to initial remove button
-            document.querySelector('.remove-subject').addEventListener('click', function() {
-                const container = document.getElementById('subjectsContainer');
-                if (container.children.length > 1) {
-                    this.closest('.subject-row').remove();
-                }
-            });
+                                // Add event listener to remove button
+                                subjectRow.querySelector('.remove-subject').addEventListener('click', function() {
+                                    if (container.children.length > 1) {
+                                        this.closest('.subject-row').remove();
+                                    }
+                                });
 
-            // Student selection from search results
-            document.querySelectorAll('.select-student').forEach(button => {
-                button.addEventListener('click', function() {
-                    const studentId = this.getAttribute('data-id');
-                    const studentName = this.getAttribute('data-name');
-                    const studentRoll = this.getAttribute('data-roll');
-                    const studentClass = this.getAttribute('data-class');
+                                container.appendChild(subjectRow);
+                            });
 
-                    document.getElementById('student_id').value = studentId;
-                    document.getElementById('student_name').value = studentName;
-                    document.getElementById('student_roll').value = studentRoll;
-                    document.getElementById('student_class').value = studentClass;
-                });
-            });
+                            // Initialize event listeners
+                            document.addEventListener('DOMContentLoaded', function() {
+                                // Add event listener to initial remove button
+                                document.querySelector('.remove-subject').addEventListener('click', function() {
+                                    const container = document.getElementById('subjectsContainer');
+                                    if (container.children.length > 1) {
+                                        this.closest('.subject-row').remove();
+                                    }
+                                });
 
-            // Preview Results
-            document.getElementById('previewButton').addEventListener('click', function() {
-                const previewSection = document.getElementById('previewSection');
-                const previewBody = document.getElementById('previewBody');
-                const previewTotal = document.getElementById('previewTotal');
-                const previewPercentage = document.getElementById('previewPercentage');
-                const previewResult = document.getElementById('previewResult');
+                                // Student selection from search results
+                                document.querySelectorAll('.select-student').forEach(button => {
+                                    button.addEventListener('click', function() {
+                                        const studentId = this.getAttribute('data-id');
+                                        const studentName = this.getAttribute('data-name');
+                                        const studentRoll = this.getAttribute('data-roll');
+                                        const studentClass = this.getAttribute('data-class');
 
-                // Clear previous preview
-                previewBody.innerHTML = '';
+                                        document.getElementById('student_id').value = studentId;
+                                        document.getElementById('student_name').value = studentName;
+                                        document.getElementById('student_roll').value = studentRoll;
+                                        document.getElementById('student_class').value = studentClass;
+                                    });
+                                });
 
-                // Get all subject rows
-                const subjectRows = document.querySelectorAll('.subject-row');
+                                // Preview Results
+                                document.getElementById('previewButton').addEventListener('click', function() {
+                                    const previewSection = document.getElementById('previewSection');
+                                    const previewBody = document.getElementById('previewBody');
+                                    const previewTotal = document.getElementById('previewTotal');
+                                    const previewPercentage = document.getElementById('previewPercentage');
+                                    const previewResult = document.getElementById('previewResult');
 
-                let totalMarks = 0;
-                let totalSubjects = 0;
-                let validSubjects = 0;
+                                    // Clear previous preview
+                                    previewBody.innerHTML = '';
 
-                // Process each subject
-                subjectRows.forEach(row => {
-                    const subjectSelect = row.querySelector('select[name="subject_id[]"]');
-                    const theoryInput = row.querySelector('input[name="theory_marks[]"]');
-                    const practicalInput = row.querySelector('input[name="practical_marks[]"]');
+                                    // Get all subject rows
+                                    const subjectRows = document.querySelectorAll('.subject-row');
 
-                    if (subjectSelect.value && (theoryInput.value || practicalInput.value)) {
-                        const subjectName = subjectSelect.options[subjectSelect.selectedIndex].text;
-                        const theory = parseFloat(theoryInput.value) || 0;
-                        const practical = parseFloat(practicalInput.value) || 0;
-                        const total = theory + practical;
+                                    let totalMarks = 0;
+                                    let totalSubjects = 0;
+                                    let validSubjects = 0;
 
-                        // Calculate grade point based on percentage
-                        const percentage = (total / 100) * 100;
-                        let gradePoint = 0;
+                                    // Process each subject
+                                    subjectRows.forEach(row => {
+                                        const subjectSelect = row.querySelector('select[name="subject_id[]"]');
+                                        const theoryInput = row.querySelector('input[name="theory_marks[]"]');
+                                        const practicalInput = row.querySelector('input[name="practical_marks[]"]');
 
-                        if (percentage >= 91) {
-                            gradePoint = 3.8;
-                        } else if (percentage >= 81) {
-                            gradePoint = 3.4;
-                        } else if (percentage >= 71) {
-                            gradePoint = 3.0;
-                        } else if (percentage >= 61) {
-                            gradePoint = 2.7;
-                        } else if (percentage >= 51) {
-                            gradePoint = 2.4;
-                        } else if (percentage >= 41) {
-                            gradePoint = 1.9;
-                        } else if (percentage >= 35) {
-                            gradePoint = 1.6;
-                        } else {
-                            gradePoint = 0.0;
-                        }
+                                        if (subjectSelect.value && (theoryInput.value || practicalInput.value)) {
+                                            const subjectName = subjectSelect.options[subjectSelect.selectedIndex].text;
+                                            const theory = parseFloat(theoryInput.value) || 0;
+                                            const practical = parseFloat(practicalInput.value) || 0;
+                                            const total = theory + practical;
 
-                        // Create table row - show blank for practical if empty
-                        const practicalDisplay = practicalInput.value === '' ? '' : practical;
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
+                                            // Calculate grade point based on percentage
+                                            const percentage = (total / 100) * 100;
+                                            let gradePoint = 0;
+
+                                            // if (percentage >= 91) {
+                                            //     gradePoint = 3.8;
+                                            // } else if (percentage >= 81) {
+                                            //     gradePoint = 3.4;
+                                            // } else if (percentage >= 71) {
+                                            //     gradePoint = 3.0;
+                                            // } else if (percentage >= 61) {
+                                            //     gradePoint = 2.7;
+                                            // } else if (percentage >= 51) {
+                                            //     gradePoint = 2.4;
+                                            // } else if (percentage >= 41) {
+                                            //     gradePoint = 1.9;
+                                            // } else if (percentage >= 35) {
+                                            //     gradePoint = 1.6;
+                                            // } else {
+                                            //     gradePoint = 0.0;
+                                            // }
+                                            if (percentage >= 91) {
+                                                gradePoint = 3.8;
+                                                grade = 'A+';
+                                            } else if (percentage >= 81) {
+                                                gradePoint = 3.4;
+                                                grade = 'A';
+                                            } else if (percentage >= 71) {
+                                                gradePoint = 3.0;
+                                                grade = 'B+';
+                                            } else if (percentage >= 61) {
+                                                gradePoint = 2.7;
+                                                grade = 'B';
+                                            } else if (percentage >= 51) {
+                                                gradePoint = 2.4;
+                                                grade = 'C+';
+                                            } else if (percentage >= 41) {
+                                                gradePoint = 1.9;
+                                                grade = 'C';
+                                            } else if (percentage >= 35) {
+                                                gradePoint = 1.6;
+                                                grade = 'D';
+                                            } else {
+                                                gradePoint = 0.0;
+                                                grade = 'NG';
+                                            }
+
+                                            // Create table row - show blank for practical if empty
+                                            const practicalDisplay = practicalInput.value === '' ? '' : practical;
+                                            const tr = document.createElement('tr');
+                                            tr.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${subjectName}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${theory}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${practicalDisplay}</td>
@@ -1215,56 +1243,56 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                             </td>
                         `;
 
-                        previewBody.appendChild(tr);
+                                            previewBody.appendChild(tr);
 
-                        totalMarks += total;
-                        validSubjects++;
-                    }
+                                            totalMarks += total;
+                                            validSubjects++;
+                                        }
 
-                    totalSubjects++;
-                });
+                                        totalSubjects++;
+                                    });
 
-                // Update summary
-                if (validSubjects > 0) {
-                    const percentage = (totalMarks / (validSubjects * 100)) * 100;
-                    previewTotal.textContent = totalMarks;
-                    previewPercentage.textContent = percentage.toFixed(2) + '%';
-                    previewResult.textContent = percentage >= 35 ? 'PASS' : 'FAIL';
-                    previewResult.className = percentage >= 35 ? 'px-6 py-3 text-left text-sm font-medium text-green-600' : 'px-6 py-3 text-left text-sm font-medium text-red-600';
+                                    // Update summary
+                                    if (validSubjects > 0) {
+                                        const percentage = (totalMarks / (validSubjects * 100)) * 100;
+                                        previewTotal.textContent = totalMarks;
+                                        previewPercentage.textContent = percentage.toFixed(2) + '%';
+                                        previewResult.textContent = percentage >= 35 ? 'PASS' : 'FAIL';
+                                        previewResult.className = percentage >= 35 ? 'px-6 py-3 text-left text-sm font-medium text-green-600' : 'px-6 py-3 text-left text-sm font-medium text-red-600';
 
-                    // Show preview section
-                    previewSection.classList.remove('hidden');
-                } else {
-                    alert('Please enter marks for at least one subject.');
-                }
-            });
+                                        // Show preview section
+                                        previewSection.classList.remove('hidden');
+                                    } else {
+                                        alert('Please enter marks for at least one subject.');
+                                    }
+                                });
 
-            // Filter students by class in batch entry
-            document.getElementById('batch_class_id').addEventListener('change', function() {
-                const classId = this.value;
-                if (!classId) return;
+                                // Filter students by class in batch entry
+                                document.getElementById('batch_class_id').addEventListener('change', function() {
+                                    const classId = this.value;
+                                    if (!classId) return;
 
-                // Fetch students via AJAX
-                fetch(`get_students_by_class.php?class_id=${classId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const container = document.getElementById('batch-students-container');
-                        container.innerHTML = '';
+                                    // Fetch students via AJAX
+                                    fetch(`get_students_by_class.php?class_id=${classId}`)
+                                        .then(response => response.json())
+                                        .then(data => {
+                                            const container = document.getElementById('batch-students-container');
+                                            container.innerHTML = '';
 
-                        if (data.length === 0) {
-                            container.innerHTML = `
+                                            if (data.length === 0) {
+                                                container.innerHTML = `
                                 <tr>
                                     <td colspan="5" class="px-6 py-4 text-center text-gray-500">
                                         No students found in this class.
                                     </td>
                                 </tr>
                             `;
-                            return;
-                        }
+                                                return;
+                                            }
 
-                        data.forEach((student, index) => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
+                                            data.forEach((student, index) => {
+                                                const row = document.createElement('tr');
+                                                row.innerHTML = `
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <select name="students[${index}][student_id]" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                                         <option value="${student.student_id}">${student.full_name} (${student.student_id})</option>
@@ -1287,394 +1315,395 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                                     </button>
                                 </td>
                             `;
-                            container.appendChild(row);
-                        });
+                                                container.appendChild(row);
+                                            });
 
-                        // Update student row count
-                        studentRowCount = data.length;
-                    })
-                    .catch(error => {
-                        console.error('Error fetching students:', error);
-                        alert('Failed to load students. Please try again.');
-                    });
-            });
+                                            // Update student row count
+                                            studentRowCount = data.length;
+                                        })
+                                        .catch(error => {
+                                            console.error('Error fetching students:', error);
+                                            alert('Failed to load students. Please try again.');
+                                        });
+                                });
 
-            // Mobile sidebar toggle
-            const sidebarToggle = document.getElementById('sidebar-toggle');
-            if (sidebarToggle) {
-                sidebarToggle.addEventListener('click', function() {
-                    document.getElementById('mobile-sidebar').classList.remove('-translate-x-full');
-                });
-            }
+                                // Mobile sidebar toggle
+                                const sidebarToggle = document.getElementById('sidebar-toggle');
+                                if (sidebarToggle) {
+                                    sidebarToggle.addEventListener('click', function() {
+                                        document.getElementById('mobile-sidebar').classList.remove('-translate-x-full');
+                                    });
+                                }
 
-            const closeSidebar = document.getElementById('close-sidebar');
-            if (closeSidebar) {
-                closeSidebar.addEventListener('click', function() {
-                    document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
-                });
-            }
+                                const closeSidebar = document.getElementById('close-sidebar');
+                                if (closeSidebar) {
+                                    closeSidebar.addEventListener('click', function() {
+                                        document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
+                                    });
+                                }
 
-            const sidebarBackdrop = document.getElementById('sidebar-backdrop');
-            if (sidebarBackdrop) {
-                sidebarBackdrop.addEventListener('click', function() {
-                    document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
-                });
-            }
+                                const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+                                if (sidebarBackdrop) {
+                                    sidebarBackdrop.addEventListener('click', function() {
+                                        document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
+                                    });
+                                }
 
-            // Add event delegation for delete student row buttons
-            document.addEventListener('click', function(e) {
-                if (e.target.closest('.delete-student-row')) {
-                    const row = e.target.closest('tr');
-                    const container = document.getElementById('batch-students-container');
-                    
-                    // Only delete if there's more than one row
-                    if (container.querySelectorAll('tr').length > 1) {
-                        row.remove();
-                    } else {
-                        alert('You must have at least one student row.');
-                    }
-                }
-            });
+                                // Add event delegation for delete student row buttons
+                                document.addEventListener('click', function(e) {
+                                    if (e.target.closest('.delete-student-row')) {
+                                        const row = e.target.closest('tr');
+                                        const container = document.getElementById('batch-students-container');
 
-            // Form submission validation
-            document.getElementById('resultForm').addEventListener('submit', async function(e) {
-                e.preventDefault();
-                
-                const isValid = await validateManualEntry();
-                if (isValid) {
-                    this.submit();
-                }
-            });
+                                        // Only delete if there's more than one row
+                                        if (container.querySelectorAll('tr').length > 1) {
+                                            row.remove();
+                                        } else {
+                                            alert('You must have at least one student row.');
+                                        }
+                                    }
+                                });
 
-            // Batch form submission validation
-            document.querySelector('#content-batch form').addEventListener('submit', async function(e) {
-                e.preventDefault();
-                
-                const isValid = await validateBatchEntry();
-                if (isValid) {
-                    this.submit();
-                }
-            });
-        });
-    </script>
-    
-    <script>
-        // Function to update marks distribution for manual entry
-        function updateMarksDistribution(input) {
-            const row = input.closest('.subject-row');
-            const theoryInput = row.querySelector('.theory-marks');
-            const practicalInput = row.querySelector('.practical-marks');
-            const totalInput = row.querySelector('.total-marks');
-            const theoryMaxSpan = row.querySelector('.theory-max-marks');
-            const practicalMaxSpan = row.querySelector('.practical-max-marks');
-            
-            const theoryValue = parseFloat(theoryInput.value) || 0;
-            const practicalValue = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
-            
-            // Determine marks distribution
-            if (theoryValue > 0 && practicalInput.value !== '' && practicalValue > 0) {
-                // Both theory and practical provided - distribute as 75:25
-                theoryInput.max = 75;
-                practicalInput.max = 25;
-                theoryMaxSpan.textContent = '(Max: 75)';
-                practicalMaxSpan.textContent = '(Max: 25)';
-                
-                // Validate current values
-                if (theoryValue > 75) {
-                    theoryInput.value = 75;
-                    alert('Theory marks cannot exceed 75 when practical marks are provided.');
-                }
-                if (practicalValue > 25) {
-                    practicalInput.value = 25;
-                    alert('Practical marks cannot exceed 25 when theory marks are provided.');
-                }
-            } else if (theoryValue > 0 && (practicalInput.value === '' || practicalValue === 0)) {
-                // Only theory provided or practical is blank - allow up to 100 for theory
-                theoryInput.max = 100;
-                practicalInput.max = 0;
-                theoryMaxSpan.textContent = '(Max: 100)';
-                practicalMaxSpan.textContent = '(Max: 0)';
-                // Don't clear practical marks if user left it blank intentionally
-            } else if (theoryValue === 0 && practicalValue > 0) {
-                // Only practical provided - not allowed, reset
-                alert('Practical marks cannot be entered without theory marks.');
-                practicalInput.value = '';
-                return;
-            } else {
-                // Reset to default
-                theoryInput.max = 100;
-                practicalInput.max = 100;
-                theoryMaxSpan.textContent = '(Max: 100)';
-                practicalMaxSpan.textContent = '(Max: 0)';
-            }
-            
-            // Calculate total - treat blank practical as 0 for calculation
-            const finalTheory = parseFloat(theoryInput.value) || 0;
-            const finalPractical = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
-            totalInput.value = finalTheory + finalPractical;
-        }
+                                // Form submission validation
+                                document.getElementById('resultForm').addEventListener('submit', async function(e) {
+                                    e.preventDefault();
 
-        // Function to update marks distribution for batch entry
-        function updateBatchMarksDistribution(input) {
-            const row = input.closest('tr');
-            const theoryInput = row.querySelector('.batch-theory-marks');
-            const practicalInput = row.querySelector('.batch-practical-marks');
-            const totalInput = row.querySelector('.batch-total-marks');
-            
-            const theoryValue = parseFloat(theoryInput.value) || 0;
-            const practicalValue = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
-            
-            // Update header max values
-            const theoryMaxSpan = document.querySelector('.batch-theory-max');
-            const practicalMaxSpan = document.querySelector('.batch-practical-max');
-            
-            // Determine marks distribution
-            if (theoryValue > 0 && practicalInput.value !== '' && practicalValue > 0) {
-                // Both theory and practical provided - distribute as 75:25
-                theoryInput.max = 75;
-                practicalInput.max = 25;
-                theoryMaxSpan.textContent = '(Max: 75)';
-                practicalMaxSpan.textContent = '(Max: 25)';
-                
-                // Validate current values
-                if (theoryValue > 75) {
-                    theoryInput.value = 75;
-                    alert('Theory marks cannot exceed 75 when practical marks are provided.');
-                }
-                if (practicalValue > 25) {
-                    practicalInput.value = 25;
-                    alert('Practical marks cannot exceed 25 when theory marks are provided.');
-                }
-            } else if (theoryValue > 0 && (practicalInput.value === '' || practicalValue === 0)) {
-                // Only theory provided or practical is blank - allow up to 100 for theory
-                theoryInput.max = 100;
-                practicalInput.max = 0;
-                theoryMaxSpan.textContent = '(Max: 100)';
-                practicalMaxSpan.textContent = '(Max: 0)';
-                // Don't clear practical marks if user left it blank intentionally
-            } else if (theoryValue === 0 && practicalValue > 0) {
-                // Only practical provided - not allowed, reset
-                alert('Practical marks cannot be entered without theory marks.');
-                practicalInput.value = '';
-                return;
-            } else {
-                // Reset to default
-                theoryInput.max = 100;
-                practicalInput.max = 100;
-                theoryMaxSpan.textContent = '(Max: 100)';
-                practicalMaxSpan.textContent = '(Max: 0)';
-            }
-            
-            // Calculate total - treat blank practical as 0 for calculation
-            const finalTheory = parseFloat(theoryInput.value) || 0;
-            const finalPractical = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
-            totalInput.value = finalTheory + finalPractical;
-            
-            // Update all other rows in batch entry to maintain consistency
-            updateAllBatchRows();
-        }
+                                    const isValid = await validateManualEntry();
+                                    if (isValid) {
+                                        this.submit();
+                                    }
+                                });
 
-        // Function to update all batch entry rows with consistent max values
-        function updateAllBatchRows() {
-            const container = document.getElementById('batch-students-container');
-            const rows = container.querySelectorAll('tr');
-            const theoryMaxSpan = document.querySelector('.batch-theory-max');
-            const practicalMaxSpan = document.querySelector('.batch-practical-max');
-            
-            // Get max values from header
-            const theoryMax = theoryMaxSpan.textContent.includes('75') ? 75 : 100;
-            const practicalMax = practicalMaxSpan.textContent.includes('25') ? 25 : 0;
-            
-            rows.forEach(row => {
-                const theoryInput = row.querySelector('.batch-theory-marks');
-                const practicalInput = row.querySelector('.batch-practical-marks');
-                
-                if (theoryInput && practicalInput) {
-                    theoryInput.max = theoryMax;
-                    practicalInput.max = practicalMax;
-                    
-                    if (practicalMax === 0) {
-                        // Don't clear the value, just disable if max is 0
-                        practicalInput.disabled = true;
-                    } else {
-                        practicalInput.disabled = false;
-                    }
-                }
-            });
-        }
-    </script>
-    
-    <script>
-// Bulk delete functionality
-function toggleSelectAll() {
-    const selectAllCheckbox = document.getElementById('selectAll');
-    const studentCheckboxes = document.querySelectorAll('.student-checkbox');
-    
-    studentCheckboxes.forEach(checkbox => {
-        checkbox.checked = selectAllCheckbox.checked;
-    });
-    
-    updateBulkDeleteButton();
-}
+                                // Batch form submission validation
+                                document.querySelector('#content-batch form').addEventListener('submit', async function(e) {
+                                    e.preventDefault();
 
-function updateBulkDeleteButton() {
-    const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
-    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-    
-    if (selectedCheckboxes.length > 0) {
-        bulkDeleteBtn.disabled = false;
-        bulkDeleteBtn.innerHTML = `<i class="fas fa-trash-alt mr-2"></i>Delete Selected (${selectedCheckboxes.length})`;
-    } else {
-        bulkDeleteBtn.disabled = true;
-        bulkDeleteBtn.innerHTML = '<i class="fas fa-trash-alt mr-2"></i>Delete Selected';
-    }
-    
-    // Update select all checkbox state
-    const allCheckboxes = document.querySelectorAll('.student-checkbox');
-    const selectAllCheckbox = document.getElementById('selectAll');
-    
-    if (selectedCheckboxes.length === 0) {
-        selectAllCheckbox.indeterminate = false;
-        selectAllCheckbox.checked = false;
-    } else if (selectedCheckboxes.length === allCheckboxes.length) {
-        selectAllCheckbox.indeterminate = false;
-        selectAllCheckbox.checked = true;
-    } else {
-        selectAllCheckbox.indeterminate = true;
-    }
-}
+                                    const isValid = await validateBatchEntry();
+                                    if (isValid) {
+                                        this.submit();
+                                    }
+                                });
+                            });
+                        </script>
 
-async function bulkDelete() {
-    const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
-    
-    if (selectedCheckboxes.length === 0) {
-        Swal.fire({
-            title: 'No Selection',
-            text: 'Please select at least one entry to delete.',
-            icon: 'warning',
-            confirmButtonColor: '#3085d6'
-        });
-        return;
-    }
-    
-    const confirmed = await Swal.fire({
-        title: 'Delete Selected Results?',
-        html: `You are about to delete <strong>${selectedCheckboxes.length}</strong> student result entries.<br><br>
+                        <script>
+                            // Function to update marks distribution for manual entry
+                            function updateMarksDistribution(input) {
+                                const row = input.closest('.subject-row');
+                                const theoryInput = row.querySelector('.theory-marks');
+                                const practicalInput = row.querySelector('.practical-marks');
+                                const totalInput = row.querySelector('.total-marks');
+                                const theoryMaxSpan = row.querySelector('.theory-max-marks');
+                                const practicalMaxSpan = row.querySelector('.practical-max-marks');
+
+                                const theoryValue = parseFloat(theoryInput.value) || 0;
+                                const practicalValue = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
+
+                                // Determine marks distribution
+                                if (theoryValue > 0 && practicalInput.value !== '' && practicalValue > 0) {
+                                    // Both theory and practical provided - distribute as 75:25
+                                    theoryInput.max = 75;
+                                    practicalInput.max = 25;
+                                    theoryMaxSpan.textContent = '(Max: 75)';
+                                    practicalMaxSpan.textContent = '(Max: 25)';
+
+                                    // Validate current values
+                                    if (theoryValue > 75) {
+                                        theoryInput.value = 75;
+                                        alert('Theory marks cannot exceed 75 when practical marks are provided.');
+                                    }
+                                    if (practicalValue > 25) {
+                                        practicalInput.value = 25;
+                                        alert('Practical marks cannot exceed 25 when theory marks are provided.');
+                                    }
+                                } else if (theoryValue > 0 && (practicalInput.value === '' || practicalValue === 0)) {
+                                    // Only theory provided or practical is blank - allow up to 100 for theory
+                                    theoryInput.max = 100;
+                                    practicalInput.max = 0;
+                                    theoryMaxSpan.textContent = '(Max: 100)';
+                                    practicalMaxSpan.textContent = '(Max: 0)';
+                                    // Don't clear practical marks if user left it blank intentionally
+                                } else if (theoryValue === 0 && practicalValue > 0) {
+                                    // Only practical provided - not allowed, reset
+                                    alert('Practical marks cannot be entered without theory marks.');
+                                    practicalInput.value = '';
+                                    return;
+                                } else {
+                                    // Reset to default
+                                    theoryInput.max = 100;
+                                    practicalInput.max = 100;
+                                    theoryMaxSpan.textContent = '(Max: 100)';
+                                    practicalMaxSpan.textContent = '(Max: 0)';
+                                }
+
+                                // Calculate total - treat blank practical as 0 for calculation
+                                const finalTheory = parseFloat(theoryInput.value) || 0;
+                                const finalPractical = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
+                                totalInput.value = finalTheory + finalPractical;
+                            }
+
+                            // Function to update marks distribution for batch entry
+                            function updateBatchMarksDistribution(input) {
+                                const row = input.closest('tr');
+                                const theoryInput = row.querySelector('.batch-theory-marks');
+                                const practicalInput = row.querySelector('.batch-practical-marks');
+                                const totalInput = row.querySelector('.batch-total-marks');
+
+                                const theoryValue = parseFloat(theoryInput.value) || 0;
+                                const practicalValue = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
+
+                                // Update header max values
+                                const theoryMaxSpan = document.querySelector('.batch-theory-max');
+                                const practicalMaxSpan = document.querySelector('.batch-practical-max');
+
+                                // Determine marks distribution
+                                if (theoryValue > 0 && practicalInput.value !== '' && practicalValue > 0) {
+                                    // Both theory and practical provided - distribute as 75:25
+                                    theoryInput.max = 75;
+                                    practicalInput.max = 25;
+                                    theoryMaxSpan.textContent = '(Max: 75)';
+                                    practicalMaxSpan.textContent = '(Max: 25)';
+
+                                    // Validate current values
+                                    if (theoryValue > 75) {
+                                        theoryInput.value = 75;
+                                        alert('Theory marks cannot exceed 75 when practical marks are provided.');
+                                    }
+                                    if (practicalValue > 25) {
+                                        practicalInput.value = 25;
+                                        alert('Practical marks cannot exceed 25 when theory marks are provided.');
+                                    }
+                                } else if (theoryValue > 0 && (practicalInput.value === '' || practicalValue === 0)) {
+                                    // Only theory provided or practical is blank - allow up to 100 for theory
+                                    theoryInput.max = 100;
+                                    practicalInput.max = 0;
+                                    theoryMaxSpan.textContent = '(Max: 100)';
+                                    practicalMaxSpan.textContent = '(Max: 0)';
+                                    // Don't clear practical marks if user left it blank intentionally
+                                } else if (theoryValue === 0 && practicalValue > 0) {
+                                    // Only practical provided - not allowed, reset
+                                    alert('Practical marks cannot be entered without theory marks.');
+                                    practicalInput.value = '';
+                                    return;
+                                } else {
+                                    // Reset to default
+                                    theoryInput.max = 100;
+                                    practicalInput.max = 100;
+                                    theoryMaxSpan.textContent = '(Max: 100)';
+                                    practicalMaxSpan.textContent = '(Max: 0)';
+                                }
+
+                                // Calculate total - treat blank practical as 0 for calculation
+                                const finalTheory = parseFloat(theoryInput.value) || 0;
+                                const finalPractical = practicalInput.value === '' ? 0 : parseFloat(practicalInput.value) || 0;
+                                totalInput.value = finalTheory + finalPractical;
+
+                                // Update all other rows in batch entry to maintain consistency
+                                updateAllBatchRows();
+                            }
+
+                            // Function to update all batch entry rows with consistent max values
+                            function updateAllBatchRows() {
+                                const container = document.getElementById('batch-students-container');
+                                const rows = container.querySelectorAll('tr');
+                                const theoryMaxSpan = document.querySelector('.batch-theory-max');
+                                const practicalMaxSpan = document.querySelector('.batch-practical-max');
+
+                                // Get max values from header
+                                const theoryMax = theoryMaxSpan.textContent.includes('75') ? 75 : 100;
+                                const practicalMax = practicalMaxSpan.textContent.includes('25') ? 25 : 0;
+
+                                rows.forEach(row => {
+                                    const theoryInput = row.querySelector('.batch-theory-marks');
+                                    const practicalInput = row.querySelector('.batch-practical-marks');
+
+                                    if (theoryInput && practicalInput) {
+                                        theoryInput.max = theoryMax;
+                                        practicalInput.max = practicalMax;
+
+                                        if (practicalMax === 0) {
+                                            // Don't clear the value, just disable if max is 0
+                                            practicalInput.disabled = true;
+                                        } else {
+                                            practicalInput.disabled = false;
+                                        }
+                                    }
+                                });
+                            }
+                        </script>
+
+                        <script>
+                            // Bulk delete functionality
+                            function toggleSelectAll() {
+                                const selectAllCheckbox = document.getElementById('selectAll');
+                                const studentCheckboxes = document.querySelectorAll('.student-checkbox');
+
+                                studentCheckboxes.forEach(checkbox => {
+                                    checkbox.checked = selectAllCheckbox.checked;
+                                });
+
+                                updateBulkDeleteButton();
+                            }
+
+                            function updateBulkDeleteButton() {
+                                const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+                                const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+
+                                if (selectedCheckboxes.length > 0) {
+                                    bulkDeleteBtn.disabled = false;
+                                    bulkDeleteBtn.innerHTML = `<i class="fas fa-trash-alt mr-2"></i>Delete Selected (${selectedCheckboxes.length})`;
+                                } else {
+                                    bulkDeleteBtn.disabled = true;
+                                    bulkDeleteBtn.innerHTML = '<i class="fas fa-trash-alt mr-2"></i>Delete Selected';
+                                }
+
+                                // Update select all checkbox state
+                                const allCheckboxes = document.querySelectorAll('.student-checkbox');
+                                const selectAllCheckbox = document.getElementById('selectAll');
+
+                                if (selectedCheckboxes.length === 0) {
+                                    selectAllCheckbox.indeterminate = false;
+                                    selectAllCheckbox.checked = false;
+                                } else if (selectedCheckboxes.length === allCheckboxes.length) {
+                                    selectAllCheckbox.indeterminate = false;
+                                    selectAllCheckbox.checked = true;
+                                } else {
+                                    selectAllCheckbox.indeterminate = true;
+                                }
+                            }
+
+                            async function bulkDelete() {
+                                const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+
+                                if (selectedCheckboxes.length === 0) {
+                                    Swal.fire({
+                                        title: 'No Selection',
+                                        text: 'Please select at least one entry to delete.',
+                                        icon: 'warning',
+                                        confirmButtonColor: '#3085d6'
+                                    });
+                                    return;
+                                }
+
+                                const confirmed = await Swal.fire({
+                                    title: 'Delete Selected Results?',
+                                    html: `You are about to delete <strong>${selectedCheckboxes.length}</strong> student result entries.<br><br>
                <span class="text-red-600">This action cannot be undone!</span>`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc2626',
-        cancelButtonColor: '#6b7280',
-        confirmButtonText: 'Yes, Delete All',
-        cancelButtonText: 'Cancel'
-    });
-    
-    if (!confirmed.isConfirmed) return;
-    
-    // Show loading
-    Swal.fire({
-        title: 'Deleting...',
-        text: 'Please wait while we delete the selected entries.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-    
-    let successCount = 0;
-    let errorCount = 0;
-    
-    // Process deletions one by one
-    for (const checkbox of selectedCheckboxes) {
-        const uploadId = checkbox.dataset.uploadId;
-        const studentId = checkbox.dataset.studentId;
-        
-        try {
-            let response;
-            if (studentId && studentId !== 'undefined') {
-                // Delete specific student results
-                response = await fetch(`delete_student_result.php?upload_id=${uploadId}&student_id=${studentId}`);
-            } else {
-                // Delete entire upload
-                response = await fetch(`delete_upload.php?id=${uploadId}`);
-            }
-            
-            if (response.ok) {
-                successCount++;
-            } else {
-                errorCount++;
-            }
-        } catch (error) {
-            console.error('Delete error:', error);
-            errorCount++;
-        }
-    }
-    
-    // Show result
-    if (errorCount === 0) {
-        Swal.fire({
-            title: 'Success!',
-            text: `Successfully deleted ${successCount} entries.`,
-            icon: 'success',
-            timer: 2000,
-            showConfirmButton: false
-        });
-    } else {
-        Swal.fire({
-            title: 'Partial Success',
-            text: `Deleted ${successCount} entries. ${errorCount} entries could not be deleted.`,
-            icon: 'warning'
-        });
-    }
-    
-    // Reload page after 2 seconds
-    setTimeout(() => {
-        window.location.reload();
-    }, 2000);
-}
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#dc2626',
+                                    cancelButtonColor: '#6b7280',
+                                    confirmButtonText: 'Yes, Delete All',
+                                    cancelButtonText: 'Cancel'
+                                });
 
-function deleteStudentResult(uploadId, studentId, studentName) {
-    Swal.fire({
-        title: 'Delete Student Results?',
-        html: `Are you sure you want to delete results for:<br><br>
+                                if (!confirmed.isConfirmed) return;
+
+                                // Show loading
+                                Swal.fire({
+                                    title: 'Deleting...',
+                                    text: 'Please wait while we delete the selected entries.',
+                                    allowOutsideClick: false,
+                                    didOpen: () => {
+                                        Swal.showLoading();
+                                    }
+                                });
+
+                                let successCount = 0;
+                                let errorCount = 0;
+
+                                // Process deletions one by one
+                                for (const checkbox of selectedCheckboxes) {
+                                    const uploadId = checkbox.dataset.uploadId;
+                                    const studentId = checkbox.dataset.studentId;
+
+                                    try {
+                                        let response;
+                                        if (studentId && studentId !== 'undefined') {
+                                            // Delete specific student results
+                                            response = await fetch(`delete_student_result.php?upload_id=${uploadId}&student_id=${studentId}`);
+                                        } else {
+                                            // Delete entire upload
+                                            response = await fetch(`delete_upload.php?id=${uploadId}`);
+                                        }
+
+                                        if (response.ok) {
+                                            successCount++;
+                                        } else {
+                                            errorCount++;
+                                        }
+                                    } catch (error) {
+                                        console.error('Delete error:', error);
+                                        errorCount++;
+                                    }
+                                }
+
+                                // Show result
+                                if (errorCount === 0) {
+                                    Swal.fire({
+                                        title: 'Success!',
+                                        text: `Successfully deleted ${successCount} entries.`,
+                                        icon: 'success',
+                                        timer: 2000,
+                                        showConfirmButton: false
+                                    });
+                                } else {
+                                    Swal.fire({
+                                        title: 'Partial Success',
+                                        text: `Deleted ${successCount} entries. ${errorCount} entries could not be deleted.`,
+                                        icon: 'warning'
+                                    });
+                                }
+
+                                // Reload page after 2 seconds
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 2000);
+                            }
+
+                            function deleteStudentResult(uploadId, studentId, studentName) {
+                                Swal.fire({
+                                    title: 'Delete Student Results?',
+                                    html: `Are you sure you want to delete results for:<br><br>
                <strong>${studentName}</strong> (ID: ${studentId})<br><br>
                <span class="text-red-600">This action cannot be undone!</span>`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc2626',
-        cancelButtonColor: '#6b7280',
-        confirmButtonText: 'Yes, Delete',
-        cancelButtonText: 'Cancel'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            window.location.href = `delete_student_result.php?upload_id=${uploadId}&student_id=${studentId}`;
-        }
-    });
-}
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#dc2626',
+                                    cancelButtonColor: '#6b7280',
+                                    confirmButtonText: 'Yes, Delete',
+                                    cancelButtonText: 'Cancel'
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        window.location.href = `delete_student_result.php?upload_id=${uploadId}&student_id=${studentId}`;
+                                    }
+                                });
+                            }
 
-function deleteUpload(uploadId) {
-    Swal.fire({
-        title: 'Delete Upload?',
-        html: `Are you sure you want to delete this upload?<br><br>
+                            function deleteUpload(uploadId) {
+                                Swal.fire({
+                                    title: 'Delete Upload?',
+                                    html: `Are you sure you want to delete this upload?<br><br>
                <span class="text-red-600">This will delete all associated results and cannot be undone!</span>`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc2626',
-        cancelButtonColor: '#6b7280',
-        confirmButtonText: 'Yes, Delete',
-        cancelButtonText: 'Cancel'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            window.location.href = `delete_upload.php?id=${uploadId}`;
-        }
-    });
-}
-</script>
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#dc2626',
+                                    cancelButtonColor: '#6b7280',
+                                    confirmButtonText: 'Yes, Delete',
+                                    cancelButtonText: 'Cancel'
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        window.location.href = `delete_upload.php?id=${uploadId}`;
+                                    }
+                                });
+                            }
+                        </script>
 </body>
 
 </html>
 <?php
-function studentHasResults($conn, $student_id, $exam_id) {
+function studentHasResults($conn, $student_id, $exam_id)
+{
     $stmt = $conn->prepare("SELECT COUNT(*) as count FROM results WHERE student_id = ? AND exam_id = ?");
     $stmt->bind_param("si", $student_id, $exam_id);
     $stmt->execute();

@@ -177,22 +177,22 @@ if (isset($_GET['student_id']) && isset($_GET['exam_id'])) {
             $subject['calculated_gpa'] = 0.0;
         } else {
             // Calculate grade based on total percentage
-            if ($total_percentage >= 90) {
+            if ($total_percentage >= 91) {
                 $subject['calculated_grade'] = 'A+';
                 $subject['calculated_gpa'] = 4.0;
-            } elseif ($total_percentage >= 80) {
+            } elseif ($total_percentage >= 81) {
                 $subject['calculated_grade'] = 'A';
                 $subject['calculated_gpa'] = 3.6;
-            } elseif ($total_percentage >= 70) {
+            } elseif ($total_percentage >= 71) {
                 $subject['calculated_grade'] = 'B+';
                 $subject['calculated_gpa'] = 3.2;
-            } elseif ($total_percentage >= 60) {
+            } elseif ($total_percentage >= 61) {
                 $subject['calculated_grade'] = 'B';
                 $subject['calculated_gpa'] = 2.8;
-            } elseif ($total_percentage >= 50) {
+            } elseif ($total_percentage >= 51) {
                 $subject['calculated_grade'] = 'C+';
                 $subject['calculated_gpa'] = 2.4;
-            } elseif ($total_percentage >= 40) {
+            } elseif ($total_percentage >= 41) {
                 $subject['calculated_grade'] = 'C';
                 $subject['calculated_gpa'] = 2.0;
             } elseif ($total_percentage >= 35) {
@@ -1188,12 +1188,12 @@ function calculateGPA($percentage, $conn)
                                                         $theory_full_marks = $subject['theory_full_marks'] ?? ($subject['has_practical'] ? 75 : 100);
                                                         if ($theory_marks > 0 && $theory_full_marks > 0) {
                                                             $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
-                                                            if ($theory_percentage >= 90) echo 'A+';
-                                                            elseif ($theory_percentage >= 80) echo 'A';
-                                                            elseif ($theory_percentage >= 70) echo 'B+';
-                                                            elseif ($theory_percentage >= 60) echo 'B';
-                                                            elseif ($theory_percentage >= 50) echo 'C+';
-                                                            elseif ($theory_percentage >= 40) echo 'C';
+                                                            if ($theory_percentage >= 91) echo 'A+';
+                                                            elseif ($theory_percentage >= 81) echo 'A';
+                                                            elseif ($theory_percentage >= 71) echo 'B+';
+                                                            elseif ($theory_percentage >= 61) echo 'B';
+                                                            elseif ($theory_percentage >= 51) echo 'C+';
+                                                            elseif ($theory_percentage >= 41) echo 'C';
                                                             elseif ($theory_percentage >= 35) echo 'D';
                                                             else echo 'NG';
                                                         } else {
@@ -1211,12 +1211,12 @@ function calculateGPA($percentage, $conn)
                                                         if ($has_practical && $practical_full_marks > 0) {
                                                             if ($practical_marks > 0) {
                                                                 $practical_percentage = ($practical_marks / $practical_full_marks) * 100;
-                                                                if ($practical_percentage >= 90) echo 'A+';
-                                                                elseif ($practical_percentage >= 80) echo 'A';
-                                                                elseif ($practical_percentage >= 70) echo 'B+';
-                                                                elseif ($practical_percentage >= 60) echo 'B';
-                                                                elseif ($practical_percentage >= 50) echo 'C+';
-                                                                elseif ($practical_percentage >= 40) echo 'C';
+                                                                if ($practical_percentage >= 91) echo 'A+';
+                                                                elseif ($practical_percentage >= 81) echo 'A';
+                                                                elseif ($practical_percentage >= 71) echo 'B+';
+                                                                elseif ($practical_percentage >= 61) echo 'B';
+                                                                elseif ($practical_percentage >= 51) echo 'C+';
+                                                                elseif ($practical_percentage >= 41) echo 'C';
                                                                 elseif ($practical_percentage >= 35) echo 'D';
                                                                 else echo 'NG';
                                                             } else {
@@ -1323,12 +1323,12 @@ function calculateGPA($percentage, $conn)
                                             <div class="simple-summary-value">
                                                 <?php
                                                 // Calculate grade based on percentage
-                                                if ($percentage >= 90) echo 'A+';
-                                                elseif ($percentage >= 80) echo 'A';
-                                                elseif ($percentage >= 70) echo 'B+';
-                                                elseif ($percentage >= 60) echo 'B';
-                                                elseif ($percentage >= 50) echo 'C+';
-                                                elseif ($percentage >= 40) echo 'C';
+                                                if ($percentage >= 91) echo 'A+';
+                                                elseif ($percentage >= 81) echo 'A';
+                                                elseif ($percentage >= 71) echo 'B+';
+                                                elseif ($percentage >= 61) echo 'B';
+                                                elseif ($percentage >= 51) echo 'C+';
+                                                elseif ($percentage >= 41) echo 'C';
                                                 elseif ($percentage >= 35) echo 'D';
                                                 else echo 'NG';
                                                 ?>
@@ -1423,7 +1423,6 @@ function calculateGPA($percentage, $conn)
                                     </div>
                                 </div>
 
-                                <div class="qr-code">QR CODE</div>
 
                                 <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #777;">
                                     <p><?php echo isset($settings['result_footer']) ? $settings['result_footer'] : 'This is a computer-generated document. No signature is required.'; ?></p>

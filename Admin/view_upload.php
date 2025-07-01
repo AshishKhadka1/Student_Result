@@ -21,6 +21,102 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+// Exact GPA Calculation Functions
+function calculateExactGPA($percentage)
+{
+    $percentage = round($percentage, 2);
+
+    if ($percentage >= 91) {
+        // A+ grade: 3.6 - 4.0 range
+        $gpa = 3.6 + (($percentage - 91) / 9) * (4.0 - 3.6);
+        return ['grade' => 'A+', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 81) {
+        // A grade: 3.2 - 3.6 range
+        $gpa = 3.2 + (($percentage - 81) / 9) * (3.6 - 3.2);
+        return ['grade' => 'A', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 71) {
+        // B+ grade: 2.8 - 3.2 range
+        $gpa = 2.8 + (($percentage - 71) / 9) * (3.2 - 2.8);
+        return ['grade' => 'B+', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 61) {
+        // B grade: 2.6 - 2.8 range
+        $gpa = 2.6 + (($percentage - 61) / 9) * (2.8 - 2.6);
+        return ['grade' => 'B', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 51) {
+        // C+ grade: 2.2 - 2.6 range
+        $gpa = 2.2 + (($percentage - 51) / 9) * (2.6 - 2.2);
+        return ['grade' => 'C+', 'gpa' => round($gpa, 2), 'class' => 'bg-yellow-100 text-yellow-800'];
+    } elseif ($percentage >= 41) {
+        // C grade: 1.6 - 2.2 range
+        $gpa = 1.6 + (($percentage - 41) / 9) * (2.2 - 1.6);
+        return ['grade' => 'C', 'gpa' => round($gpa, 2), 'class' => 'bg-yellow-100 text-yellow-800'];
+    } elseif ($percentage >= 35) {
+        // D+ grade: 1.6 (fixed value)
+        return ['grade' => 'D+', 'gpa' => 1.6, 'class' => 'bg-orange-100 text-orange-800'];
+    } else {
+        // NG grade: 0.0
+        return ['grade' => 'NG', 'gpa' => 0.0, 'class' => 'bg-red-100 text-red-800'];
+    }
+}
+
+function calculateTheoryOnlyGPA($theoryMarks, $theoryFullMarks = 100)
+{
+    // Validate marks don't exceed full marks
+    if ($theoryMarks > $theoryFullMarks) {
+        return ['error' => 'Theory marks cannot exceed full marks'];
+    }
+
+    $percentage = ($theoryMarks / $theoryFullMarks) * 100;
+    $result = calculateExactGPA($percentage);
+
+    return [
+        'percentage' => round($percentage, 2),
+        'grade' => $result['grade'],
+        'gpa' => $result['gpa'],
+        'class' => $result['class']
+    ];
+}
+
+function calculateTheoryPracticalGPA($theoryMarks, $practicalMarks, $theoryFullMarks = 75, $practicalFullMarks = 25)
+{
+    // Validate marks don't exceed full marks
+    if ($theoryMarks > $theoryFullMarks || $practicalMarks > $practicalFullMarks) {
+        return ['error' => 'Marks cannot exceed respective full marks'];
+    }
+
+    $theoryPercentage = ($theoryMarks / $theoryFullMarks) * 100;
+    $practicalPercentage = ($practicalMarks / $practicalFullMarks) * 100;
+
+    $theoryResult = calculateExactGPA($theoryPercentage);
+    $practicalResult = calculateExactGPA($practicalPercentage);
+
+    // Calculate weighted final GPA
+    $finalGPA = ($theoryResult['gpa'] * 75 + $practicalResult['gpa'] * 25) / 100;
+
+    return [
+        'theory' => [
+            'percentage' => round($theoryPercentage, 2),
+            'grade' => $theoryResult['grade'],
+            'gpa' => $theoryResult['gpa'],
+            'class' => $theoryResult['class']
+        ],
+        'practical' => [
+            'percentage' => round($practicalPercentage, 2),
+            'grade' => $practicalResult['grade'],
+            'gpa' => $practicalResult['gpa'],
+            'class' => $practicalResult['class']
+        ],
+        'final_gpa' => round($finalGPA, 2)
+    ];
+}
+
+// Function to get grade and grade point from percentage (kept for backward compatibility)
+function getGradeInfo($percentage)
+{
+    $result = calculateExactGPA($percentage);
+    return ['grade' => $result['grade'], 'point' => $result['gpa'], 'class' => $result['class']];
+}
+
 // Get upload details with proper joins to match the manage_results.php data
 $stmt = $conn->prepare("
     SELECT ru.*, u.full_name as uploaded_by_name, e.exam_name, e.exam_type, c.class_name, c.section 
@@ -96,19 +192,6 @@ $stmt->close();
 
 // Count subjects for this entry
 $subject_count = $results->num_rows;
-
-// Function to get grade and grade point from percentage
-function getGradeInfo($percentage)
-{
-    if ($percentage >= 90) return ['grade' => 'A+', 'point' => 4.0, 'class' => 'bg-green-100 text-green-800'];
-    elseif ($percentage >= 80) return ['grade' => 'A', 'point' => 3.6, 'class' => 'bg-green-100 text-green-800'];
-    elseif ($percentage >= 70) return ['grade' => 'B+', 'point' => 3.2, 'class' => 'bg-green-100 text-green-800'];
-    elseif ($percentage >= 60) return ['grade' => 'B', 'point' => 2.8, 'class' => 'bg-green-100 text-green-800'];
-    elseif ($percentage >= 50) return ['grade' => 'C+', 'point' => 2.4, 'class' => 'bg-yellow-100 text-yellow-800'];
-    elseif ($percentage >= 40) return ['grade' => 'C', 'point' => 2.0, 'class' => 'bg-yellow-100 text-yellow-800'];
-    elseif ($percentage >= 35) return ['grade' => 'D', 'point' => 1.6, 'class' => 'bg-orange-100 text-orange-800'];
-    else return ['grade' => 'NG', 'point' => 0.0, 'class' => 'bg-red-100 text-red-800'];
-}
 
 // Function to format file name for display (matching manage_results.php)
 function getDisplayFileName($fileName)
@@ -192,7 +275,6 @@ function getDisplayFileName($fileName)
                             </div>
                         </div>
 
-
                         <!-- Enhanced Upload Information Section -->
                         <div class="bg-white border rounded-lg p-6 max-w-5xl mx-auto mb-6">
                             <!-- Header -->
@@ -205,7 +287,6 @@ function getDisplayFileName($fileName)
 
                             <!-- Content Grid -->
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-700">
-
                                 <!-- Exam -->
                                 <div class="space-y-1">
                                     <p class="text-xs text-gray-500 uppercase">Exam</p>
@@ -232,8 +313,6 @@ function getDisplayFileName($fileName)
                                     <p class="text-xs text-gray-500 uppercase">Subjects</p>
                                 </div>
 
-
-
                                 <!-- Action Buttons -->
                                 <div class="flex flex-wrap gap-3   ">
                                     <?php if ($upload['status'] != 'Published'): ?>
@@ -252,8 +331,6 @@ function getDisplayFileName($fileName)
                             </div>
                         </div>
                     </div>
-
-
 
                     <!-- Results Table for Single Student -->
                     <div class="bg-white shadow-sm rounded-lg overflow-hidden">
@@ -303,7 +380,6 @@ function getDisplayFileName($fileName)
                                         $overall_total_marks = 0;
                                         $overall_full_marks = 0;
                                         $failed_subjects = 0;
-
                                         while ($row = $results->fetch_assoc()):
                                             // Determine full marks based on whether practical marks exist
                                             $has_practical = $row['practical_marks'] > 0;
@@ -311,41 +387,90 @@ function getDisplayFileName($fileName)
                                             $practical_full_marks = $has_practical ? 25 : 0;
                                             $total_full_marks = 100;
 
-                                            // Calculate percentages
-                                            $theory_percentage = ($row['theory_marks'] / $theory_full_marks) * 100;
-                                            $practical_percentage = $has_practical ? ($row['practical_marks'] / $practical_full_marks) * 100 : 0;
-
-                                            // Get grade info for theory and practical
-                                            $theory_grade_info = getGradeInfo($theory_percentage);
-                                            $practical_grade_info = $has_practical ? getGradeInfo($practical_percentage) : ['grade' => 'N/A', 'point' => 0, 'class' => 'bg-gray-100 text-gray-800'];
-
-                                            // Check for failure condition (either theory or practical below 35%)
-                                            $is_failed = ($theory_percentage < 35) || ($has_practical && $practical_percentage < 35);
-
-                                            // Calculate final GPA
-                                            if ($is_failed) {
-                                                $final_gpa = 0.0;
-                                                $final_grade = 'NG';
-                                                $final_grade_class = 'bg-red-100 text-red-800';
-                                                $failed_subjects++;
-                                            } else {
-                                                if ($has_practical) {
-                                                    $final_gpa = (($theory_grade_info['point'] * $theory_full_marks) + ($practical_grade_info['point'] * $practical_full_marks)) / $total_full_marks;
+                                            // Calculate using exact GPA functions
+                                            if ($has_practical) {
+                                                // Theory + Practical case (75 + 25)
+                                                $gpaResult = calculateTheoryPracticalGPA($row['theory_marks'], $row['practical_marks'], 75, 25);
+                                                if (isset($gpaResult['error'])) {
+                                                    $theory_percentage = 0;
+                                                    $practical_percentage = 0;
+                                                    $theory_grade_info = ['grade' => 'Error', 'gpa' => 0, 'class' => 'bg-red-100 text-red-800'];
+                                                    $practical_grade_info = ['grade' => 'Error', 'gpa' => 0, 'class' => 'bg-red-100 text-red-800'];
+                                                    $final_gpa = 0.0;
+                                                    $final_grade = 'Error';
+                                                    $final_grade_class = 'bg-red-100 text-red-800';
+                                                    $is_failed = true;
                                                 } else {
-                                                    $final_gpa = $theory_grade_info['point'];
+                                                    $theory_percentage = $gpaResult['theory']['percentage'];
+                                                    $practical_percentage = $gpaResult['practical']['percentage'];
+                                                    $theory_grade_info = ['grade' => $gpaResult['theory']['grade'], 'gpa' => $gpaResult['theory']['gpa'], 'class' => $gpaResult['theory']['class']];
+                                                    $practical_grade_info = ['grade' => $gpaResult['practical']['grade'], 'gpa' => $gpaResult['practical']['gpa'], 'class' => $gpaResult['practical']['class']];
+                                                    $final_gpa = $gpaResult['final_gpa'];
+
+                                                    // Check for failure condition (either theory or practical below 35%)
+                                                    $is_failed = ($theory_percentage < 35) || ($practical_percentage < 35);
+
+                                                    if ($is_failed) {
+                                                        $final_gpa = 0.0;
+                                                        $final_grade = 'NG';
+                                                        $final_grade_class = 'bg-red-100 text-red-800';
+                                                    } else {
+                                                        // Determine final grade based on exact GPA
+                                                        if ($final_gpa >= 3.6) {
+                                                            $final_grade = 'A+';
+                                                        } elseif ($final_gpa >= 3.2) {
+                                                            $final_grade = 'A';
+                                                        } elseif ($final_gpa >= 2.8) {
+                                                            $final_grade = 'B+';
+                                                        } elseif ($final_gpa >= 2.6) {
+                                                            $final_grade = 'B';
+                                                        } elseif ($final_gpa >= 2.2) {
+                                                            $final_grade = 'C+';
+                                                        } elseif ($final_gpa > 1.6) {
+                                                            $final_grade = 'C';
+                                                        } elseif ($final_gpa == 1.6) {
+                                                            $final_grade = 'D+';
+                                                        } else {
+                                                            $final_grade = 'NG';
+                                                        }
+
+
+                                                        $final_grade_class = $final_grade == 'NG' ? 'bg-red-100 text-red-800' : ($final_gpa >= 3.0 ? 'bg-green-100 text-green-800' : ($final_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
+                                                    }
                                                 }
+                                            } else {
+                                                // Theory only case (100 marks)
+                                                $gpaResult = calculateTheoryOnlyGPA($row['theory_marks'], 100);
+                                                if (isset($gpaResult['error'])) {
+                                                    $theory_percentage = 0;
+                                                    $theory_grade_info = ['grade' => 'Error', 'gpa' => 0, 'class' => 'bg-red-100 text-red-800'];
+                                                    $final_gpa = 0.0;
+                                                    $final_grade = 'Error';
+                                                    $final_grade_class = 'bg-red-100 text-red-800';
+                                                    $is_failed = true;
+                                                } else {
+                                                    $theory_percentage = $gpaResult['percentage'];
+                                                    $theory_grade_info = ['grade' => $gpaResult['grade'], 'gpa' => $gpaResult['gpa'], 'class' => $gpaResult['class']];
+                                                    $final_gpa = $gpaResult['gpa'];
 
-                                                // Determine final grade based on GPA
-                                                if ($final_gpa >= 3.8) $final_grade = 'A+';
-                                                elseif ($final_gpa >= 3.4) $final_grade = 'A';
-                                                elseif ($final_gpa >= 3.0) $final_grade = 'B+';
-                                                elseif ($final_gpa >= 2.6) $final_grade = 'B';
-                                                elseif ($final_gpa >= 2.2) $final_grade = 'C+';
-                                                elseif ($final_gpa >= 1.8) $final_grade = 'C';
-                                                elseif ($final_gpa >= 1.4) $final_grade = 'D';
-                                                else $final_grade = 'NG';
+                                                    // Check for failure condition (theory below 35%)
+                                                    $is_failed = ($theory_percentage < 35);
 
-                                                $final_grade_class = $final_grade == 'NG' ? 'bg-red-100 text-red-800' : ($final_gpa >= 3.0 ? 'bg-green-100 text-green-800' : ($final_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
+                                                    if ($is_failed) {
+                                                        $final_gpa = 0.0;
+                                                        $final_grade = 'NG';
+                                                        $final_grade_class = 'bg-red-100 text-red-800';
+                                                    } else {
+                                                        $final_grade = $gpaResult['grade'];
+                                                        $final_grade_class = $gpaResult['class'];
+                                                    }
+                                                }
+                                                $practical_percentage = 0;
+                                                $practical_grade_info = ['grade' => 'N/A', 'gpa' => 0, 'class' => 'bg-gray-100 text-gray-800'];
+                                            }
+
+                                            if ($is_failed) {
+                                                $failed_subjects++;
                                             }
 
                                             $subject_total_marks = $row['theory_marks'] + $row['practical_marks'];
@@ -405,7 +530,6 @@ function getDisplayFileName($fileName)
                                 </table>
                             </div>
 
-
                             <div class="bg-white border rounded-lg p-6 max-w-5xl mx-auto text-gray-800 mb-6">
                                 <!-- Summary Header -->
                                 <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
@@ -415,8 +539,6 @@ function getDisplayFileName($fileName)
 
                                 <!-- Statistics Grid -->
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6 text-center text-sm">
-
-
                                     <!-- Total Marks -->
                                     <div>
                                         <p class="text-sm text-gray-500 mb-1">Total Marks</p>
@@ -446,7 +568,6 @@ function getDisplayFileName($fileName)
                                     </div>
                                 </div>
                             </div>
-
 
                         <?php else: ?>
                             <div class="p-8 text-center">

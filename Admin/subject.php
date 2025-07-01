@@ -40,6 +40,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $subject_name = $_POST['subject_name'];
         $subject_code = $_POST['subject_id']; // Using subject_id as the code
         $description = $_POST['description'] ?? '';
+        $full_marks_theory = floatval($_POST['full_marks_theory']);
+        $full_marks_practical = floatval($_POST['full_marks_practical']);
+        $pass_marks_theory = floatval($_POST['pass_marks_theory']);
+        $pass_marks_practical = floatval($_POST['pass_marks_practical']);
+        $credit_hours = floatval($_POST['credit_hours']);
+        $is_optional = isset($_POST['is_optional']) ? 1 : 0;
         
         // Check if subject already exists
         $stmt = $conn->prepare("SELECT subject_id FROM subjects WHERE subject_id = ?");
@@ -51,8 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             $_SESSION['error'] = "Subject with this code already exists!";
         } else {
             // Insert new subject
-            $stmt = $conn->prepare("INSERT INTO subjects (subject_id, subject_name, description, created_at) VALUES (?, ?, ?, NOW())");
-            $stmt->bind_param("sss", $subject_code, $subject_name, $description);
+            $stmt = $conn->prepare("INSERT INTO subjects (subject_id, subject_name, description, full_marks_theory, full_marks_practical, pass_marks_theory, pass_marks_practical, credit_hours, is_optional, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->bind_param("sssdddddi", $subject_code, $subject_name, $description, $full_marks_theory, $full_marks_practical, $pass_marks_theory, $pass_marks_practical, $credit_hours, $is_optional);
             
             if ($stmt->execute()) {
                 $_SESSION['success'] = "Subject added successfully!";
@@ -76,10 +82,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $subject_id = $_POST['subject_id'];
         $subject_name = $_POST['subject_name'];
         $description = $_POST['description'] ?? '';
+        $full_marks_theory = floatval($_POST['full_marks_theory']);
+        $full_marks_practical = floatval($_POST['full_marks_practical']);
+        $pass_marks_theory = floatval($_POST['pass_marks_theory']);
+        $pass_marks_practical = floatval($_POST['pass_marks_practical']);
+        $credit_hours = floatval($_POST['credit_hours']);
+        $is_optional = isset($_POST['is_optional']) ? 1 : 0;
         
         // Update subject
-        $stmt = $conn->prepare("UPDATE subjects SET subject_name = ?, description = ?, updated_at = NOW() WHERE subject_id = ?");
-        $stmt->bind_param("sss", $subject_name, $description, $subject_id);
+        $stmt = $conn->prepare("UPDATE subjects SET subject_name = ?, description = ?, full_marks_theory = ?, full_marks_practical = ?, pass_marks_theory = ?, pass_marks_practical = ?, credit_hours = ?, is_optional = ?, updated_at = NOW() WHERE subject_id = ?");
+        $stmt->bind_param("ssdddddis", $subject_name, $description, $full_marks_theory, $full_marks_practical, $pass_marks_theory, $pass_marks_practical, $credit_hours, $is_optional, $subject_id);
         
         if ($stmt->execute()) {
             $_SESSION['success'] = "Subject updated successfully!";
@@ -208,27 +220,70 @@ $conn->close();
     <title>Manage Subjects | Result Management System</title>
     <link href="https://cdn.tailwindcss.com" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
 </head>
 <body class="bg-gray-100">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <?php
-        // Include the file that processes form data
-        include 'sidebar.php';
-        ?>
+        <?php include 'sidebar.php'; ?>
 
-       <?php include 'mobile_sidebar.php'; 
-        
-        ?>
+        <!-- Mobile sidebar -->
+        <div class="fixed inset-0 flex z-40 md:hidden transform -translate-x-full transition-transform duration-300 ease-in-out" id="mobile-sidebar">
+            <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="sidebar-backdrop"></div>
+            <div class="relative flex-1 flex flex-col max-w-xs w-full bg-gray-800">
+                <div class="absolute top-0 right-0 -mr-12 pt-2">
+                    <button class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" id="close-sidebar">
+                        <span class="sr-only">Close sidebar</span>
+                        <i class="fas fa-times text-white"></i>
+                    </button>
+                </div>
+                <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
+                    <div class="flex-shrink-0 flex items-center px-4">
+                        <span class="text-white text-lg font-semibold">Result Management</span>
+                    </div>
+                    <nav class="mt-5 px-2 space-y-1">
+                        <a href="admin_dashboard.php" class="flex items-center px-4 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-tachometer-alt mr-3"></i>
+                            Dashboard
+                        </a>
+                        <a href="result.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-clipboard-list mr-3"></i>
+                            Results
+                        </a>
+                        <a href="subject.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-white bg-gray-700 rounded-md">
+                            <i class="fas fa-book mr-3"></i>
+                            Subjects
+                        </a>
+                        <?php if ($role == 'admin'): ?>
+                        <a href="users.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-users mr-3"></i>
+                            Users
+                        </a>
+                        <a href="students.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-user-graduate mr-3"></i>
+                            Students
+                        </a>
+                        <a href="teachers.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-chalkboard-teacher mr-3"></i>
+                            Teachers
+                        </a>
+                        <?php endif; ?>
+                        <a href="settings.php" class="flex items-center px-4 py-2 mt-1 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-cog mr-3"></i>
+                            Settings
+                        </a>
+                        <a href="logout.php" class="flex items-center px-4 py-2 mt-5 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-700 hover:text-white">
+                            <i class="fas fa-sign-out-alt mr-3"></i>
+                            Logout
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </div>
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
             <!-- Top Navigation -->
-            <?php
-        // Include the file that processes form data
-        include 'topBar.php';
-        ?>
+            <?php include 'topBar.php'; ?>
 
             <!-- Main Content -->
             <main class="flex-1 relative overflow-y-auto focus:outline-none">
@@ -268,7 +323,7 @@ $conn->close();
                         <!-- Add Subject Section -->
                         <div class="bg-white shadow rounded-lg p-6 mb-6">
                             <h2 class="text-lg font-medium text-gray-900 mb-4">Add New Subject</h2>
-                            <form action="subject.php" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <form action="subject.php" method="POST" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <input type="hidden" name="action" value="add_subject">
                                 
                                 <div>
@@ -280,6 +335,31 @@ $conn->close();
                                     <label for="subject_id" class="block text-sm font-medium text-gray-700 mb-1">Subject ID</label>
                                     <input type="text" id="subject_id" name="subject_id" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                                     <p class="text-xs text-gray-500 mt-1">Example: 101, 102, etc.</p>
+                                </div>
+                                
+                                <div>
+                                    <label for="full_marks_theory" class="block text-sm font-medium text-gray-700 mb-1">Theory Full Marks</label>
+                                    <input type="number" id="full_marks_theory" name="full_marks_theory" step="0.01" min="0" value="100" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                </div>
+                                
+                                <div>
+                                    <label for="full_marks_practical" class="block text-sm font-medium text-gray-700 mb-1">Practical Full Marks</label>
+                                    <input type="number" id="full_marks_practical" name="full_marks_practical" step="0.01" min="0" value="0" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                </div>
+                                
+                                <div>
+                                    <label for="pass_marks_theory" class="block text-sm font-medium text-gray-700 mb-1">Theory Pass Marks</label>
+                                    <input type="number" id="pass_marks_theory" name="pass_marks_theory" step="0.01" min="0" value="40" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                </div>
+                                
+                                <div>
+                                    <label for="pass_marks_practical" class="block text-sm font-medium text-gray-700 mb-1">Practical Pass Marks</label>
+                                    <input type="number" id="pass_marks_practical" name="pass_marks_practical" step="0.01" min="0" value="0" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                </div>
+                                
+                                <div>
+                                    <label for="credit_hours" class="block text-sm font-medium text-gray-700 mb-1">Credit Hours</label>
+                                    <input type="number" id="credit_hours" name="credit_hours" step="0.1" min="0.1" value="1.0" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                                 </div>
                                 
                                 <?php if ($role == 'admin' || $role == 'teacher'): ?>
@@ -296,12 +376,17 @@ $conn->close();
                                 </div>
                                 <?php endif; ?>
                                 
-                                <div class="<?php echo ($role == 'admin' || $role == 'teacher') ? '' : 'md:col-span-2'; ?>">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="is_optional" name="is_optional" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                    <label for="is_optional" class="ml-2 block text-sm text-gray-700">Optional Subject</label>
+                                </div>
+                                
+                                <div class="lg:col-span-3">
                                     <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                                     <textarea id="description" name="description" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"></textarea>
                                 </div>
                                 
-                                <div class="md:col-span-2">
+                                <div class="lg:col-span-3">
                                     <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                         <i class="fas fa-plus mr-2"></i> Add Subject
                                     </button>
@@ -321,7 +406,10 @@ $conn->close();
                                             <tr>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject ID</th>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject Name</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Theory Marks</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Practical Marks</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Credit Hours</th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                                                 <?php if ($role == 'admin'): ?>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                                 <?php endif; ?>
@@ -330,19 +418,32 @@ $conn->close();
                                         <tbody class="bg-white divide-y divide-gray-200">
                                             <?php if (empty($subjects)): ?>
                                             <tr>
-                                                <td colspan="<?php echo $role == 'admin' ? '4' : '3'; ?>" class="px-6 py-4 text-center text-sm text-gray-500">No subjects found.</td>
+                                                <td colspan="<?php echo $role == 'admin' ? '7' : '6'; ?>" class="px-6 py-4 text-center text-sm text-gray-500">No subjects found.</td>
                                             </tr>
                                             <?php else: ?>
                                                 <?php foreach ($subjects as $subject): ?>
                                                 <tr>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $subject['subject_id']; ?></td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $subject['subject_name']; ?></td>
-                                                    <td class="px-6 py-4 text-sm text-gray-900">
-                                                        <?php echo !empty($subject['description']) ? $subject['description'] : 'N/A'; ?>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        <div class="text-xs text-gray-500">Full: <?php echo $subject['full_marks_theory']; ?></div>
+                                                        <div class="text-xs text-gray-500">Pass: <?php echo $subject['pass_marks_theory']; ?></div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        <div class="text-xs text-gray-500">Full: <?php echo $subject['full_marks_practical']; ?></div>
+                                                        <div class="text-xs text-gray-500">Pass: <?php echo $subject['pass_marks_practical']; ?></div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $subject['credit_hours']; ?></td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        <?php if ($subject['is_optional']): ?>
+                                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Optional</span>
+                                                        <?php else: ?>
+                                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Compulsory</span>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <?php if ($role == 'admin'): ?>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                        <button type="button" onclick="editSubject('<?php echo $subject['subject_id']; ?>', '<?php echo $subject['subject_name']; ?>', '<?php echo $subject['description']; ?>')" class="text-blue-600 hover:text-blue-900 mr-3">
+                                                        <button type="button" onclick="editSubject('<?php echo $subject['subject_id']; ?>', '<?php echo addslashes($subject['subject_name']); ?>', '<?php echo addslashes($subject['description']); ?>', '<?php echo $subject['full_marks_theory']; ?>', '<?php echo $subject['full_marks_practical']; ?>', '<?php echo $subject['pass_marks_theory']; ?>', '<?php echo $subject['pass_marks_practical']; ?>', '<?php echo $subject['credit_hours']; ?>', '<?php echo $subject['is_optional']; ?>')" class="text-blue-600 hover:text-blue-900 mr-3">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
                                                         <button type="button" onclick="assignTeacher('<?php echo $subject['subject_id']; ?>')" class="text-green-600 hover:text-green-900 mr-3">
@@ -373,7 +474,7 @@ $conn->close();
 
     <!-- Edit Subject Modal -->
     <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-screen overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-medium text-gray-900">Edit Subject</h3>
                 <button onclick="closeModal('editModal')" class="text-gray-400 hover:text-gray-500">
@@ -384,18 +485,48 @@ $conn->close();
                 <input type="hidden" name="action" value="update_subject">
                 <input type="hidden" name="subject_id" id="edit_subject_id">
                 
-                <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="edit_subject_name" class="block text-sm font-medium text-gray-700 mb-1">Subject Name</label>
                         <input type="text" id="edit_subject_name" name="subject_name" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
                     </div>
                     
                     <div>
+                        <label for="edit_full_marks_theory" class="block text-sm font-medium text-gray-700 mb-1">Theory Full Marks</label>
+                        <input type="number" id="edit_full_marks_theory" name="full_marks_theory" step="0.01" min="0" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div>
+                        <label for="edit_full_marks_practical" class="block text-sm font-medium text-gray-700 mb-1">Practical Full Marks</label>
+                        <input type="number" id="edit_full_marks_practical" name="full_marks_practical" step="0.01" min="0" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div>
+                        <label for="edit_pass_marks_theory" class="block text-sm font-medium text-gray-700 mb-1">Theory Pass Marks</label>
+                        <input type="number" id="edit_pass_marks_theory" name="pass_marks_theory" step="0.01" min="0" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div>
+                        <label for="edit_pass_marks_practical" class="block text-sm font-medium text-gray-700 mb-1">Practical Pass Marks</label>
+                        <input type="number" id="edit_pass_marks_practical" name="pass_marks_practical" step="0.01" min="0" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div>
+                        <label for="edit_credit_hours" class="block text-sm font-medium text-gray-700 mb-1">Credit Hours</label>
+                        <input type="number" id="edit_credit_hours" name="credit_hours" step="0.1" min="0.1" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" id="edit_is_optional" name="is_optional" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                        <label for="edit_is_optional" class="ml-2 block text-sm text-gray-700">Optional Subject</label>
+                    </div>
+                    
+                    <div class="md:col-span-2">
                         <label for="edit_description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                         <textarea id="edit_description" name="description" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"></textarea>
                     </div>
                     
-                    <div class="flex justify-end space-x-3 pt-4">
+                    <div class="md:col-span-2 flex justify-end space-x-3 pt-4">
                         <button type="button" onclick="closeModal('editModal')" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                             Cancel
                         </button>
@@ -466,10 +597,16 @@ $conn->close();
 
     <script>
         // Function to edit subject
-        function editSubject(subjectId, subjectName, description) {
+        function editSubject(subjectId, subjectName, description, fullMarksTheory, fullMarksPractical, passMarksTheory, passMarksPractical, creditHours, isOptional) {
             document.getElementById('edit_subject_id').value = subjectId;
             document.getElementById('edit_subject_name').value = subjectName;
             document.getElementById('edit_description').value = description;
+            document.getElementById('edit_full_marks_theory').value = fullMarksTheory;
+            document.getElementById('edit_full_marks_practical').value = fullMarksPractical;
+            document.getElementById('edit_pass_marks_theory').value = passMarksTheory;
+            document.getElementById('edit_pass_marks_practical').value = passMarksPractical;
+            document.getElementById('edit_credit_hours').value = creditHours;
+            document.getElementById('edit_is_optional').checked = isOptional == '1';
             document.getElementById('editModal').classList.remove('hidden');
         }
         
@@ -496,8 +633,32 @@ $conn->close();
         document.getElementById('sidebar-backdrop').addEventListener('click', function() {
             document.getElementById('mobile-sidebar').classList.add('-translate-x-full');
         });
-    </script>
 
-    
+        // Auto-calculate pass marks based on full marks
+        document.getElementById('full_marks_theory').addEventListener('input', function() {
+            const fullMarks = parseFloat(this.value) || 0;
+            const passMarks = Math.round(fullMarks * 0.4); // 40% of full marks
+            document.getElementById('pass_marks_theory').value = passMarks;
+        });
+
+        document.getElementById('full_marks_practical').addEventListener('input', function() {
+            const fullMarks = parseFloat(this.value) || 0;
+            const passMarks = Math.round(fullMarks * 0.4); // 40% of full marks
+            document.getElementById('pass_marks_practical').value = passMarks;
+        });
+
+        // Edit modal auto-calculate
+        document.getElementById('edit_full_marks_theory').addEventListener('input', function() {
+            const fullMarks = parseFloat(this.value) || 0;
+            const passMarks = Math.round(fullMarks * 0.4);
+            document.getElementById('edit_pass_marks_theory').value = passMarks;
+        });
+
+        document.getElementById('edit_full_marks_practical').addEventListener('input', function() {
+            const fullMarks = parseFloat(this.value) || 0;
+            const passMarks = Math.round(fullMarks * 0.4);
+            document.getElementById('edit_pass_marks_practical').value = passMarks;
+        });
+    </script>
 </body>
 </html>

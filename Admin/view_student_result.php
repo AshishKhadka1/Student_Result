@@ -14,35 +14,36 @@ if ($conn->connect_error) {
 // Function to get grade and grade point from percentage - EXACT same as view_upload.php
 function getGradeInfo($percentage)
 {
-    if ($percentage >= 90) return ['grade' => 'A+', 'point' => 4.0, 'class' => 'bg-green-100 text-green-800'];
-    elseif ($percentage >= 80) return ['grade' => 'A', 'point' => 3.6, 'class' => 'bg-green-100 text-green-800']; // Changed
-    elseif ($percentage >= 70) return ['grade' => 'B+', 'point' => 3.2, 'class' => 'bg-green-100 text-green-800']; // Changed
-    elseif ($percentage >= 60) return ['grade' => 'B', 'point' => 2.8, 'class' => 'bg-green-100 text-green-800']; // Changed
-    elseif ($percentage >= 50) return ['grade' => 'C+', 'point' => 2.4, 'class' => 'bg-yellow-100 text-yellow-800']; // Changed
-    elseif ($percentage >= 40) return ['grade' => 'C', 'point' => 2.0, 'class' => 'bg-yellow-100 text-yellow-800']; // Changed
-    elseif ($percentage >= 33) return ['grade' => 'D', 'point' => 1.6, 'class' => 'bg-orange-100 text-orange-800']; // Changed
-    else return ['grade' => 'F', 'point' => 0.0, 'class' => 'bg-red-100 text-red-800'];
+    if ($percentage >= 91) return ['grade' => 'A+', 'point' => 4.0, 'class' => 'bg-green-100 text-green-800'];
+    elseif ($percentage >= 81) return ['grade' => 'A', 'point' => 3.6, 'class' => 'bg-green-100 text-green-800']; // Changed
+    elseif ($percentage >= 71) return ['grade' => 'B+', 'point' => 3.2, 'class' => 'bg-green-100 text-green-800']; // Changed
+    elseif ($percentage >= 61) return ['grade' => 'B', 'point' => 2.8, 'class' => 'bg-green-100 text-green-800']; // Changed
+    elseif ($percentage >= 51) return ['grade' => 'C+', 'point' => 2.4, 'class' => 'bg-yellow-100 text-yellow-800']; // Changed
+    elseif ($percentage >= 41) return ['grade' => 'C', 'point' => 2.0, 'class' => 'bg-yellow-100 text-yellow-800']; // Changed
+    elseif ($percentage >= 35) return ['grade' => 'D', 'point' => 1.6, 'class' => 'bg-orange-100 text-orange-800']; // Changed
+    else return ['grade' => 'NG', 'point' => 0.0, 'class' => 'bg-red-100 text-red-800'];
 }
 
 // Function to calculate grade and GPA based on percentage - EXACT same as view_upload.php
 function calculateGradeAndGPA($percentage)
 {
-    if ($percentage >= 90) {
-        return ['grade' => 'A+', 'gpa' => 4.0];
-    } elseif ($percentage >= 80) {
-        return ['grade' => 'A', 'gpa' => 3.6]; // Changed to match view_upload.php
-    } elseif ($percentage >= 70) {
-        return ['grade' => 'B+', 'gpa' => 3.2]; // Changed to match view_upload.php
-    } elseif ($percentage >= 60) {
-        return ['grade' => 'B', 'gpa' => 2.8]; // Changed to match view_upload.php
-    } elseif ($percentage >= 50) {
-        return ['grade' => 'C+', 'gpa' => 2.4]; // Changed to match view_upload.php
-    } elseif ($percentage >= 40) {
-        return ['grade' => 'C', 'gpa' => 2.0]; // Changed to match view_upload.php
-    } elseif ($percentage >= 33) {
-        return ['grade' => 'D', 'gpa' => 1.6]; // Changed to match view_upload.php
+
+    if ($percentage >= 91) {
+        return ['grade' => 'A+', 'gpa' => 3.8];
+    } elseif ($percentage >= 81) {
+        return ['grade' => 'A', 'gpa' => 3.4];
+    } elseif ($percentage >= 71) {
+        return ['grade' => 'B+', 'gpa' => 3.0];
+    } elseif ($percentage >= 61) {
+        return ['grade' => 'B', 'gpa' => 2.7];
+    } elseif ($percentage >= 51) {
+        return ['grade' => 'C+', 'gpa' => 2.4];
+    } elseif ($percentage >= 41) {
+        return ['grade' => 'C', 'gpa' => 1.9];
+    } elseif ($percentage >= 35) {
+        return ['grade' => 'D', 'gpa' => 1.6];
     } else {
-        return ['grade' => 'F', 'gpa' => 0.0];
+        return ['grade' => 'NG', 'gpa' => 0.0];
     }
 }
 
@@ -153,7 +154,7 @@ if (isset($_POST['action'])) {
 
         // Calculate grade and GPA
         if ($is_failed) {
-            $grade = 'F';
+            $grade = 'NG';
             $gpa = 0.0;
         } else {
             $grade_data = calculateGradeAndGPA($percentage);
@@ -329,40 +330,43 @@ try {
             // Calculate final GPA for this subject using EXACT same logic as view_upload.php
             if ($is_failed) {
                 $subject_gpa = 0.0;
-                $subject_grade = 'F';
+                $subject_grade = 'NG';
                 $final_grade_class = 'bg-red-100 text-red-800';
             } else {
                 // Calculate subject GPA based on total percentage - EXACT same as view_upload.php
                 $subject_total_percentage = ($subject_total_obtained / $subject_full_marks) * 100;
 
                 // Use EXACT same grading scale as view_upload.php
-                if ($subject_total_percentage >= 90) {
-                    $subject_gpa = 4.0;
+
+
+                if ($subject_total_percentage >= 91) {
+                    $subject_gpa = 3.8;
                     $subject_grade = 'A+';
-                } elseif ($subject_total_percentage >= 80) {
-                    $subject_gpa = 3.6; // Changed to match view_upload.php exactly
+                } elseif ($subject_total_percentage >= 81) {
+                    $subject_gpa = 3.4;
                     $subject_grade = 'A';
-                } elseif ($subject_total_percentage >= 70) {
-                    $subject_gpa = 3.2; // Changed to match view_upload.php exactly
+                } elseif ($subject_total_percentage >= 71) {
+                    $subject_gpa = 3.0;
                     $subject_grade = 'B+';
-                } elseif ($subject_total_percentage >= 60) {
-                    $subject_gpa = 2.8; // Changed to match view_upload.php exactly
+                } elseif ($subject_total_percentage >= 61) {
+                    $subject_gpa = 2.7;
                     $subject_grade = 'B';
-                } elseif ($subject_total_percentage >= 50) {
-                    $subject_gpa = 2.4; // Changed to match view_upload.php exactly
+                } elseif ($subject_total_percentage >= 51) {
+                    $subject_gpa = 2.4;
                     $subject_grade = 'C+';
-                } elseif ($subject_total_percentage >= 40) {
-                    $subject_gpa = 2.0; // Changed to match view_upload.php exactly
+                } elseif ($subject_total_percentage >= 41) {
+                    $subject_gpa = 1.9;
                     $subject_grade = 'C';
-                } elseif ($subject_total_percentage >= 33) {
-                    $subject_gpa = 1.6; // Changed to match view_upload.php exactly
+                } elseif ($subject_total_percentage >= 35) {
+                    $subject_gpa = 1.6;
                     $subject_grade = 'D';
                 } else {
                     $subject_gpa = 0.0;
-                    $subject_grade = 'F';
+                    $subject_grade = 'NG';
                 }
 
-                $final_grade_class = $subject_grade == 'F' ? 'bg-red-100 text-red-800' : ($subject_gpa >= 3.0 ? 'bg-green-100 text-green-800' : ($subject_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
+
+                $final_grade_class = $subject_grade == 'NG' ? 'bg-red-100 text-red-800' : ($subject_gpa >= 3.0 ? 'bg-green-100 text-green-800' : ($subject_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
             }
 
             // Store calculated values - EXACT same structure as view_upload.php
@@ -416,28 +420,27 @@ try {
     $is_pass = ($failed_subjects == 0);
 
     // Determine overall grade - EXACT same logic as view_upload.php
-    if ($failed_subjects > 0) {
-        $overall_grade = 'F';
+   if ($failed_subjects > 0) {
+    $overall_grade = 'NG';
+} else {
+    if ($overall_percentage >= 91) {
+        $overall_grade = 'A+';
+    } elseif ($overall_percentage >= 81) {
+        $overall_grade = 'A';
+    } elseif ($overall_percentage >= 71) {
+        $overall_grade = 'B+';
+    } elseif ($overall_percentage >= 61) {
+        $overall_grade = 'B';
+    } elseif ($overall_percentage >= 51) {
+        $overall_grade = 'C+';
+    } elseif ($overall_percentage >= 41) {
+        $overall_grade = 'C';
+    } elseif ($overall_percentage >= 35) {
+        $overall_grade = 'D';
     } else {
-        // Use EXACT same grading scale as view_upload.php
-        if ($overall_percentage >= 90) {
-            $overall_grade = 'A+';
-        } elseif ($overall_percentage >= 80) {
-            $overall_grade = 'A';
-        } elseif ($overall_percentage >= 70) {
-            $overall_grade = 'B+';
-        } elseif ($overall_percentage >= 60) {
-            $overall_grade = 'B';
-        } elseif ($overall_percentage >= 50) {
-            $overall_grade = 'C+';
-        } elseif ($overall_percentage >= 40) {
-            $overall_grade = 'C';
-        } elseif ($overall_percentage >= 33) {
-            $overall_grade = 'D';
-        } else {
-            $overall_grade = 'F';
-        }
+        $overall_grade = 'NG';
     }
+}
 
     // Determine division - EXACT same logic as view_upload.php
     $division = '';
@@ -449,7 +452,7 @@ try {
         $division = 'First Division';
     } elseif ($overall_percentage >= 45) {
         $division = 'Second Division';
-    } elseif ($overall_percentage >= 33) {
+    } elseif ($overall_percentage >= 35) {
         $division = 'Third Division';
     } else {
         $division = 'Fail';
@@ -823,7 +826,7 @@ $conn->close();
                                                             </div>
                                                         </td>
                                                         <td class="px-6 py-4 whitespace-nowrap">
-                                                            <?php $is_pass = ($subject['calculated_grade'] != 'F'); ?>
+                                                            <?php $is_pass = ($subject['calculated_grade'] != 'NG'); ?>
                                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $is_pass ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
                                                                 <?php echo $is_pass ? 'Pass' : 'Fail'; ?>
                                                             </span>
@@ -876,7 +879,7 @@ $conn->close();
                                             'B+', 'B' => 'text-blue-700',
                                             'C+', 'C' => 'text-yellow-700',
                                             'D'        => 'text-orange-700',
-                                            'F'        => 'text-red-700',
+                                            'NG'        => 'text-red-700',
                                             default    => 'text-gray-700'
                                         };
                                         ?>
