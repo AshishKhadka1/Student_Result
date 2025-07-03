@@ -549,9 +549,7 @@ $conn->close();
                                                             <button onclick="showEditModal('<?php echo $student['student_id']; ?>')" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded inline-flex items-center" title="Edit">
                                                                 <i class="fas fa-edit mr-1"></i> Edit
                                                             </button>
-                                                            <button onclick="showResultsModal('<?php echo $student['student_id']; ?>')" class="bg-green-100 hover:bg-green-200 text-green-700 py-1 px-2 rounded inline-flex items-center" title="View Results">
-                                                                <i class="fas fa-clipboard-list mr-1"></i> Results
-                                                            </button>
+                                                            
                                                             <button onclick="confirmDelete('<?php echo $student['student_id']; ?>')" class="bg-red-100 hover:bg-red-200 text-red-700 py-1 px-2 rounded inline-flex items-center" title="Delete">
                                                                 <i class="fas fa-trash mr-1"></i> Delete
                                                             </button>
@@ -771,22 +769,7 @@ $conn->close();
         </div>
     </div>
 
-    <!-- Results Modal -->
-    <div id="resultsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="text-lg font-medium text-gray-900">Student Results</h3>
-                <button type="button" onclick="closeResultsModal()" class="text-gray-400 hover:text-gray-500">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div id="resultsContent" class="mt-4">
-                <div class="flex justify-center">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                </div>
-            </div>
-        </div>
-    </div>
+    
 
     <script>
         // Confirm delete function
@@ -1094,25 +1077,7 @@ $conn->close();
             document.getElementById('editModal').classList.add('hidden');
         }
         
-        // Results Modal Functions
-        function showResultsModal(studentId) {
-            document.getElementById('resultsModal').classList.remove('hidden');
-            document.getElementById('resultsContent').innerHTML = '<div class="flex justify-center"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
-            
-            // Fetch student results
-            fetch(`get_student_results.php?id=${studentId}`)
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('resultsContent').innerHTML = data;
-                })
-                .catch(error => {
-                    document.getElementById('resultsContent').innerHTML = `<div class="text-red-500">Error loading results: ${error.message}</div>`;
-                });
-        }
         
-        function closeResultsModal() {
-            document.getElementById('resultsModal').classList.add('hidden');
-        }
         
         // Save student edit form
         function saveStudentEdit(formId) {
@@ -1215,40 +1180,7 @@ function showEditModal(studentId) {
         });
 }
 
-function showResultsModal(studentId) {
-    document.getElementById('resultsModal').classList.remove('hidden');
-    const resultsContent = document.getElementById('resultsContent');
-    resultsContent.innerHTML = '<div class="flex justify-center"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
-    
-    // Fetch student results with better error handling
-    fetch(`get_student_results.php?id=${studentId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-            return response.text();
-        })
-        .then(data => {
-            resultsContent.innerHTML = data;
-            
-            // Set the student ID on the exam selector after content is loaded
-            const examSelector = document.getElementById('exam_selector');
-            if (examSelector) {
-                examSelector.setAttribute('data-student-id', studentId);
-            }
-        })
-        .catch(error => {
-            resultsContent.innerHTML = `
-                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
-                    <p class="font-bold">Error</p>
-                    <p>Failed to load student results: ${error.message}</p>
-                    <button onclick="closeResultsModal()" class="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                        Close
-                    </button>
-                </div>
-            `;
-        });
-}
+
 
 // Enhanced delete confirmation with more detailed warning
 function confirmDelete(studentId) {
@@ -1291,67 +1223,7 @@ function confirmDelete(studentId) {
     });
 }
 
-function changeExam(examId) {
-    // Show loading indicator only in the table body
-    const tableBody = document.querySelector('#resultsContent table tbody');
-    if (tableBody) {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="7" class="px-6 py-4 text-center">
-                    <div class="flex justify-center items-center space-x-2">
-                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-                        <span class="text-sm text-gray-500">Loading results...</span>
-                    </div>
-                </td>
-            </tr>
-        `;
-    } else {
-        // Fallback if table body not found
-        document.getElementById('resultsContent').innerHTML = '<div class="flex justify-center"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
-    }
-    
-    // Get the student ID from the data attribute
-    const studentId = document.getElementById('exam_selector').getAttribute('data-student-id');
-    
-    // Add a timestamp to prevent caching
-    const timestamp = new Date().getTime();
-    
-    // Use fetch with cache control
-    fetch(`get_student_results.php?id=${studentId}&exam_id=${examId}&_=${timestamp}`, {
-        headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.text();
-    })
-    .then(data => {
-        document.getElementById('resultsContent').innerHTML = data;
-        
-        // Update the exam selector to maintain the selected value
-        const newExamSelector = document.getElementById('exam_selector');
-        if (newExamSelector) {
-            newExamSelector.value = examId;
-            newExamSelector.setAttribute('data-student-id', studentId);
-        }
-    })
-    .catch(error => {
-        document.getElementById('resultsContent').innerHTML = `
-            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
-                <p class="font-bold">Error</p>
-                <p>Failed to load results: ${error.message}</p>
-                <button onclick="closeResultsModal()" class="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                    Close
-                </button>
-            </div>
-        `;
-    });
-}
+
     </script>
 </body>
 

@@ -219,100 +219,6 @@ $conn->close();
                 </div>
             </div>
             
-            <div class="mb-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-2">Academic Performance</h3>
-                <?php if (empty($performance_data)): ?>
-                    <p class="text-gray-500">No performance data available.</p>
-                <?php else: ?>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subjects</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg. Marks</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GPA</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Result</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <?php foreach ($performance_data as $exam): ?>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            <?php echo htmlspecialchars($exam['exam_name']); ?>
-                                            <div class="text-xs text-gray-500"><?php echo ucfirst(htmlspecialchars($exam['exam_type'])); ?></div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <?php echo $exam['subjects_passed'] . '/' . $exam['subjects_count']; ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <?php echo number_format($exam['average_marks'], 2); ?>%
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <?php echo number_format($exam['average_gpa'], 2); ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <?php 
-                                            $passed = $exam['subjects_passed'] == $exam['subjects_count'];
-                                            $class = $passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-                                            $result = $passed ? 'PASS' : 'FAIL';
-                                            ?>
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $class; ?>">
-                                                <?php echo $result; ?>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-            
-            <?php if ($attendance_data): ?>
-            <div class="mb-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-2">Attendance Summary</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div class="bg-green-50 p-4 rounded-lg">
-                        <p class="text-sm text-gray-500">Present Days</p>
-                        <p class="text-2xl font-bold text-green-600"><?php echo $attendance_data['present_days']; ?></p>
-                        <p class="text-sm text-gray-500">
-                            <?php 
-                            $present_percentage = ($attendance_data['total_days'] > 0) 
-                                ? round(($attendance_data['present_days'] / $attendance_data['total_days']) * 100) 
-                                : 0;
-                            echo $present_percentage . '%';
-                            ?>
-                        </p>
-                    </div>
-                    <div class="bg-red-50 p-4 rounded-lg">
-                        <p class="text-sm text-gray-500">Absent Days</p>
-                        <p class="text-2xl font-bold text-red-600"><?php echo $attendance_data['absent_days']; ?></p>
-                        <p class="text-sm text-gray-500">
-                            <?php 
-                            $absent_percentage = ($attendance_data['total_days'] > 0) 
-                                ? round(($attendance_data['absent_days'] / $attendance_data['total_days']) * 100) 
-                                : 0;
-                            echo $absent_percentage . '%';
-                            ?>
-                        </p>
-                    </div>
-                    <div class="bg-yellow-50 p-4 rounded-lg">
-                        <p class="text-sm text-gray-500">Late Days</p>
-                        <p class="text-2xl font-bold text-yellow-600"><?php echo $attendance_data['late_days']; ?></p>
-                        <p class="text-sm text-gray-500">
-                            <?php 
-                            $late_percentage = ($attendance_data['total_days'] > 0) 
-                                ? round(($attendance_data['late_days'] / $attendance_data['total_days']) * 100) 
-                                : 0;
-                            echo $late_percentage . '%';
-                            ?>
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
-            
             <div>
                 <h3 class="text-lg font-medium text-gray-900 mb-2">Account Information</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -340,12 +246,7 @@ $conn->close();
             </svg>
             Edit Profile
         </button>
-        <button onclick="showResultsModal('<?php echo $student['student_id']; ?>')" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            View Results
-        </button>
+    
         <button onclick="closeProfileModal()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
             Close
         </button>

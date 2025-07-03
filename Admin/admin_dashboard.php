@@ -750,7 +750,6 @@ $conn->close();
                                         <h3 class="text-lg font-medium text-gray-900">Class Toppers</h3>
                                         <p class="mt-1 text-sm text-gray-500">Students with highest GPA in each class</p>
                                     </div>
-                                    <a href="toppers.php" class="text-sm text-blue-600 hover:text-blue-500">View all</a>
                                 </div>
                                 <div class="px-4 py-5 sm:p-6">
                                     <div class="overflow-x-auto">
@@ -803,7 +802,6 @@ $conn->close();
                                         <h3 class="text-lg font-medium text-gray-900">Academic Progress</h3>
                                         <p class="mt-1 text-sm text-gray-500">Overall class performance metrics</p>
                                     </div>
-                                    <a href="academic_progress.php" class="text-sm text-blue-600 hover:text-blue-500">View all</a>
                                 </div>
                                 <div class="px-4 py-5 sm:p-6">
                                     <div class="overflow-x-auto">

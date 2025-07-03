@@ -14,6 +14,117 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+// Exact GPA Calculation Functions - SAME as view_student_result.php
+function calculateExactGPA($percentage)
+{
+    $percentage = round($percentage, 2);
+
+    if ($percentage >= 91) {
+        // A+ grade: 3.6 - 4.0 range
+        $gpa = 3.6 + (($percentage - 91) / 9) * (4.0 - 3.6);
+        return ['grade' => 'A+', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 81) {
+        // A grade: 3.2 - 3.6 range
+        $gpa = 3.2 + (($percentage - 81) / 9) * (3.6 - 3.2);
+        return ['grade' => 'A', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 71) {
+        // B+ grade: 2.8 - 3.2 range
+        $gpa = 2.8 + (($percentage - 71) / 9) * (3.2 - 2.8);
+        return ['grade' => 'B+', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 61) {
+        // B grade: 2.6 - 2.8 range
+        $gpa = 2.6 + (($percentage - 61) / 9) * (2.8 - 2.6);
+        return ['grade' => 'B', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 51) {
+        // C+ grade: 2.2 - 2.6 range
+        $gpa = 2.2 + (($percentage - 51) / 9) * (2.6 - 2.2);
+        return ['grade' => 'C+', 'gpa' => round($gpa, 2), 'class' => 'bg-yellow-100 text-yellow-800'];
+    } elseif ($percentage >= 41) {
+        // C grade: 1.6 - 2.2 range
+        $gpa = 1.6 + (($percentage - 41) / 9) * (2.2 - 1.6);
+        return ['grade' => 'C', 'gpa' => round($gpa, 2), 'class' => 'bg-yellow-100 text-yellow-800'];
+    } elseif ($percentage >= 35) {
+        // D+ grade: 1.6 (fixed value)
+        return ['grade' => 'D+', 'gpa' => 1.6, 'class' => 'bg-orange-100 text-orange-800'];
+    } else {
+        // NG grade: 0.0
+        return ['grade' => 'NG', 'gpa' => 0.0, 'class' => 'bg-red-100 text-red-800'];
+    }
+}
+
+function calculateTheoryOnlyGPA($theoryMarks, $theoryFullMarks = 100)
+{
+    // Validate marks don't exceed full marks
+    if ($theoryMarks > $theoryFullMarks) {
+        return ['error' => 'Theory marks cannot exceed full marks'];
+    }
+
+    $percentage = ($theoryMarks / $theoryFullMarks) * 100;
+    $result = calculateExactGPA($percentage);
+
+    return [
+        'percentage' => round($percentage, 2),
+        'grade' => $result['grade'],
+        'gpa' => $result['gpa'],
+        'class' => $result['class']
+    ];
+}
+
+function calculateTheoryPracticalGPA($theoryMarks, $practicalMarks, $theoryFullMarks = 75, $practicalFullMarks = 25)
+{
+    // Validate marks don't exceed full marks
+    if ($theoryMarks > $theoryFullMarks || $practicalMarks > $practicalFullMarks) {
+        return ['error' => 'Marks cannot exceed respective full marks'];
+    }
+
+    $theoryPercentage = ($theoryMarks / $theoryFullMarks) * 100;
+    $practicalPercentage = ($practicalMarks / $practicalFullMarks) * 100;
+
+    $theoryResult = calculateExactGPA($theoryPercentage);
+    $practicalResult = calculateExactGPA($practicalPercentage);
+
+    // Calculate weighted final GPA
+    $finalGPA = ($theoryResult['gpa'] * 75 + $practicalResult['gpa'] * 25) / 100;
+
+    return [
+        'theory' => [
+            'percentage' => round($theoryPercentage, 2),
+            'grade' => $theoryResult['grade'],
+            'gpa' => $theoryResult['gpa'],
+            'class' => $theoryResult['class']
+        ],
+        'practical' => [
+            'percentage' => round($practicalPercentage, 2),
+            'grade' => $practicalResult['grade'],
+            'gpa' => $practicalResult['gpa'],
+            'class' => $practicalResult['class']
+        ],
+        'final_gpa' => round($finalGPA, 2)
+    ];
+}
+
+// Function to check if subject is failed - Updated to match view_student_result.php (33% minimum)
+function isSubjectFailed($theory_marks, $practical_marks = null, $has_practical = false)
+{
+    // Check theory failure (below 33% of theory full marks)
+    $theory_full_marks = $has_practical ? 75 : 100;
+    $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
+
+    if ($theory_percentage < 33) {
+        return true;
+    }
+
+    // Check practical failure if practical exists (below 33%)
+    if ($has_practical && $practical_marks !== null) {
+        $practical_percentage = ($practical_marks / 25) * 100;
+        if ($practical_percentage < 33) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // Initialize variables
 $student = [];
 $subjects = [];
@@ -96,7 +207,7 @@ if (isset($_GET['student_id']) && isset($_GET['exam_id'])) {
         die("Database error: " . $conn->error);
     }
 
-    // Get results for this student and exam
+    // Get results for this student and exam using EXACT same logic as view_student_result.php
     $stmt = $conn->prepare("
         SELECT r.*, s.subject_name, s.subject_code, s.full_marks_theory, s.full_marks_practical
         FROM results r
@@ -111,147 +222,193 @@ if (isset($_GET['student_id']) && isset($_GET['exam_id'])) {
         $results_data = $stmt->get_result();
 
         $subjects = [];
-        $total_marks = 0;
+        $total_marks_obtained = 0;
+        $total_full_marks = 0;
         $total_subjects = 0;
-        $max_marks = 0;
+        $failed_subjects = 0;
+        $total_gpa_points = 0;
 
         while ($row = $results_data->fetch_assoc()) {
-            $theory_marks = $row['theory_marks'] ?? 0;
-            $practical_marks = $row['practical_marks'] ?? 0;
-            $total_subject_marks = $theory_marks + $practical_marks;
-            $subject_max_marks = $row['full_marks_theory'] + $row['full_marks_practical'];
+            $theory_marks = floatval($row['theory_marks'] ?? 0);
+            $practical_marks = floatval($row['practical_marks'] ?? 0);
+
+            // Determine if subject has practical based on whether practical_marks > 0
+            $has_practical = !is_null($row['practical_marks']) && $row['practical_marks'] > 0;
+
+            // Determine full marks based on whether practical exists
+            $theory_full_marks = $has_practical ? 75 : 100;
+            $practical_full_marks = $has_practical ? 25 : 0;
+            $subject_full_marks = 100; // Total is always 100
+
+            $subject_total_obtained = $theory_marks + $practical_marks;
+            $total_marks_obtained += $subject_total_obtained;
+            $total_full_marks += $subject_full_marks;
+            $total_subjects++;
+
+            // Calculate using exact GPA functions - SAME as view_student_result.php
+            if ($has_practical) {
+                // Theory + Practical case (75 + 25)
+                $gpaResult = calculateTheoryPracticalGPA($theory_marks, $practical_marks, 75, 25);
+                if (isset($gpaResult['error'])) {
+                    $theory_percentage = 0;
+                    $practical_percentage = 0;
+                    $theory_grade_info = ['grade' => 'Error', 'gpa' => 0, 'class' => 'bg-red-100 text-red-800'];
+                    $practical_grade_info = ['grade' => 'Error', 'gpa' => 0, 'class' => 'bg-red-100 text-red-800'];
+                    $final_gpa = 0.0;
+                    $final_grade = 'Error';
+                    $final_grade_class = 'bg-red-100 text-red-800';
+                    $is_failed = true;
+                } else {
+                    $theory_percentage = $gpaResult['theory']['percentage'];
+                    $practical_percentage = $gpaResult['practical']['percentage'];
+                    $theory_grade_info = ['grade' => $gpaResult['theory']['grade'], 'gpa' => $gpaResult['theory']['gpa'], 'class' => $gpaResult['theory']['class']];
+                    $practical_grade_info = ['grade' => $gpaResult['practical']['grade'], 'gpa' => $gpaResult['practical']['gpa'], 'class' => $gpaResult['practical']['class']];
+                    $final_gpa = $gpaResult['final_gpa'];
+
+                    // Check for failure condition (either theory or practical below 33%)
+                    $is_failed = ($theory_percentage < 33) || ($practical_percentage < 33);
+
+                    if ($is_failed) {
+                        $final_gpa = 0.0;
+                        $final_grade = 'NG';
+                        $final_grade_class = 'bg-red-100 text-red-800';
+                    } else {
+                        // Determine final grade based on exact GPA
+                        if ($final_gpa >= 3.6) {
+                            $final_grade = 'A+';
+                        } elseif ($final_gpa >= 3.2) {
+                            $final_grade = 'A';
+                        } elseif ($final_gpa >= 2.8) {
+                            $final_grade = 'B+';
+                        } elseif ($final_gpa >= 2.6) {
+                            $final_grade = 'B';
+                        } elseif ($final_gpa >= 2.2) {
+                            $final_grade = 'C+';
+                        } elseif ($final_gpa > 1.6) {
+                            $final_grade = 'C';
+                        } elseif ($final_gpa == 1.6) {
+                            $final_grade = 'D+';
+                        } else {
+                            $final_grade = 'NG';
+                        }
+
+                        $final_grade_class = $final_grade == 'NG' ? 'bg-red-100 text-red-800' : ($final_gpa >= 3.0 ? 'bg-green-100 text-green-800' : ($final_gpa >= 2.0 ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'));
+                    }
+                }
+            } else {
+                // Theory only case (100 marks)
+                $gpaResult = calculateTheoryOnlyGPA($theory_marks, 100);
+                if (isset($gpaResult['error'])) {
+                    $theory_percentage = 0;
+                    $theory_grade_info = ['grade' => 'Error', 'gpa' => 0, 'class' => 'bg-red-100 text-red-800'];
+                    $final_gpa = 0.0;
+                    $final_grade = 'Error';
+                    $final_grade_class = 'bg-red-100 text-red-800';
+                    $is_failed = true;
+                } else {
+                    $theory_percentage = $gpaResult['percentage'];
+                    $theory_grade_info = ['grade' => $gpaResult['grade'], 'gpa' => $gpaResult['gpa'], 'class' => $gpaResult['class']];
+                    $final_gpa = $gpaResult['gpa'];
+
+                    // Check for failure condition (theory below 33%)
+                    $is_failed = ($theory_percentage < 33);
+
+                    if ($is_failed) {
+                        $final_gpa = 0.0;
+                        $final_grade = 'NG';
+                        $final_grade_class = 'bg-red-100 text-red-800';
+                    } else {
+                        $final_grade = $gpaResult['grade'];
+                        $final_grade_class = $gpaResult['class'];
+                    }
+                }
+                $practical_percentage = 0;
+                $practical_grade_info = ['grade' => 'N/A', 'gpa' => 0, 'class' => 'bg-gray-100 text-gray-800'];
+            }
+
+            if ($is_failed) {
+                $failed_subjects++;
+            }
+
+            $total_gpa_points += $final_gpa;
 
             $subjects[] = [
                 'code' => $row['subject_code'] ?? $row['subject_id'],
                 'name' => $row['subject_name'],
-                'credit_hour' => $row['credit_hours'],
+                'credit_hour' => $row['credit_hours'] ?? 4,
                 'theory_marks' => $theory_marks,
-                'practical_marks' => $practical_marks,
-                'full_marks_theory' => $row['full_marks_theory'],
-                'full_marks_practical' => $row['full_marks_practical'],
-                'total_marks' => $total_subject_marks,
+                'practical_marks' => $has_practical ? $practical_marks : null,
+                'full_marks_theory' => $theory_full_marks,
+                'full_marks_practical' => $practical_full_marks,
+                'total_marks' => $subject_total_obtained,
                 'grade' => $row['grade'],
-                'remarks' => $row['remarks'] ?? ''
+                'remarks' => $row['remarks'] ?? '',
+                'calculated_grade' => $final_grade,
+                'calculated_gpa' => $final_gpa,
+                'has_practical' => $has_practical,
+                'theory_percentage' => $theory_percentage,
+                'practical_percentage' => $practical_percentage,
+                'theory_grade_info' => $theory_grade_info,
+                'practical_grade_info' => $practical_grade_info,
+                'final_grade_class' => $final_grade_class,
+                'is_failed' => $is_failed
             ];
-
-            $total_marks += $total_subject_marks;
-            $total_subjects++;
-            $max_marks += $subject_max_marks;
         }
 
         $stmt->close();
-    } else {
-        die("Database error: " . $conn->error);
-    }
 
-    // Enhanced subject processing with detailed grade calculations
-    foreach ($subjects as &$subject) {
-        // Determine if subject has practical
-        $has_practical = !is_null($subject['practical_marks']) && $subject['practical_marks'] > 0;
-        
-        // Set full marks based on practical existence
-        $subject['theory_full_marks'] = $has_practical ? 75 : 100;
-        $subject['practical_full_marks'] = $has_practical ? 25 : 0;
-        $subject['has_practical'] = $has_practical;
-        
-        // Calculate theory and practical percentages
-        $theory_marks = $subject['theory_marks'] ?? 0;
-        $practical_marks = $subject['practical_marks'] ?? 0;
-        
-        $subject['theory_percentage'] = $subject['theory_full_marks'] > 0 ? 
-            ($theory_marks / $subject['theory_full_marks']) * 100 : 0;
-        $subject['practical_percentage'] = $subject['practical_full_marks'] > 0 ? 
-            ($practical_marks / $subject['practical_full_marks']) * 100 : 0;
-        
-        // Calculate final grade and GPA
-        $total_obtained = $theory_marks + $practical_marks;
-        $total_full = $subject['theory_full_marks'] + $subject['practical_full_marks'];
-        $total_percentage = $total_full > 0 ? ($total_obtained / $total_full) * 100 : 0;
-        
-        // Check for failure (35% rule)
-        $theory_failed = $subject['theory_percentage'] < 35;
-        $practical_failed = $has_practical && $subject['practical_percentage'] < 35;
-        
-        if ($theory_failed || $practical_failed) {
-            $subject['calculated_grade'] = 'NG';
-            $subject['calculated_gpa'] = 0.0;
+        // Calculate overall performance using EXACT same logic as view_student_result.php
+        $overall_percentage = $total_full_marks > 0 ? ($total_marks_obtained / $total_full_marks) * 100 : 0;
+        $overall_gpa = $total_subjects > 0 ? ($total_gpa_points / $total_subjects) : 0;
+        $is_pass = ($failed_subjects == 0);
+
+        // Determine overall grade - EXACT same logic as view_student_result.php
+        if ($failed_subjects > 0) {
+            $overall_grade = 'NG';
         } else {
-            // Calculate grade based on total percentage
-            if ($total_percentage >= 91) {
-                $subject['calculated_grade'] = 'A+';
-                $subject['calculated_gpa'] = 4.0;
-            } elseif ($total_percentage >= 81) {
-                $subject['calculated_grade'] = 'A';
-                $subject['calculated_gpa'] = 3.6;
-            } elseif ($total_percentage >= 71) {
-                $subject['calculated_grade'] = 'B+';
-                $subject['calculated_gpa'] = 3.2;
-            } elseif ($total_percentage >= 61) {
-                $subject['calculated_grade'] = 'B';
-                $subject['calculated_gpa'] = 2.8;
-            } elseif ($total_percentage >= 51) {
-                $subject['calculated_grade'] = 'C+';
-                $subject['calculated_gpa'] = 2.4;
-            } elseif ($total_percentage >= 41) {
-                $subject['calculated_grade'] = 'C';
-                $subject['calculated_gpa'] = 2.0;
-            } elseif ($total_percentage >= 35) {
-                $subject['calculated_grade'] = 'D';
-                $subject['calculated_gpa'] = 1.6;
+            if ($overall_percentage >= 91) {
+                $overall_grade = 'A+';
+            } elseif ($overall_percentage >= 81) {
+                $overall_grade = 'A';
+            } elseif ($overall_percentage >= 71) {
+                $overall_grade = 'B+';
+            } elseif ($overall_percentage >= 61) {
+                $overall_grade = 'B';
+            } elseif ($overall_percentage >= 51) {
+                $overall_grade = 'C+';
+            } elseif ($overall_percentage >= 41) {
+                $overall_grade = 'C';
+            } elseif ($overall_percentage >= 35) {
+                $overall_grade = 'D+';
             } else {
-                $subject['calculated_grade'] = 'NG';
-                $subject['calculated_gpa'] = 0.0;
+                $overall_grade = 'NG';
             }
         }
-    }
 
-    // Get student performance data if available
-    $stmt = $conn->prepare("
-        SELECT * FROM student_performance 
-        WHERE student_id = ? AND exam_id = ?
-    ");
-    
-    if ($stmt) {
-        $stmt->bind_param("si", $student_id, $exam_id);
-        $stmt->execute();
-        $performance_result = $stmt->get_result();
-
-        if ($performance_result->num_rows > 0) {
-            $performance = $performance_result->fetch_assoc();
-            $gpa = $performance['gpa'];
-            $percentage = $performance['average_marks'];
+        // Determine division - EXACT same logic as view_student_result.php
+        $division = '';
+        if ($failed_subjects > 0) {
+            $division = 'Fail';
+        } elseif ($overall_percentage >= 80) {
+            $division = 'Distinction';
+        } elseif ($overall_percentage >= 60) {
+            $division = 'First Division';
+        } elseif ($overall_percentage >= 45) {
+            $division = 'Second Division';
+        } elseif ($overall_percentage >= 35) {
+            $division = 'Third Division';
         } else {
-            // Calculate percentage if performance data not available
-            $percentage = $max_marks > 0 ? ($total_marks / $max_marks) * 100 : 0;
-
-            // Calculate GPA (using grading system from database)
-            $gpa = calculateGPA($percentage, $conn);
+            $division = 'Fail';
         }
 
-        $stmt->close();
-    } else {
-        // If query fails, calculate manually
-        $percentage = $max_marks > 0 ? ($total_marks / $max_marks) * 100 : 0;
-        $gpa = calculateGPA($percentage, $conn);
-    }
+        // Set final values
+        $total_marks = $total_marks_obtained;
+        $max_marks = $total_full_marks;
+        $percentage = $overall_percentage;
+        $gpa = $overall_gpa;
 
-    // Determine division
-    if ($percentage >= 91) {
-        $division = 'Distinction (A+)';
-    } elseif ($percentage >= 81) {
-        $division = 'First Division (A)';
-    } elseif ($percentage >= 71) {
-        $division = 'Second Division (B+)';
-    } elseif ($percentage >= 61) {
-        $division = 'Second Division (B)';
-    } elseif ($percentage >= 51) {
-        $division = 'Third Division (C+)';
-    } elseif ($percentage >= 41) {
-        $division = 'Third Division (C)';
-    } elseif ($percentage >= 35) {
-        $division = 'Pass (D+)';
     } else {
-        $division = 'Not Graded (NG)';
+        die("Database error: " . $conn->error);
     }
 } else {
     // If no specific student is requested, show a list of students to select
@@ -377,21 +534,7 @@ if (isset($_GET['student_id']) && isset($_GET['exam_id'])) {
     }
 }
 
-// Function to calculate GPA based on percentage
-function calculateGPA($percentage, $conn)
-{
-    // Use the new grading system
-    if ($percentage >= 91) return 3.8; // Average of 3.6-4.0
-    elseif ($percentage >= 81) return 3.4; // Average of 3.2-3.6
-    elseif ($percentage >= 71) return 3.0; // Average of 2.8-3.2
-    elseif ($percentage >= 61) return 2.7; // Average of 2.6-2.8
-    elseif ($percentage >= 51) return 2.4; // Average of 2.2-2.6
-    elseif ($percentage >= 41) return 1.9; // Average of 1.6-2.2
-    elseif ($percentage >= 35) return 1.6; // Borderline
-    else return 0.0; // Not Graded
-}
-
-
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -892,14 +1035,8 @@ function calculateGPA($percentage, $conn)
 <body class="bg-gray-100">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <?php include 'sidebar.php'; 
-        
-        ?>
-        <?php include 'mobile_sidebar.php'; 
-        
-        ?>
-
-        
+        <?php include 'sidebar.php'; ?>
+        <?php include 'mobile_sidebar.php'; ?>
 
         <!-- Main Content -->
         <div class="flex flex-col flex-1 w-0 overflow-hidden">
@@ -1178,89 +1315,20 @@ function calculateGPA($percentage, $conn)
                                         <?php else: ?>
                                             <?php foreach ($subjects as $subject): ?>
                                                 <tr>
-                                                    <td><?php echo htmlspecialchars($subject['subject_code'] ?? $subject['code']); ?></td>
-                                                    <td><?php echo htmlspecialchars($subject['subject_name'] ?? $subject['name']); ?></td>
-                                                    <td><?php echo htmlspecialchars($subject['credit_hour'] ?? 3); ?></td>
+                                                    <td><?php echo htmlspecialchars($subject['code']); ?></td>
+                                                    <td><?php echo htmlspecialchars($subject['name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($subject['credit_hour']); ?></td>
                                                     <td>
-                                                        <?php 
-                                                        // Calculate theory grade from marks
-                                                        $theory_marks = $subject['theory_marks'];
-                                                        $theory_full_marks = $subject['theory_full_marks'] ?? ($subject['has_practical'] ? 75 : 100);
-                                                        if ($theory_marks > 0 && $theory_full_marks > 0) {
-                                                            $theory_percentage = ($theory_marks / $theory_full_marks) * 100;
-                                                            if ($theory_percentage >= 91) echo 'A+';
-                                                            elseif ($theory_percentage >= 81) echo 'A';
-                                                            elseif ($theory_percentage >= 71) echo 'B+';
-                                                            elseif ($theory_percentage >= 61) echo 'B';
-                                                            elseif ($theory_percentage >= 51) echo 'C+';
-                                                            elseif ($theory_percentage >= 41) echo 'C';
-                                                            elseif ($theory_percentage >= 35) echo 'D';
-                                                            else echo 'NG';
-                                                        } else {
-                                                            echo 'N/A';
-                                                        }
-                                                        ?>
+                                                        <?php echo $subject['theory_grade_info']['grade']; ?>
                                                     </td>
                                                     <td>
-                                                        <?php 
-                                                        // Calculate practical grade from marks
-                                                        $practical_marks = $subject['practical_marks'] ?? 0;
-                                                        $practical_full_marks = $subject['practical_full_marks'] ?? 25;
-                                                        $has_practical = $subject['has_practical'] ?? (!is_null($subject['practical_marks']) && $subject['practical_marks'] > 0);
-                                                        
-                                                        if ($has_practical && $practical_full_marks > 0) {
-                                                            if ($practical_marks > 0) {
-                                                                $practical_percentage = ($practical_marks / $practical_full_marks) * 100;
-                                                                if ($practical_percentage >= 91) echo 'A+';
-                                                                elseif ($practical_percentage >= 81) echo 'A';
-                                                                elseif ($practical_percentage >= 71) echo 'B+';
-                                                                elseif ($practical_percentage >= 61) echo 'B';
-                                                                elseif ($practical_percentage >= 51) echo 'C+';
-                                                                elseif ($practical_percentage >= 41) echo 'C';
-                                                                elseif ($practical_percentage >= 35) echo 'D';
-                                                                else echo 'NG';
-                                                            } else {
-                                                                echo 'N/A';
-                                                            }
-                                                        } else {
-                                                            echo 'N/A';
-                                                        }
-                                                        ?>
+                                                        <?php echo $subject['practical_grade_info']['grade']; ?>
                                                     </td>
                                                     <td>
-                                                        <?php 
-                                                        // Use calculated grade or fall back to stored grade
-                                                        echo htmlspecialchars($subject['calculated_grade'] ?? $subject['grade'] ?? 'N/A'); 
-                                                        ?>
+                                                        <?php echo htmlspecialchars($subject['calculated_grade']); ?>
                                                     </td>
                                                     <td>
-                                                        <?php 
-                                                        // Calculate grade point based on final grade or percentage
-                                                        $final_grade = $subject['calculated_grade'] ?? $subject['grade'] ?? '';
-                                                        $grade_point = 0.0;
-                                                        
-                                                        if (isset($subject['calculated_gpa'])) {
-                                                            $grade_point = $subject['calculated_gpa'];
-                                                        } else {
-                                                            // Calculate from total marks if available
-                                                            $total_marks = ($subject['theory_marks'] ?? 0) + ($subject['practical_marks'] ?? 0);
-                                                            $total_full_marks = ($subject['theory_full_marks'] ?? 100) + ($subject['practical_full_marks'] ?? 0);
-                                                            
-                                                            if ($total_marks > 0 && $total_full_marks > 0) {
-                                                                $total_percentage = ($total_marks / $total_full_marks) * 100;
-                                                                if ($total_percentage >= 90) $grade_point = 4.0;
-                                                                elseif ($total_percentage >= 80) $grade_point = 3.6;
-                                                                elseif ($total_percentage >= 70) $grade_point = 3.2;
-                                                                elseif ($total_percentage >= 60) $grade_point = 2.8;
-                                                                elseif ($total_percentage >= 50) $grade_point = 2.4;
-                                                                elseif ($total_percentage >= 40) $grade_point = 2.0;
-                                                                elseif ($total_percentage >= 35) $grade_point = 1.6;
-                                                                else $grade_point = 0.0;
-                                                            }
-                                                        }
-                                                        
-                                                        echo number_format($grade_point, 1);
-                                                        ?>
+                                                        <?php echo number_format($subject['calculated_gpa'], 2); ?>
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
@@ -1275,21 +1343,7 @@ function calculateGPA($percentage, $conn)
                                 $failed_subjects = 0;
                                 
                                 foreach ($subjects as $subject) {
-                                    $theory_marks = $subject['theory_marks'] ?? 0;
-                                    $practical_marks = $subject['practical_marks'] ?? 0;
-                                    $has_practical = !is_null($subject['practical_marks']) && $subject['practical_marks'] > 0;
-                                    
-                                    $theory_full_marks = $has_practical ? 75 : 100;
-                                    $practical_full_marks = $has_practical ? 25 : 0;
-                                    
-                                    $theory_percentage = $theory_full_marks > 0 ? ($theory_marks / $theory_full_marks) * 100 : 0;
-                                    $practical_percentage = $practical_full_marks > 0 ? ($practical_marks / $practical_full_marks) * 100 : 0;
-                                    
-                                    // Check for failure (35% rule)
-                                    $theory_failed = $theory_percentage < 35;
-                                    $practical_failed = $has_practical && $practical_percentage < 35;
-                                    
-                                    if ($theory_failed || $practical_failed) {
+                                    if ($subject['is_failed']) {
                                         $has_ng_grade = true;
                                         $failed_subjects++;
                                     }
@@ -1322,14 +1376,14 @@ function calculateGPA($percentage, $conn)
                                             <div class="simple-summary-label">Grade</div>
                                             <div class="simple-summary-value">
                                                 <?php
-                                                // Calculate grade based on percentage
+                                                // Calculate grade based on percentage using exact same logic
                                                 if ($percentage >= 91) echo 'A+';
                                                 elseif ($percentage >= 81) echo 'A';
                                                 elseif ($percentage >= 71) echo 'B+';
                                                 elseif ($percentage >= 61) echo 'B';
                                                 elseif ($percentage >= 51) echo 'C+';
                                                 elseif ($percentage >= 41) echo 'C';
-                                                elseif ($percentage >= 35) echo 'D';
+                                                elseif ($percentage >= 35) echo 'D+';
                                                 else echo 'NG';
                                                 ?>
                                             </div>
@@ -1422,7 +1476,6 @@ function calculateGPA($percentage, $conn)
                                         <div>SCHOOL PRINCIPAL</div>
                                     </div>
                                 </div>
-
 
                                 <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #777;">
                                     <p><?php echo isset($settings['result_footer']) ? $settings['result_footer'] : 'This is a computer-generated document. No signature is required.'; ?></p>
