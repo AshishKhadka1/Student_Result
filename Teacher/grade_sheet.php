@@ -1221,9 +1221,7 @@ if (isset($_GET['student_id'])) {
                             <button onclick="openTab('result')" class="tab-button w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm border-blue-500 text-blue-600">
                                 <i class="fas fa-clipboard-list mr-2"></i> Grade Sheet
                             </button>
-                            <button onclick="openTab('progress')" class="tab-button w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                                <i class="fas fa-chart-line mr-2"></i> Progress Tracking
-                            </button>
+                           
                         </nav>
                     </div>
 
@@ -1622,102 +1620,6 @@ if (isset($_GET['student_id'])) {
         </div>
     <?php endif; ?>
 </div>
-
-                    <!-- Progress Tracking Tab -->
-                    <div id="progress" class="tab-content p-6">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">Academic Progress Tracking</h3>
-                        
-                        <?php if (count($gpa_trend) > 0): ?>
-                            <!-- GPA Progress Chart -->
-                            <div class="mb-8">
-                                <h4 class="text-md font-medium text-gray-700 mb-2">GPA Progress</h4>
-                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                    <div class="chart-container">
-                                        <canvas id="gpaChart"></canvas>
-                                    </div>
-                                </div>
-                                <p class="text-sm text-gray-500 mt-2">This chart shows the student's GPA progression over time in your subjects.</p>
-                            </div>
-                            
-                            <!-- Subject Performance Chart -->
-                            <div class="mb-8">
-                                <h4 class="text-md font-medium text-gray-700 mb-2">Subject Performance</h4>
-                                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                    <div class="chart-container">
-                                        <canvas id="subjectChart"></canvas>
-                                    </div>
-                                </div>
-                                <p class="text-sm text-gray-500 mt-2">Compare the student's performance across your subjects.</p>
-                            </div>
-                            
-                            <!-- Performance Summary -->
-                            <div class="bg-blue-50 p-4 rounded-lg">
-                                <h4 class="text-md font-medium text-blue-800 mb-2">Performance Summary</h4>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div class="bg-white p-4 rounded-lg shadow-sm">
-                                        <h5 class="font-medium text-blue-700 mb-1">Current GPA</h5>
-                                        <div class="flex items-baseline">
-                                            <span class="text-2xl font-bold text-blue-900"><?php echo number_format(end($gpa_trend), 2); ?></span>
-                                            <span class="text-sm text-gray-500 ml-1">/ 4.0</span>
-                                        </div>
-                                        <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                            <div class="h-full bg-blue-600 rounded-full" style="width: <?php echo (end($gpa_trend) / 4) * 100; ?>%;"></div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="bg-white p-4 rounded-lg shadow-sm">
-                                        <h5 class="font-medium text-blue-700 mb-1">Improvement</h5>
-                                        <?php 
-                                        $improvement = count($gpa_trend) >= 2 ? end($gpa_trend) - $gpa_trend[0] : 0;
-                                        $improvement_percent = count($gpa_trend) >= 2 ? ($improvement / max(0.1, $gpa_trend[0])) * 100 : 0;
-                                        ?>
-                                        <div class="flex items-baseline">
-                                            <span class="text-2xl font-bold <?php echo $improvement >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
-                                                <?php echo $improvement >= 0 ? '+' : ''; ?><?php echo number_format($improvement, 2); ?>
-                                            </span>
-                                            <span class="text-sm text-gray-500 ml-1">points</span>
-                                        </div>
-                                        <p class="text-sm <?php echo $improvement >= 0 ? 'text-green-600' : 'text-red-600'; ?>">
-                                            <?php echo $improvement >= 0 ? '+' : ''; ?><?php echo number_format($improvement_percent, 1); ?>% since first term
-                                        </p>
-                                    </div>
-                                    
-                                    <div class="bg-white p-4 rounded-lg shadow-sm">
-                                        <h5 class="font-medium text-blue-700 mb-1">Best Subject</h5>
-                                        <?php
-                                        // Find best subject from chart data
-                                        $best_subject = '';
-                                        $best_gpa = 0;
-                                        foreach ($chart_data as $data) {
-                                            if ($data['gpa'] > $best_gpa) {
-                                                $best_gpa = $data['gpa'];
-                                                $best_subject = $data['subject'];
-                                            }
-                                        }
-                                        ?>
-                                        <div class="text-lg font-semibold text-blue-900"><?php echo $best_subject; ?></div>
-                                        <div class="flex items-baseline">
-                                            <span class="text-2xl font-bold text-green-600"><?php echo number_format($best_gpa, 2); ?></span>
-                                            <span class="text-sm text-gray-500 ml-1">GPA</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php else: ?>
-                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-                                <div class="flex">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <p class="text-sm text-yellow-700">
-                                            Not enough data to show progress tracking. Results from multiple exams are needed.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                    </div>
                 </div>
             <?php endif; ?>
         </div>

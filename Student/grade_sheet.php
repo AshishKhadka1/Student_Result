@@ -20,6 +20,95 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 // Get user ID from session
 $user_id = $_SESSION['user_id'];
 
+// Exact GPA Calculation Functions - SAME as view_grade_sheet.php
+function calculateExactGPA($percentage)
+{
+    $percentage = round($percentage, 2);
+
+    if ($percentage >= 91) {
+        // A+ grade: 3.6 - 4.0 range
+        $gpa = 3.6 + (($percentage - 91) / 9) * (4.0 - 3.6);
+        return ['grade' => 'A+', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 81) {
+        // A grade: 3.2 - 3.6 range
+        $gpa = 3.2 + (($percentage - 81) / 9) * (3.6 - 3.2);
+        return ['grade' => 'A', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 71) {
+        // B+ grade: 2.8 - 3.2 range
+        $gpa = 2.8 + (($percentage - 71) / 9) * (3.2 - 2.8);
+        return ['grade' => 'B+', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 61) {
+        // B grade: 2.6 - 2.8 range
+        $gpa = 2.6 + (($percentage - 61) / 9) * (2.8 - 2.6);
+        return ['grade' => 'B', 'gpa' => round($gpa, 2), 'class' => 'bg-green-100 text-green-800'];
+    } elseif ($percentage >= 51) {
+        // C+ grade: 2.2 - 2.6 range
+        $gpa = 2.2 + (($percentage - 51) / 9) * (2.6 - 2.2);
+        return ['grade' => 'C+', 'gpa' => round($gpa, 2), 'class' => 'bg-yellow-100 text-yellow-800'];
+    } elseif ($percentage >= 41) {
+        // C grade: 1.6 - 2.2 range
+        $gpa = 1.6 + (($percentage - 41) / 9) * (2.2 - 1.6);
+        return ['grade' => 'C', 'gpa' => round($gpa, 2), 'class' => 'bg-yellow-100 text-yellow-800'];
+    } elseif ($percentage >= 35) {
+        // D+ grade: 1.6 (fixed value)
+        return ['grade' => 'D+', 'gpa' => 1.6, 'class' => 'bg-orange-100 text-orange-800'];
+    } else {
+        // NG grade: 0.0
+        return ['grade' => 'NG', 'gpa' => 0.0, 'class' => 'bg-red-100 text-red-800'];
+    }
+}
+
+function calculateTheoryOnlyGPA($theoryMarks, $theoryFullMarks = 100)
+{
+    // Validate marks don't exceed full marks
+    if ($theoryMarks > $theoryFullMarks) {
+        return ['error' => 'Theory marks cannot exceed full marks'];
+    }
+
+    $percentage = ($theoryMarks / $theoryFullMarks) * 100;
+    $result = calculateExactGPA($percentage);
+
+    return [
+        'percentage' => round($percentage, 2),
+        'grade' => $result['grade'],
+        'gpa' => $result['gpa'],
+        'class' => $result['class']
+    ];
+}
+
+function calculateTheoryPracticalGPA($theoryMarks, $practicalMarks, $theoryFullMarks = 75, $practicalFullMarks = 25)
+{
+    // Validate marks don't exceed full marks
+    if ($theoryMarks > $theoryFullMarks || $practicalMarks > $practicalFullMarks) {
+        return ['error' => 'Marks cannot exceed respective full marks'];
+    }
+
+    $theoryPercentage = ($theoryMarks / $theoryFullMarks) * 100;
+    $practicalPercentage = ($practicalMarks / $practicalFullMarks) * 100;
+
+    $theoryResult = calculateExactGPA($theoryPercentage);
+    $practicalResult = calculateExactGPA($practicalPercentage);
+
+    // Calculate weighted final GPA
+    $finalGPA = ($theoryResult['gpa'] * 75 + $practicalResult['gpa'] * 25) / 100;
+
+    return [
+        'theory' => [
+            'percentage' => round($theoryPercentage, 2),
+            'grade' => $theoryResult['grade'],
+            'gpa' => $theoryResult['gpa'],
+            'class' => $theoryResult['class']
+        ],
+        'practical' => [
+            'percentage' => round($practicalPercentage, 2),
+            'grade' => $practicalResult['grade'],
+            'gpa' => $practicalResult['gpa'],
+            'class' => $practicalResult['class']
+        ],
+        'final_gpa' => round($finalGPA, 2)
+    ];
+}
+
 // Get student information
 try {
    $stmt = $conn->prepare("
@@ -195,98 +284,198 @@ if (!empty($selected_year)) {
    });
 }
 
-// Get student performance data for each exam - ONLY PUBLISHED RESULTS
+// Get student performance data for each exam - ONLY PUBLISHED RESULTS with ACCURATE calculations
 $exam_performances = [];
 try {
-    // Check if student_performance table exists
+    foreach ($exams as $exam) {
+        // Get results for this exam using the same logic as view_grade_sheet.php
+        $stmt = $conn->prepare("
+            SELECT r.*, s.subject_name, s.subject_code, s.full_marks_theory, s.full_marks_practical, s.credit_hours
+            FROM $results_table r
+            JOIN subjects s ON r.subject_id = s.subject_id
+            WHERE r.student_id = ? AND r.exam_id = ?
+            AND (
+                (r.is_published = 1) OR 
+                (r.status = 'published') OR
+                (EXISTS (SELECT 1 FROM exams e WHERE e.exam_id = r.exam_id AND e.results_published = 1))
+            )
+            ORDER BY s.subject_id
+        ");
+        if ($stmt === false) {
+            throw new Exception("Failed to prepare results statement: " . $conn->error);
+        }
+        
+        $stmt->bind_param("si", $student['student_id'], $exam['exam_id']);
+        $stmt->execute();
+        $results_data = $stmt->get_result();
+
+        if ($results_data->num_rows > 0) {
+            $total_marks = 0;
+            $total_subjects = 0;
+            $max_marks = 0;
+            $total_credit_hours = 0;
+            $total_grade_points = 0;
+            $failed_subjects = 0;
+
+            while ($row = $results_data->fetch_assoc()) {
+                $theory_marks = floatval($row['theory_marks'] ?? 0);
+                $practical_marks = floatval($row['practical_marks'] ?? 0);
+                $credit_hours = $row['credit_hours'] ?? 1;
+
+                // Determine if subject has practical based on whether practical_marks > 0
+                $has_practical = $practical_marks > 0;
+
+                // Determine full marks based on whether practical exists
+                $theory_full_marks = $has_practical ? 75 : 100;
+                $practical_full_marks = $has_practical ? 25 : 0;
+                $subject_full_marks = 100; // Total is always 100
+
+                $subject_total_obtained = $theory_marks + $practical_marks;
+
+                // Calculate using exact GPA functions - SAME as view_grade_sheet.php
+                if ($has_practical) {
+                    // Theory + Practical case (75 + 25)
+                    $gpaResult = calculateTheoryPracticalGPA($theory_marks, $practical_marks, 75, 25);
+                    if (isset($gpaResult['error'])) {
+                        $final_gpa = 0.0;
+                        $is_failed = true;
+                    } else {
+                        $theory_percentage = $gpaResult['theory']['percentage'];
+                        $practical_percentage = $gpaResult['practical']['percentage'];
+                        $final_gpa = $gpaResult['final_gpa'];
+
+                        // Check for failure condition (either theory or practical below 35%)
+                        $is_failed = ($theory_percentage < 35) || ($practical_percentage < 35);
+
+                        if ($is_failed) {
+                            $final_gpa = 0.0;
+                        }
+                    }
+                } else {
+                    // Theory only case (100 marks)
+                    $gpaResult = calculateTheoryOnlyGPA($theory_marks, 100);
+                    if (isset($gpaResult['error'])) {
+                        $final_gpa = 0.0;
+                        $is_failed = true;
+                    } else {
+                        $theory_percentage = $gpaResult['percentage'];
+                        $final_gpa = $gpaResult['gpa'];
+
+                        // Check for failure condition (theory below 35%)
+                        $is_failed = ($theory_percentage < 35);
+
+                        if ($is_failed) {
+                            $final_gpa = 0.0;
+                        }
+                    }
+                }
+
+                // Count failed subjects
+                if ($is_failed) {
+                    $failed_subjects++;
+                }
+
+                $total_grade_points += ($final_gpa * $credit_hours);
+                $total_credit_hours += $credit_hours;
+
+                $total_marks += $subject_total_obtained;
+                $total_subjects++;
+                $max_marks += $subject_full_marks;
+            }
+
+            // Calculate overall GPA - exact same logic as view_grade_sheet.php
+            $gpa = $total_credit_hours > 0 ? ($total_grade_points / $total_credit_hours) : 0;
+
+            // Calculate percentage - exact same logic as view_grade_sheet.php
+            $percentage = $max_marks > 0 ? ($total_marks / $max_marks) * 100 : 0;
+
+            // Determine overall grade based on GPA
+            $overall_grade = 'NG'; // Default
+
+            if ($gpa >= 3.6 && $gpa <= 4.0) {
+                $overall_grade = 'A+';
+            } elseif ($gpa >= 3.2) {
+                $overall_grade = 'A';
+            } elseif ($gpa >= 2.8) {
+                $overall_grade = 'B+';
+            } elseif ($gpa >= 2.4) {
+                $overall_grade = 'B';
+            } elseif ($gpa >= 2.0) {
+                $overall_grade = 'C+';
+            } elseif ($gpa >= 1.6) {
+                $overall_grade = 'C';
+            } elseif ($gpa >= 1.2) {
+                $overall_grade = 'D+';
+            } elseif ($gpa >= 0.8) {
+                $overall_grade = 'D';
+            } else {
+                $overall_grade = 'NG';
+            }
+
+            // Determine division
+            if ($failed_subjects > 0) {
+                $division = 'Fail';
+            } elseif ($percentage >= 80) {
+                $division = 'Distinction';
+            } elseif ($percentage >= 60) {
+                $division = 'First Division';
+            } elseif ($percentage >= 45) {
+                $division = 'Second Division';
+            } elseif ($percentage >= 35) {
+                $division = 'Third Division';
+            } else {
+                $division = 'Fail';
+            }
+
+            $exam_performances[$exam['exam_id']] = [
+                'gpa' => round($gpa, 2),
+                'percentage' => round($percentage, 2),
+                'total_marks' => $total_marks,
+                'max_marks' => $max_marks,
+                'failed_subjects' => $failed_subjects,
+                'overall_grade' => $overall_grade,
+                'division' => $division,
+                'rank' => 'N/A' // Will be updated if performance table exists
+            ];
+        }
+        $stmt->close();
+    }
+
+    // Check if student_performance table exists and get rank data
     $check_table = $conn->query("SHOW TABLES LIKE 'student_performance'");
     
     if ($check_table->num_rows > 0) {
         foreach ($exams as $exam) {
-            $stmt = $conn->prepare("
-                SELECT sp.* FROM student_performance sp
-                JOIN results r ON sp.student_id = r.student_id AND sp.exam_id = r.exam_id
-                WHERE sp.student_id = ? AND sp.exam_id = ? 
-                AND (
-                    (r.is_published = 1) OR 
-                    (r.status = 'published') OR
-                    (EXISTS (SELECT 1 FROM exams e WHERE e.exam_id = sp.exam_id AND e.results_published = 1))
-                )
-                LIMIT 1
-            ");
-            if ($stmt === false) {
-                throw new Exception("Failed to prepare performance statement: " . $conn->error);
-            }
-            
-            $stmt->bind_param("si", $student['student_id'], $exam['exam_id']);
-            $stmt->execute();
-            $performance_result = $stmt->get_result();
+            if (isset($exam_performances[$exam['exam_id']])) {
+                $stmt = $conn->prepare("
+                    SELECT sp.* FROM student_performance sp
+                    JOIN results r ON sp.student_id = r.student_id AND sp.exam_id = r.exam_id
+                    WHERE sp.student_id = ? AND sp.exam_id = ? 
+                    AND (
+                        (r.is_published = 1) OR 
+                        (r.status = 'published') OR
+                        (EXISTS (SELECT 1 FROM exams e WHERE e.exam_id = sp.exam_id AND e.results_published = 1))
+                    )
+                    LIMIT 1
+                ");
+                if ($stmt === false) {
+                    throw new Exception("Failed to prepare performance statement: " . $conn->error);
+                }
+                
+                $stmt->bind_param("si", $student['student_id'], $exam['exam_id']);
+                $stmt->execute();
+                $performance_result = $stmt->get_result();
 
-            if ($performance_result->num_rows > 0) {
-                $performance = $performance_result->fetch_assoc();
-                $exam_performances[$exam['exam_id']] = [
-                    'gpa' => $performance['gpa'],
-                    'percentage' => $performance['average_marks'],
-                    'rank' => $performance['rank'] ?? 'N/A'
-                ];
+                if ($performance_result->num_rows > 0) {
+                    $performance = $performance_result->fetch_assoc();
+                    $exam_performances[$exam['exam_id']]['rank'] = $performance['rank'] ?? 'N/A';
+                }
+                $stmt->close();
             }
-            $stmt->close();
         }
     }
 } catch (Exception $e) {
-    error_log("Error fetching performance data: " . $e->getMessage());
-}
-
-// If no performance data is available, calculate basic stats from published results
-if (empty($exam_performances)) {
-   foreach ($exams as $exam) {
-       try {
-           $stmt = $conn->prepare("
-               SELECT r.*, s.full_marks_theory, s.full_marks_practical
-               FROM $results_table r
-               JOIN subjects s ON r.subject_id = s.subject_id
-               WHERE r.student_id = ? AND r.exam_id = ? 
-               AND (
-                   (r.is_published = 1) OR 
-                   (r.status = 'published') OR
-                   (EXISTS (SELECT 1 FROM exams e WHERE e.exam_id = r.exam_id AND e.results_published = 1))
-               )
-           ");
-           if ($stmt === false) {
-               throw new Exception("Failed to prepare results statement: " . $conn->error);
-           }
-           
-           $stmt->bind_param("si", $student['student_id'], $exam['exam_id']);
-           $stmt->execute();
-           $results_data = $stmt->get_result();
-
-           $total_marks = 0;
-           $max_marks = 0;
-
-           while ($row = $results_data->fetch_assoc()) {
-               $theory_marks = $row['theory_marks'] ?? 0;
-               $practical_marks = $row['practical_marks'] ?? 0;
-               $total_subject_marks = $theory_marks + $practical_marks;
-               $subject_max_marks = ($row['full_marks_theory'] ?? 100) + ($row['full_marks_practical'] ?? 0);
-               
-               $total_marks += $total_subject_marks;
-               $max_marks += $subject_max_marks;
-           }
-
-           $stmt->close();
-           
-           // Calculate percentage
-           $percentage = $max_marks > 0 ? ($total_marks / $max_marks) * 100 : 0;
-           
-           $exam_performances[$exam['exam_id']] = [
-               'percentage' => $percentage,
-               'total_marks' => $total_marks,
-               'max_marks' => $max_marks
-           ];
-       } catch (Exception $e) {
-           error_log("Error calculating exam stats: " . $e->getMessage());
-       }
-   }
+    error_log("Error calculating exam performances: " . $e->getMessage());
 }
 
 $conn->close();
@@ -380,6 +569,26 @@ $conn->close();
            font-family: monospace;
            font-size: 0.875rem;
        }
+
+       .grade-badge {
+           display: inline-flex;
+           align-items: center;
+           padding: 0.25rem 0.5rem;
+           border-radius: 0.375rem;
+           font-size: 0.75rem;
+           font-weight: 600;
+           text-transform: uppercase;
+       }
+
+       .grade-a-plus { background-color: #dcfce7; color: #166534; }
+       .grade-a { background-color: #dcfce7; color: #15803d; }
+       .grade-b-plus { background-color: #fef3c7; color: #92400e; }
+       .grade-b { background-color: #fef3c7; color: #a16207; }
+       .grade-c-plus { background-color: #fed7aa; color: #c2410c; }
+       .grade-c { background-color: #fed7aa; color: #ea580c; }
+       .grade-d-plus { background-color: #fecaca; color: #dc2626; }
+       .grade-d { background-color: #fecaca; color: #ef4444; }
+       .grade-ng { background-color: #fee2e2; color: #b91c1c; }
        
        @media (max-width: 640px) {
            .filter-container {
@@ -460,8 +669,6 @@ $conn->close();
                            Student ID: <?php echo $student['student_id']; ?>
                        </div>
                        <?php endif; ?>
-
-                  
 
                        <?php if (count($exams) > 0): ?>
                            <!-- Filters -->
@@ -545,8 +752,6 @@ $conn->close();
                                <?php endif; ?>
                            </div>
                            
-                    
-                           
                            <!-- Exam Results Grid -->
                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                                <?php if (empty($filtered_exams)): ?>
@@ -601,8 +806,12 @@ $conn->close();
                                                    <?php if (isset($exam_performances[$exam['exam_id']])): ?>
                                                        <?php 
                                                        $performance = $exam_performances[$exam['exam_id']];
-                                                       $percentage = isset($performance['percentage']) ? $performance['percentage'] : 0;
-                                                       $isPassed = $percentage >= 33;
+                                                       $percentage = $performance['percentage'];
+                                                       $gpa = $performance['gpa'];
+                                                       $overall_grade = $performance['overall_grade'];
+                                                       $division = $performance['division'];
+                                                       $failed_subjects = $performance['failed_subjects'];
+                                                       $isPassed = ($failed_subjects == 0 && $percentage >= 35);
                                                        ?>
                                                        
                                                        <div class="flex justify-between items-center">
@@ -610,35 +819,47 @@ $conn->close();
                                                                <i class="fas <?php echo $isPassed ? 'fa-check-circle' : 'fa-times-circle'; ?>"></i>
                                                                <?php echo $isPassed ? 'Pass' : 'Fail'; ?>
                                                            </span>
+                                                           
+                                                           <?php if ($isPassed): ?>
+                                                               <span class="grade-badge grade-<?php echo strtolower(str_replace('+', '-plus', $overall_grade)); ?>">
+                                                                   <?php echo $overall_grade; ?>
+                                                               </span>
+                                                           <?php endif; ?>
                                                        </div>
                                                        
-                                                       <?php if (isset($performance['percentage'])): ?>
-                                                           <div class="text-sm">
-                                                               <span class="font-medium text-gray-700">Percentage:</span>
-                                                               <span class="text-gray-600"><?php echo number_format($performance['percentage'], 2); ?>%</span>
-                                                           </div>
-                                                       <?php endif; ?>
+                                                       <div class="text-sm">
+                                                           <span class="font-medium text-gray-700">Percentage:</span>
+                                                           <span class="text-gray-600"><?php echo number_format($percentage, 2); ?>%</span>
+                                                       </div>
                                                        
-                                                       <?php if (isset($performance['gpa'])): ?>
-                                                           <div class="text-sm">
-                                                               <span class="font-medium text-gray-700">GPA:</span>
-                                                               <span class="text-gray-600"><?php echo number_format($performance['gpa'], 2); ?></span>
-                                                           </div>
-                                                       <?php endif; ?>
+                                                       <div class="text-sm">
+                                                           <span class="font-medium text-gray-700">GPA:</span>
+                                                           <span class="text-gray-600"><?php echo number_format($gpa, 2); ?> / 4.0</span>
+                                                       </div>
                                                        
-                                                       <?php if (isset($performance['rank']) && $performance['rank'] !== 'N/A'): ?>
+                                                       <div class="text-sm">
+                                                           <span class="font-medium text-gray-700">Division:</span>
+                                                           <span class="text-gray-600"><?php echo $division; ?></span>
+                                                       </div>
+                                                       
+                                                       <?php if ($performance['rank'] !== 'N/A'): ?>
                                                            <div class="text-sm">
                                                                <span class="font-medium text-gray-700">Rank:</span>
                                                                <span class="text-gray-600"><?php echo htmlspecialchars($performance['rank']); ?></span>
                                                            </div>
                                                        <?php endif; ?>
                                                        
-                                                       <?php if (isset($performance['total_marks']) && isset($performance['max_marks'])): ?>
+                                                       <div class="text-sm">
+                                                           <span class="font-medium text-gray-700">Marks:</span>
+                                                           <span class="text-gray-600">
+                                                               <?php echo $performance['total_marks']; ?> / <?php echo $performance['max_marks']; ?>
+                                                           </span>
+                                                       </div>
+
+                                                       <?php if ($failed_subjects > 0): ?>
                                                            <div class="text-sm">
-                                                               <span class="font-medium text-gray-700">Marks:</span>
-                                                               <span class="text-gray-600">
-                                                                   <?php echo $performance['total_marks']; ?> / <?php echo $performance['max_marks']; ?>
-                                                               </span>
+                                                               <span class="font-medium text-red-700">Failed Subjects:</span>
+                                                               <span class="text-red-600 font-semibold"><?php echo $failed_subjects; ?></span>
                                                            </div>
                                                        <?php endif; ?>
                                                    <?php endif; ?>
