@@ -212,12 +212,12 @@ if (isset($_POST['action'])) {
         // Check if subject is failed using 33% rule
         $is_failed = isSubjectFailed($theory_marks, $practical_marks, $has_practical);
 
-        // Calculate grade and GPA
+        // Calculate grade and GPA using the correct function
         if ($is_failed) {
             $grade = 'NG';
             $gpa = 0.0;
         } else {
-            $grade_data = calculateGradeAndGPA($percentage);
+            $grade_data = calculateExactGPA($percentage);
             $grade = $grade_data['grade'];
             $gpa = $grade_data['gpa'];
         }

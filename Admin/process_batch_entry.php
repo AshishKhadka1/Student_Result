@@ -278,21 +278,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
  * @param float $total_marks Total marks
  * @return array Grade and GPA information
  */
-function getGradeInfo($conn, $total_marks) {
-    // Query the grading_system table to get the appropriate grade and GPA
-    $query = "SELECT grade, gpa FROM grading_system 
-              WHERE $total_marks BETWEEN min_percentage AND max_percentage 
-              LIMIT 1";
-    $result = $conn->query($query);
-    
-    if ($result && $result->num_rows > 0) {
-        return $result->fetch_assoc();
-    } else {
-        // Default fallback if no matching grade is found
-        return ['grade' => 'F', 'gpa' => 0.0];
-    }
-}
-
 /**
  * Update student performance summary for an exam
  * 
