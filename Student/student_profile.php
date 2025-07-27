@@ -250,17 +250,17 @@ if (!empty($recent_results)) {
         $overall_performance['average_gpa'] = $total_gpa / $overall_performance['subjects_with_results'];
         
         // Determine average grade
-        if ($overall_performance['average_percentage'] >= 90) {
+        if ($overall_performance['average_percentage'] >= 91) {
             $overall_performance['average_grade'] = 'A+';
-        } elseif ($overall_performance['average_percentage'] >= 80) {
+        } elseif ($overall_performance['average_percentage'] >= 81) {
             $overall_performance['average_grade'] = 'A';
-        } elseif ($overall_performance['average_percentage'] >= 70) {
+        } elseif ($overall_performance['average_percentage'] >= 71) {
             $overall_performance['average_grade'] = 'B+';
-        } elseif ($overall_performance['average_percentage'] >= 60) {
+        } elseif ($overall_performance['average_percentage'] >= 61) {
             $overall_performance['average_grade'] = 'B';
-        } elseif ($overall_performance['average_percentage'] >= 50) {
+        } elseif ($overall_performance['average_percentage'] >= 51) {
             $overall_performance['average_grade'] = 'C+';
-        } elseif ($overall_performance['average_percentage'] >= 40) {
+        } elseif ($overall_performance['average_percentage'] >= 41) {
             $overall_performance['average_grade'] = 'C';
         } elseif ($overall_performance['average_percentage'] >= 33) {
             $overall_performance['average_grade'] = 'D';

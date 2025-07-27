@@ -57,6 +57,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <!-- <a href="settings.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'settings.php') ? 'bg-gray-700' : '' ?>">
                 <i class="fas fa-cog"></i> Settings
             </a> -->
+            
+            <a href="student_ledger.php" class="flex items-center gap-3 px-3 py-2 rounded-md transition hover:bg-gray-700 <?= ($current_page == 'classes.php') ? 'bg-gray-700' : '' ?>">
+                <i class="fas fa-chalkboard-teacher"></i> Student Ledger
+            </a>
+          
         </nav>
 
         <!-- Logout -->
